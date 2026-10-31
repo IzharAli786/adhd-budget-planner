@@ -11,7 +11,7 @@ import {
   type SchemaVersion,
 } from '../schema'
 import { openDatabase, readSnapshot, snapshotDbName, writeSnapshot } from '../snapshot'
-import { openFixture, V1_ROWS } from './fixtures/v1'
+import { LATEST_ROWS, openFixture, V1_ROWS } from './fixtures/v1'
 
 const names: string[] = []
 const fresh = (label: string) => {
@@ -27,10 +27,11 @@ afterEach(async () => {
   }
 })
 
-// A pretend v2 that adds a compound index and renames transaction.note -> memo.
-// It proves the harness end to end; real v2 work adds its own block to VERSIONS.
-const V2: SchemaVersion = {
-  version: 2,
+// A pretend next version that adds a compound index and renames transaction.note -> memo.
+// It proves the harness end to end; real work adds its own block to VERSIONS.
+const NEXT = SCHEMA_VERSION + 1
+const V_NEXT: SchemaVersion = {
+  version: NEXT,
   stores: { transactions: 'id, date, createdAt, envelopeId, fundId, debtId, [envelopeId+date]' },
 }
 const renameNote: Migration = (data) => ({
@@ -56,9 +57,26 @@ describe('migrateData', () => {
     expect(migrateData({ a: [1] }, 3, 3, { 3: step(3) })).toEqual({ a: [1] })
   })
 
-  it('v1 has no transforms', () => {
-    expect(SCHEMA_VERSION).toBe(1)
-    expect(Object.keys(MIGRATIONS)).toEqual([])
+  it('v2 fills debt.originalBalance from the balance, keeping one that exists', () => {
+    expect(SCHEMA_VERSION).toBe(2)
+    expect(Object.keys(MIGRATIONS)).toEqual(['2'])
+    const out = migrateData(
+      {
+        debts: [
+          { id: 'a', balance: 500 },
+          { id: 'b', balance: 300, originalBalance: 900 },
+        ],
+        bills: [{ id: 'x' }],
+      },
+      1,
+      2,
+    )
+    expect(out.debts).toEqual([
+      { id: 'a', balance: 500, originalBalance: 500 },
+      { id: 'b', balance: 300, originalBalance: 900 },
+    ])
+    expect(out.bills).toEqual([{ id: 'x' }])
+    expect(migrateData({ bills: [] }, 1, 2)).toEqual({ bills: [] }) // no debts table: untouched
   })
 })
 
@@ -68,7 +86,13 @@ describe('real-fixture upgrades', () => {
     await openFixture(name, 1)
     const db = new SteadyDB(name)
     await openDatabase(db, new Date('2026-10-31T00:00:00Z'))
-    for (const [table, rows] of Object.entries(V1_ROWS)) {
+    expect(db.verno).toBe(SCHEMA_VERSION)
+    // The real v1 -> v2 upgrade: the fixture's card debt gains its starting balance.
+    expect(await db.debts.get('debt-card')).toMatchObject({
+      balance: 250000,
+      originalBalance: 250000,
+    })
+    for (const [table, rows] of Object.entries(LATEST_ROWS)) {
       // IndexedDB returns rows in primary-key order.
       const key = PRIMARY_KEY[table as DataTableName]
       const sorted = [...rows].sort((a, b) =>
@@ -78,18 +102,29 @@ describe('real-fixture upgrades', () => {
       )
       expect(await db.table(table).toArray()).toEqual(sorted)
     }
-    expect(await readSnapshot(name, 'migration')).toBeUndefined() // same version: no snapshot
+    expect(await readSnapshot(name, 'migration')).toMatchObject({ fromVersion: 1 })
     db.close()
   })
 
-  it('v1 -> v2 runs the transform inside upgrade() after snapshotting v1', async () => {
+  it('a database already at the current version opens without a snapshot', async () => {
+    const name = fresh('latest')
+    await openFixture(name, SCHEMA_VERSION, LATEST_ROWS)
+    const db = new SteadyDB(name)
+    await openDatabase(db, new Date('2026-10-31T00:00:00Z'))
+    expect(await db.debts.count()).toBe(1)
+    expect(await readSnapshot(name, 'migration')).toBeUndefined()
+    db.close()
+  })
+
+  it('v1 -> next runs every transform inside upgrade() after snapshotting v1', async () => {
     const name = fresh('v2')
     await openFixture(name, 1)
     const now = new Date('2026-10-31T00:00:00Z')
-    const db = new SteadyDB(name, [...VERSIONS, V2], { 2: renameNote })
+    const db = new SteadyDB(name, [...VERSIONS, V_NEXT], { ...MIGRATIONS, [NEXT]: renameNote })
     await openDatabase(db, now)
 
-    expect(db.verno).toBe(2)
+    expect(db.verno).toBe(NEXT)
+    expect(await db.debts.get('debt-card')).toMatchObject({ originalBalance: 250000 })
     const tx = await db.transactions.get('tx-1')
     expect(tx).toMatchObject({ memo: 'coffee' })
     expect(tx).not.toHaveProperty('note')
@@ -120,7 +155,7 @@ describe('real-fixture upgrades', () => {
     })
     raw.close()
 
-    const db = new SteadyDB(name, [...VERSIONS, V2], { 2: renameNote })
+    const db = new SteadyDB(name, [...VERSIONS, V_NEXT], { ...MIGRATIONS, [NEXT]: renameNote })
     await openDatabase(db, new Date('2026-10-31T00:00:00Z'))
     expect(await db.undo.count()).toBe(0)
     db.close()
@@ -129,7 +164,7 @@ describe('real-fixture upgrades', () => {
   it('never opens (and so never upgrades) on a first query: openDatabase must run first', async () => {
     const name = fresh('autoopen')
     await openFixture(name, 1)
-    const db = new SteadyDB(name, [...VERSIONS, V2], { 2: renameNote })
+    const db = new SteadyDB(name, [...VERSIONS, V_NEXT], { ...MIGRATIONS, [NEXT]: renameNote })
     await expect(db.transactions.count()).rejects.toThrow()
     expect(await readSnapshot(name, 'migration')).toBeUndefined()
     await openDatabase(db, new Date('2026-10-31T00:00:00Z'))

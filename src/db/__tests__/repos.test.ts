@@ -179,7 +179,7 @@ describe('debts', () => {
   it('a new minimum leaves the ended half of a split alone', async () => {
     const { debt, bill } = await r.addDebt(card)
     const next = await r.editBillFrom(bill.id, '2026-12-01', {})
-    await r.updateDebt(debt.id, { minPayment: 5000 })
+    await r.updateDebt(debt.id, { minPayment: 5000 }, '2026-10-31')
     expect((await r.getBill(bill.id))?.amount).toBe(4000)
     expect((await r.getBill(next!.id))?.amount).toBe(5000)
   })
@@ -192,7 +192,7 @@ describe('debts', () => {
       rule: { freq: 'monthly', day: 20, anchor: '2026-10-31' },
     })
 
-    await r.updateDebt(debt.id, { minPayment: 5000, dueDay: 25, name: 'Visa' })
+    await r.updateDebt(debt.id, { minPayment: 5000, dueDay: 25, name: 'Visa' }, '2026-10-31')
     expect(await r.getBill(bill.id)).toMatchObject({
       amount: 5000,
       name: 'Visa',
@@ -206,6 +206,87 @@ describe('debts', () => {
     await r.restoreDebt(debt.id)
     expect(await r.listDebts()).toHaveLength(1)
     expect(await r.listBills()).toHaveLength(1)
+  })
+
+  it('keeps the starting balance for % paid; a higher balance raises it', async () => {
+    const { debt } = await r.addDebt(card)
+    expect(debt.originalBalance).toBe(250000)
+    const paid = await r.updateDebt(debt.id, { balance: 200000 }, '2026-11-15')
+    expect(paid).toMatchObject({ originalBalance: 250000, balanceAsOf: '2026-11-15' })
+    const more = await r.updateDebt(debt.id, { balance: 300000 }, '2026-11-16')
+    expect(more.originalBalance).toBe(300000)
+  })
+
+  it('a due-day change splits at today instead of hiding paid months', async () => {
+    const { debt, bill } = await r.addDebt({ ...card, balanceAsOf: '2026-08-01' })
+    await r.markPaid(bill.id, '2026-08-20', 4000)
+    await r.markPaid(bill.id, '2026-09-20', 4000)
+    await r.updateDebt(debt.id, { dueDay: 5, minPayment: 4500 }, '2026-10-31')
+
+    const linked = (await r.listBills()).filter((b) => b.debtId === debt.id)
+    expect(linked).toHaveLength(2)
+    const old = linked.find((b) => b.id === bill.id)!
+    const next = linked.find((b) => b.id !== bill.id)!
+    expect(old).toMatchObject({ until: '2026-10-30', amount: 4000, rule: { day: 20 } })
+    expect(next).toMatchObject({ amount: 4500, rule: { day: 5, anchor: '2026-11-05' } })
+    // The paid rows still sit on dates the old series produces.
+    const rows = await r.listOccurrences(bill.id)
+    expect(rows.map((o) => o.originalDate).sort()).toEqual(['2026-08-20', '2026-09-20'])
+
+    // A later minimum change only touches the live half.
+    await r.updateDebt(debt.id, { minPayment: 4600 }, '2026-11-01')
+    expect((await r.getBill(bill.id))?.amount).toBe(4000)
+    expect((await r.getBill(next.id))?.amount).toBe(4600)
+
+    // One undo step reverts the whole edit, split included.
+    await undoLast()
+    await undoLast()
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id)).toHaveLength(1)
+    expect((await r.getBill(bill.id))?.rule).toMatchObject({ day: 20 })
+  })
+
+  it('a due-day change with nothing paid moves the bill in place', async () => {
+    const { debt, bill } = await r.addDebt(card)
+    await r.updateDebt(debt.id, { dueDay: 3 }, '2026-10-31')
+    const linked = (await r.listBills()).filter((b) => b.debtId === debt.id)
+    expect(linked).toHaveLength(1)
+    expect(linked[0]).toMatchObject({ id: bill.id, rule: { day: 3 } })
+  })
+
+  it('paying a debt off ends its minimum bill, keeping paid months; a new balance restarts it', async () => {
+    const { debt, bill } = await r.addDebt({ ...card, balanceAsOf: '2026-08-01' })
+    await r.markPaid(bill.id, '2026-11-20', 4000) // paid early, after "today"
+    await r.updateDebt(debt.id, { balance: 0 }, '2026-11-10')
+    expect(await r.getBill(bill.id)).toMatchObject({ until: '2026-11-20' })
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id && !b.until)).toHaveLength(0)
+
+    // Editing the paid-off debt again does not bring the bill back.
+    await r.updateDebt(debt.id, { name: 'Old card' }, '2026-11-12')
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id)).toHaveLength(1)
+
+    await r.updateDebt(debt.id, { balance: 50000 }, '2026-12-01')
+    const open = (await r.listBills()).filter((b) => b.debtId === debt.id && !b.until)
+    expect(open).toHaveLength(1)
+    expect(open[0]).toMatchObject({
+      name: 'Old card',
+      amount: 4000,
+      rule: { day: 20, anchor: '2026-12-01' },
+    })
+
+    // One undo per edit: back to paid off, then back to the open original bill.
+    await undoLast()
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id)).toHaveLength(1)
+    await undoLast()
+    await undoLast()
+    expect((await r.getBill(bill.id))?.until).toBeUndefined()
+  })
+
+  it('a debt paid off before its first due date soft-deletes the empty minimum bill', async () => {
+    const { debt, bill } = await r.addDebt(card) // first due 20 Nov
+    await r.updateDebt(debt.id, { balance: 0 }, '2026-11-05')
+    expect((await r.getBill(bill.id))?.deletedAt).toBeDefined()
+    expect(await r.listBills()).toHaveLength(0)
+    expect(await r.listDebts()).toHaveLength(1)
   })
 
   it('undo of addDebt removes both rows in one step', async () => {

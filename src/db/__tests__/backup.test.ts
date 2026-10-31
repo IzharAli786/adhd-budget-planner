@@ -15,7 +15,7 @@ import { db, SCHEMA_VERSION } from '../schema'
 import { listSnapshots, readSnapshot } from '../snapshot'
 import { undoLast } from '../undo'
 import { addTransaction, purgeDeleted } from '../repos'
-import { V1_ROWS } from './fixtures/v1'
+import { LATEST_ROWS } from './fixtures/v1'
 import { clone, loadRows, resetDb } from './helpers'
 
 beforeEach(resetDb)
@@ -28,7 +28,7 @@ const NOW = new Date('2026-10-31T12:00:00.000Z')
 
 /** A valid exported file built from the v1 fixture, as plain JSON (what a real file is). */
 async function fixtureFile(): Promise<BackupFile> {
-  await loadRows(clone(V1_ROWS))
+  await loadRows(clone(LATEST_ROWS))
   return JSON.parse(JSON.stringify(await exportBackup(NOW, 'full')))
 }
 
@@ -266,7 +266,8 @@ describe('validateBackup rejects', () => {
     const boom = () => {
       throw new TypeError('cannot read note of undefined')
     }
-    const result = validateBackup(JSON.stringify(file), 2, { 2: boom })
+    const next = SCHEMA_VERSION + 1
+    const result = validateBackup(JSON.stringify(file), next, { [next]: boom })
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid-shape', path: 'data' } })
   })
 
@@ -306,7 +307,7 @@ describe('validateBackup accepts and cleans', () => {
   })
 
   it('pins the currency when a non-default file has no settings row', async () => {
-    await loadRows(clone({ ...V1_ROWS, meta: [] }))
+    await loadRows(clone({ ...LATEST_ROWS, meta: [] }))
     await db.meta.put({ key: 'settings', value: { currency: 'JPY', decimals: 0 } })
     const exported = JSON.parse(JSON.stringify(await exportBackup(NOW, 'full'))) as Loose
     exported.data.meta = []
@@ -356,7 +357,7 @@ describe('restore safety net', () => {
   })
 
   it('a backup exported after purging still restores', async () => {
-    await loadRows(clone(V1_ROWS))
+    await loadRows(clone(LATEST_ROWS))
     // Envelope, fund and debt deleted long ago, while live rows still point at them.
     for (const table of ['envelopes', 'funds', 'debts'] as const) {
       for (const row of await db.table(table).toArray())

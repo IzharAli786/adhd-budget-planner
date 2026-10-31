@@ -80,6 +80,15 @@ export function MoreScreen() {
               to="/more/wait"
             />
           )}
+          {/* Full mode has debts in Goals; Simple mode keeps them one tap away here. */}
+          {settings.simpleMode && (
+            <ListRow
+              icon="goals"
+              label="Debt payoff"
+              detail="Snowball or avalanche, and when you’re done"
+              to="/more/debts"
+            />
+          )}
         </ListGroup>
 
         <ListGroup title="Your data">

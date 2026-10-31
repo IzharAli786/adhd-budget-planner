@@ -1,8 +1,8 @@
 // A realistic version-1 database: every table populated, every reference resolving.
 // Built as real rows in fake-indexeddb by openFixture(), never by mocking Dexie.
 import { Dexie } from 'dexie'
-import { VERSIONS } from '../../schema'
-import type { TableData } from '../../migrations'
+import { SCHEMA_VERSION, VERSIONS } from '../../schema'
+import { migrateData, type TableData } from '../../migrations'
 
 export const V1_ROWS = {
   incomes: [
@@ -142,3 +142,6 @@ export async function openFixture(name: string, version: number, rows: TableData
   })
   raw.close()
 }
+
+/** The v1 fixture in today's shape, for tests that write straight into the current schema. */
+export const LATEST_ROWS: TableData = migrateData(structuredClone(V1_ROWS), 1, SCHEMA_VERSION)

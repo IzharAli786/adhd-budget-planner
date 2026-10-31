@@ -44,6 +44,8 @@ export const VERSIONS: readonly SchemaVersion[] = [
       meta: 'key',
     },
   },
+  // v2: debts gain originalBalance (filled by MIGRATIONS[2]). No index changes.
+  { version: 2, stores: {} },
 ]
 
 export const SCHEMA_VERSION = VERSIONS[VERSIONS.length - 1]!.version
