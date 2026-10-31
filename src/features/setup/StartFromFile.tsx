@@ -60,7 +60,7 @@ export function StartFromFile({ ackAt }: { ackAt: string | undefined }) {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-[0.9375rem] font-medium text-accent hover:bg-accent-soft/60"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-body font-medium text-accent hover:bg-accent-soft/60"
       >
         <Icon name="upload" size={18} />
         Start from a backup or demo file

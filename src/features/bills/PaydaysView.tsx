@@ -14,6 +14,7 @@ import type { IncomeSource, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { DateInput } from '../../ui/DateInput'
 import { Icon } from '../../ui/Icon'
+import { EmptyState } from '../../ui/PageHeader'
 import { ListGroup, ListRow } from '../../ui/List'
 import { Sheet } from '../../ui/Sheet'
 import { describeSchedule } from './describe'
@@ -46,30 +47,29 @@ export function PaydaysView({ data, today }: { data: BillsData; today: ISODate }
   return (
     <div className="space-y-6">
       {incomes.length === 0 ? (
-        <section className="animate-fade-in rounded-[1.75rem] bg-surface px-6 py-10 text-center shadow-card ring-1 ring-line">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-            <Icon name="payday" size={26} />
-          </span>
-          <h2 className="mt-4 text-lg font-semibold">When do you get paid?</h2>
-          <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">
-            Add your pay and Steady groups bills by the time between paydays, so you see what’s due
-            before the next one.
-          </p>
-          <Button className="mt-5" onClick={() => setPanel({ kind: 'income' })}>
-            <Icon name="plus" size={18} />
-            Add your pay
-          </Button>
-        </section>
+        <EmptyState
+          art="sunrise"
+          title="When do you get paid?"
+          action={
+            <Button onClick={() => setPanel({ kind: 'income' })}>
+              <Icon name="plus" size={18} />
+              Add your pay
+            </Button>
+          }
+        >
+          Add your pay and Steady groups bills by the time between paydays, so you see what’s due
+          before the next one.
+        </EmptyState>
       ) : (
         <>
-          <section className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line">
+          <section className="card p-6">
             <p className="text-sm text-muted">Next payday</p>
             {next ? (
               <>
                 <p className="mt-1 text-[2rem] leading-tight font-semibold tracking-tight">
                   {f.dayLong(next.date)}
                 </p>
-                <p className="mt-2 text-[0.9375rem] text-muted">
+                <p className="mt-2 text-body text-muted">
                   {capitalize(f.relative(next.date, today))} ·{' '}
                   <span className="font-medium text-text tabular-nums">{f.money(next.amount)}</span>{' '}
                   from {next.name}
@@ -109,10 +109,8 @@ export function PaydaysView({ data, today }: { data: BillsData; today: ISODate }
 
           {upcoming.length > 0 && (
             <section className="space-y-2">
-              <h2 className="px-1 text-xs font-semibold tracking-wider text-muted uppercase">
-                Coming paydays
-              </h2>
-              <ul className="divide-y divide-line overflow-hidden rounded-[1.5rem] bg-surface shadow-card ring-1 ring-line">
+              <h2 className="px-1 eyebrow text-muted">Coming paydays</h2>
+              <ul className="card divide-y divide-line overflow-hidden">
                 {upcoming.map((p) => (
                   <li
                     key={`${p.incomeId}|${p.nominal}`}

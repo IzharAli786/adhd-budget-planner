@@ -106,7 +106,7 @@ export function SettingsScreen() {
         </Section>
 
         <Section title="Tools">
-          <div className="flex items-center gap-3 rounded-[1.5rem] bg-surface px-4 py-2 shadow-card ring-1 ring-line">
+          <div className="card flex items-center gap-3 px-4 py-2">
             <div className="min-w-0 flex-1 py-1.5">
               <p className="font-medium">Show more tools</p>
               <p className="text-sm text-muted">
@@ -132,7 +132,7 @@ export function SettingsScreen() {
 function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 id={id} className="px-1 text-xs font-semibold tracking-wider text-muted uppercase">
+      <h2 id={id} className="px-1 eyebrow text-muted">
         {title}
       </h2>
       {children}
@@ -164,34 +164,59 @@ function ThemeSwatch({
         selected ? 'bg-accent-soft/70' : 'hover:bg-accent-soft/40',
       )}
     >
+      {/* A tiny preview: a light card and a dark card on their own backgrounds. */}
       <span
         className={cx(
-          'relative flex h-14 w-full items-end overflow-hidden rounded-xl ring-1 ring-line',
+          'relative block h-16 w-full overflow-hidden rounded-xl ring-1 ring-line transition-shadow',
           selected && 'ring-2 ring-[var(--l-accent)]',
         )}
         style={{
-          background: 'linear-gradient(135deg, var(--l-bg) 50%, var(--d-bg) 50%)',
+          background:
+            theme === 'midnight'
+              ? 'radial-gradient(120% 100% at 50% 0%, color-mix(in oklab, var(--d-accent) 28%, var(--d-bg)), var(--d-bg))'
+              : 'linear-gradient(135deg, var(--l-bg) 50%, var(--d-bg) 50%)',
         }}
       >
-        <span
-          className="absolute top-2.5 left-2.5 h-4 w-8 rounded-full"
-          style={{ background: 'var(--l-accent)' }}
-        />
-        <span
-          className="absolute right-2.5 bottom-2.5 h-4 w-8 rounded-full"
-          style={{ background: 'var(--d-accent)' }}
+        <MiniCard surface="var(--l-surface)" accent="var(--l-accent)" className="top-2 left-2" />
+        <MiniCard
+          surface="var(--d-surface)"
+          accent="var(--d-accent)"
+          className="right-2 bottom-2"
         />
         {selected && (
           <span
-            className="absolute inset-0 m-auto flex h-6 w-6 items-center justify-center rounded-full text-white"
-            style={{ background: 'var(--l-accent)' }}
+            className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full shadow-sm"
+            style={{ background: 'var(--l-accent)', color: 'var(--l-surface)' }}
           >
-            <Icon name="check" size={15} strokeWidth={2.5} />
+            <Icon name="check" size={13} strokeWidth={2.75} />
           </span>
         )}
       </span>
       <span className="text-sm font-medium">{THEME_LABELS[theme]}</span>
     </button>
+  )
+}
+
+function MiniCard({
+  surface,
+  accent,
+  className,
+}: {
+  surface: string
+  accent: string
+  className: string
+}) {
+  return (
+    <span
+      className={cx(
+        'absolute flex h-7 w-12 flex-col justify-center gap-1 rounded-lg px-1.5 shadow-sm',
+        className,
+      )}
+      style={{ background: surface }}
+    >
+      <span className="h-1.5 w-7 rounded-full" style={{ background: accent }} />
+      <span className="h-1 w-5 rounded-full opacity-30" style={{ background: accent }} />
+    </span>
   )
 }
 
@@ -215,7 +240,7 @@ function BadgeSetting() {
 
   return (
     <Section title="Reminders">
-      <div className="rounded-[1.5rem] bg-surface px-4 py-2 shadow-card ring-1 ring-line">
+      <div className="card px-4 py-2">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1 py-1.5">
             <p className="font-medium">Number on the app icon</p>
@@ -253,8 +278,8 @@ function StorageCard() {
 
   return (
     <section className="space-y-3">
-      <h2 className="px-1 text-xs font-semibold tracking-wider text-muted uppercase">Storage</h2>
-      <div className="rounded-[1.5rem] bg-surface p-5 shadow-card ring-1 ring-line">
+      <h2 className="px-1 eyebrow text-muted">Storage</h2>
+      <div className="card p-5">
         <div className="flex items-start gap-3">
           <span
             className={cx(

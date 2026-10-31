@@ -18,7 +18,7 @@ export function Stat({ label, value, hint, size = 'md', className }: StatProps) 
         aria-live="polite"
         className={cx(
           'font-semibold tracking-tight tabular-nums',
-          size === 'hero' && 'mt-1 text-[clamp(3rem,15vw,4.5rem)] leading-none',
+          size === 'hero' && 'mt-1 text-display',
           size === 'md' && 'mt-0.5 text-2xl',
           size === 'sm' && 'mt-0.5 text-lg',
         )}

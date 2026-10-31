@@ -130,6 +130,76 @@
   --font-sans: 'Inter Variable', system-ui, sans-serif;
 }
 
+/*
+ * Type scale: display (the hero number), figure (a screen's secondary number), title (h1),
+ * heading (h2), body and caption, used 
+ * everywhere instead of one-off sizes, so screens share a
+ * rhythm. rem-based, so Large text (the root scale) grows all of them together.
+ */
+@theme {
+  --text-display: clamp(3rem, 15vw, 4.75rem);
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 600;
+  --text-figure: clamp(2.25rem, 10vw, 2.75rem);
+  --text-figure--line-height: 1.05;
+  --text-figure--letter-spacing: -0.03em;
+  --text-figure--font-weight: 600;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.02em;
+  --text-title--font-weight: 600;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.35;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 600;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+}
+
+/* Small uppercase label above a group. One style for every section in the app. */
+@utility eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/*
+ * Card hierarchy: one hero per screen (the number), regular cards for content, quiet
+ * cards for secondary glances. Quieter = less shadow and less contrast, never less
+ * legible.
+ */
+@utility card {
+  background-color: var(--surface);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 0 0 1px var(--line),
+    var(--shadow);
+}
+@utility card-quiet {
+  background-color: color-mix(in oklab, var(--surface) 72%, var(--bg));
+  border-radius: 1.5rem;
+  box-shadow: 0 0 0 1px var(--line);
+}
+@utility card-hero {
+  border-radius: 1.75rem;
+  background-color: var(--surface);
+  /* A whisper of the theme colour in one corner: the eye lands here first. */
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in oklab, var(--accent-soft) 70%, transparent) 0%,
+    transparent 60%
+  );
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 24px 48px -28px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
 /* Large text scales the root, and everything sized in rem follows (PLAN §8). */
 html {
   font-size: var(--text-scale, 100%);
@@ -142,10 +212,34 @@ body {
   transition: background-color 200ms ease;
 }
 
+/*
+ * Focus: a two-tone ring (accent line on a background-coloured gap) that reads on any
+ * surface. No border-radius here: the outline follows each element's own rounding.
+ */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 0.5rem;
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 18%, transparent);
+}
+/* Headings get programmatic focus after navigation (tabindex=-1); no ring for those. */
+[tabindex='-1']:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+}
+
+/* Midnight is the premium dark: a deep blue field with a faint glow from the top. */
+:root[data-theme='midnight'] body {
+  background-image: radial-gradient(
+    80rem 40rem at 50% -10rem,
+    color-mix(in oklab, var(--accent) 14%, transparent),
+    transparent 70%
+  );
+  background-attachment: fixed;
 }
 
 /* Native dialog: the backdrop dims, the panel eases in. */
@@ -195,6 +289,27 @@ dialog.sheet[open] {
 }
 .animate-fade-in {
   animation: fade-in 240ms ease-out;
+}
+/* A changed amount settles into place: a short rise and fade, never a counter spin. */
+@keyframes number-in {
+  from {
+    opacity: 0.35;
+    transform: translateY(0.12em);
+    filter: blur(1.5px);
+  }
+}
+.animate-number {
+  display: inline-block;
+  animation: number-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.animate-rise-in {
+  animation: rise-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 /* Garden (Goals): a slow sway. The motion rules below stop it, leaving a still picture. */

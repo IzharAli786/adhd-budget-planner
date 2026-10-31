@@ -25,7 +25,7 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
       {ctx === 'prompt' && <PromptInstall />}
       {ctx === 'unsupported' && <MenuInstall />}
       {ctx === 'installed' && (
-        <p className="text-[0.9375rem] text-muted">
+        <p className="text-body text-muted">
           Steady is installed. Open it from your home screen or app list.
         </p>
       )}
@@ -36,7 +36,7 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
     return (
       <>
         <PageHeader title="Install Steady" back={{ to: '/more', label: 'More' }} />
-        <div className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line">{body}</div>
+        <div className="card p-6">{body}</div>
       </>
     )
   }
@@ -67,7 +67,7 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
         <button
           type="button"
           onClick={onContinue}
-          className="mx-auto mt-8 min-h-11 rounded-full px-4 text-[0.9375rem] font-medium text-muted underline underline-offset-4 hover:text-text"
+          className="mx-auto mt-8 min-h-11 rounded-full px-4 text-body font-medium text-muted underline underline-offset-4 hover:text-text"
         >
           Continue in browser
         </button>
@@ -86,7 +86,7 @@ function Step({ n, children }: { n: number; children: ReactNode }) {
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-contrast">
         {n}
       </span>
-      <span className="text-[0.9375rem] leading-snug">{children}</span>
+      <span className="text-body leading-snug">{children}</span>
     </li>
   )
 }
@@ -147,7 +147,7 @@ function PromptInstall() {
   const [outcome, setOutcome] = useState<string | null>(null)
   return (
     <div className="space-y-3">
-      <p className="text-[0.9375rem] text-muted">
+      <p className="text-body text-muted">
         Get Steady on your home screen or dock. It opens instantly and works offline.
       </p>
       <Button

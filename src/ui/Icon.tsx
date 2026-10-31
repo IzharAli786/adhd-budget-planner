@@ -1,7 +1,8 @@
 import type { SVGProps } from 'react'
 
-// A tiny inline icon set (24px grid, 1.75 stroke, round caps). Inline SVG keeps icons in
-// the precached JS bundle, themeable via currentColor, with no icon-font request.
+// A tiny inline line-icon set (24px grid, 1.75 stroke, round caps and joins). Every icon
+// in the app comes from here so weights match. Inline SVG keeps icons in the precached
+// JS bundle, themeable via currentColor, with no icon-font request.
 const PATHS = {
   today:
     'M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z',
@@ -41,6 +42,10 @@ const PATHS = {
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2',
   leaf: 'M5 19c0-8 5-14 15-14 0 10-6 15-14 15M5 19l7-7',
   envelope: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  wallet:
+    'M4 7a2 2 0 0 1 2-2h11v4M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H6a2 2 0 0 1-2-2ZM16 14h.01',
+  sprout: 'M12 20v-8M12 12c0-4-3-6-7-6 0 4 3 6 7 6ZM12 10c0-3.5 2.5-5.5 7-5.5 0 3.5-2.5 5.5-7 5.5Z',
 } as const
 
 export type IconName = keyof typeof PATHS

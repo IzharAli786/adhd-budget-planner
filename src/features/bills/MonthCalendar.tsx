@@ -75,10 +75,7 @@ export function MonthCalendar({
   }
 
   return (
-    <section
-      aria-label="Calendar"
-      className="rounded-[1.75rem] bg-surface p-4 shadow-card ring-1 ring-line sm:p-5"
-    >
+    <section aria-label="Calendar" className="card p-4 sm:p-5">
       <div className="mb-2 flex items-center gap-1">
         <h2 className="flex-1 pl-2 text-base font-semibold" aria-live="polite">
           {f.month(first)}
@@ -142,7 +139,7 @@ export function MonthCalendar({
               aria-label={calendarDayLabel(date, today, dayBills, dayPaydays.length, f)}
               aria-current={isToday ? 'date' : undefined}
               className={cx(
-                'relative mx-auto flex h-12 w-full max-w-12 flex-col items-center justify-center rounded-2xl text-[0.9375rem] tabular-nums transition-colors',
+                'relative mx-auto flex h-12 w-full max-w-12 flex-col items-center justify-center rounded-2xl text-body tabular-nums transition-colors',
                 'hover:bg-accent-soft/50',
                 // Not on today: two text colours on one element would fight in the cascade.
                 !inMonth && !isToday && 'text-muted/60',

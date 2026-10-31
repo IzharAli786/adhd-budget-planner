@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { cx } from './cx'
+import { Icon } from './Icon'
 
 export interface ToastOptions {
   message: ReactNode
@@ -76,7 +77,7 @@ function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }
         'bg-text py-2 pr-2 pl-4 text-bg shadow-card',
       )}
     >
-      <p className="min-w-0 flex-1 py-2 text-[0.9375rem]">{toast.message}</p>
+      <p className="min-w-0 flex-1 py-2 text-body">{toast.message}</p>
       {toast.action && (
         <button
           type="button"
@@ -94,9 +95,9 @@ function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="min-h-11 min-w-11 shrink-0 rounded-xl opacity-70 hover:opacity-100"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl opacity-70 hover:opacity-100"
         >
-          ✕
+          <Icon name="close" size={18} />
         </button>
       )}
     </div>

@@ -2,17 +2,14 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { cx } from './cx'
 import { Icon, type IconName } from './Icon'
+import { SectionHeader } from './Section'
 
 /** An inset grouped list, the iOS Settings pattern people already know. */
 export function ListGroup({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      {title && (
-        <h2 className="px-1 text-xs font-semibold tracking-wider text-muted uppercase">{title}</h2>
-      )}
-      <ul className="divide-y divide-line overflow-hidden rounded-[1.5rem] bg-surface shadow-card ring-1 ring-line">
-        {children}
-      </ul>
+      {title && <SectionHeader title={title} />}
+      <ul className="card divide-y divide-line overflow-hidden">{children}</ul>
     </section>
   )
 }

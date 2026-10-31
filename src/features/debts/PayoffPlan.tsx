@@ -50,15 +50,12 @@ export function PayoffPlan({ debts, today }: { debts: Debt[]; today: ISODate }) 
   const sliderMax = Math.max(minimums * 3, minimums + 1000 * unit)
 
   return (
-    <section
-      aria-labelledby={`${sliderId}-title`}
-      className="space-y-6 rounded-[1.75rem] bg-surface p-5 shadow-card ring-1 ring-line sm:p-6"
-    >
+    <section aria-labelledby={`${sliderId}-title`} className="card space-y-6 p-5 sm:p-6">
       <header>
-        <h3 id={`${sliderId}-title`} className="text-lg font-semibold">
+        <h3 id={`${sliderId}-title`} className="text-heading">
           Your payoff plan
         </h3>
-        <p className="mt-0.5 text-[0.9375rem] text-muted">
+        <p className="mt-0.5 text-body text-muted">
           Two ways to use the same monthly amount. Minimums first, the rest to one debt.
         </p>
       </header>
@@ -91,7 +88,7 @@ export function PayoffPlan({ debts, today }: { debts: Debt[]; today: ISODate }) 
       </div>
 
       {'error' in result ? (
-        <p role="status" className="rounded-2xl bg-danger-soft px-4 py-3 text-[0.9375rem]">
+        <p role="status" className="rounded-2xl bg-danger-soft px-4 py-3 text-body">
           To cover every minimum this needs at least{' '}
           <span className="font-semibold tabular-nums">{f.money(result.minimums)}</span> a month.
         </p>
@@ -110,7 +107,7 @@ export function PayoffPlan({ debts, today }: { debts: Debt[]; today: ISODate }) 
       )}
 
       {stuck.length > 0 && (
-        <div className="flex gap-3 rounded-2xl bg-accent-soft/70 px-4 py-3 text-[0.9375rem]">
+        <div className="flex gap-3 rounded-2xl bg-accent-soft/70 px-4 py-3 text-body">
           <Icon name="info" size={20} className="mt-0.5 shrink-0 text-accent" />
           <div className="space-y-1">
             {stuck.map((d) => (
@@ -173,7 +170,7 @@ function Comparison(p: ComparisonProps) {
         ))}
       </div>
 
-      <p className="text-[0.9375rem]" aria-live="polite">
+      <p className="text-body" aria-live="polite">
         {p.snowball.paidOff && p.avalanche.paidOff
           ? summary(p.interestSaved, p.monthsDiff, f)
           : 'At this amount there’s no finish date within 50 years. A higher monthly amount shows one.'}

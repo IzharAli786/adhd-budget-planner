@@ -72,17 +72,14 @@ export function FreshStart({ gap, today, onDone }: Props) {
   }
 
   return (
-    <section
-      aria-labelledby="fresh-start"
-      className="animate-fade-in rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line"
-    >
+    <section aria-labelledby="fresh-start" className="card animate-fade-in p-6">
       <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
         <Icon name="sparkle" size={24} />
       </span>
       <h2 id="fresh-start" className="mt-4 text-xl font-semibold">
         Welcome back. Let’s just update one number.
       </h2>
-      <p className="mt-1 text-[0.9375rem] text-muted">
+      <p className="mt-1 text-body text-muted">
         What’s in your account right now? Whatever happened while you were away is already in it, so
         there’s nothing to fill in.
       </p>
@@ -102,7 +99,7 @@ export function FreshStart({ gap, today, onDone }: Props) {
         </Chip>
 
         {(autoPaid.length > 0 || ask.length > 0 || archive.length > 0) && (
-          <ul className="space-y-1.5 rounded-2xl bg-accent-soft/50 p-4 text-[0.9375rem]">
+          <ul className="space-y-1.5 rounded-2xl bg-accent-soft/50 p-4 text-body">
             {autoPaid.length > 0 && (
               <Line>
                 {plural(autoPaid.length, 'autopay bill', 'autopay bills')} will be marked paid
@@ -127,7 +124,7 @@ export function FreshStart({ gap, today, onDone }: Props) {
           <button
             type="button"
             onClick={() => setPicking(true)}
-            className="-mx-1 min-h-11 rounded-full px-1 text-[0.9375rem] font-medium text-accent"
+            className="-mx-1 min-h-11 rounded-full px-1 text-body font-medium text-accent"
           >
             Some didn’t go out?
           </button>
@@ -170,7 +167,7 @@ export function FreshStart({ gap, today, onDone }: Props) {
         )}
 
         {failed && (
-          <p role="alert" className="text-[0.9375rem] text-muted">
+          <p role="alert" className="text-body text-muted">
             That didn’t save. Nothing changed, so you can try again.
           </p>
         )}

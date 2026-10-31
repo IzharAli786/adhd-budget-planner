@@ -92,11 +92,7 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
             Enter the code from your PDF to unlock the app. You only need to do this once.
           </p>
 
-          <form
-            noValidate
-            onSubmit={(e) => void submit(e)}
-            className="mt-8 rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line"
-          >
+          <form noValidate onSubmit={(e) => void submit(e)} className="card mt-8 p-5">
             <label htmlFor={inputId} className="block text-sm font-medium">
               Unlock code
             </label>
@@ -155,7 +151,7 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
             href={DEMO_URL}
             target="_blank"
             rel="noopener"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-[0.9375rem] font-medium text-accent hover:bg-accent-soft/60"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-body font-medium text-accent hover:bg-accent-soft/60"
           >
             No code? Try the free demo
             <Icon name="external" size={16} />

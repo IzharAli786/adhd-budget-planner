@@ -73,14 +73,14 @@ export function BackupScreen() {
       />
 
       <div className="space-y-5">
-        <section className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line">
+        <section className="card p-6">
           <div className="flex items-start gap-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
               <Icon name="share" size={22} />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold">Save a backup</h2>
-              <p className="text-[0.9375rem] text-muted">
+              <h2 className="text-heading">Save a backup</h2>
+              <p className="text-body text-muted">
                 {lastBackupAt
                   ? `Last saved ${relativeDays(lastBackupAt)}${changesNote(changes)}.`
                   : 'You haven’t saved one yet.'}{' '}
@@ -107,14 +107,14 @@ export function BackupScreen() {
           )}
         </section>
 
-        <section className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line">
+        <section className="card p-6">
           <div className="flex items-start gap-4">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
               <Icon name="upload" size={22} />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold">Restore from a file</h2>
-              <p className="text-[0.9375rem] text-muted">
+              <h2 className="text-heading">Restore from a file</h2>
+              <p className="text-body text-muted">
                 Replaces what’s on this device. You’ll see what’s inside before anything changes.
               </p>
             </div>

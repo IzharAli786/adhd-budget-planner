@@ -46,7 +46,7 @@ export function UpdateToast() {
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
         <Icon name="sparkle" size={18} />
       </span>
-      <p className="min-w-0 flex-1 text-[0.9375rem] font-medium">An update is ready</p>
+      <p className="min-w-0 flex-1 text-body font-medium">An update is ready</p>
       <Button variant="ghost" onClick={() => setNeedRefresh(false)} className="px-3">
         Later
       </Button>

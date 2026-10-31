@@ -41,13 +41,10 @@ export function ImpulseList() {
       <AddForm />
       {waiting.length > 0 && (
         <section aria-labelledby="impulse-waiting" className="space-y-2">
-          <h3
-            id="impulse-waiting"
-            className="px-1 text-xs font-semibold tracking-wider text-muted uppercase"
-          >
+          <h3 id="impulse-waiting" className="px-1 eyebrow text-muted">
             Waiting
           </h3>
-          <ul className="divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-card ring-1 ring-line">
+          <ul className="card divide-y divide-line overflow-hidden">
             {waiting.map((item) => (
               <WaitingRow key={item.id} item={item} left={countdownLabel(msLeft(item, now))} />
             ))}
@@ -55,7 +52,7 @@ export function ImpulseList() {
         </section>
       )}
       {saved > 0 && (
-        <p className="rounded-3xl bg-accent-soft px-5 py-4 text-[0.9375rem]">
+        <p className="rounded-3xl bg-accent-soft px-5 py-4 text-body">
           <span className="font-semibold tabular-nums">{f.money(saved)}</span> saved by waiting.
         </p>
       )}
@@ -80,11 +77,8 @@ function AddForm() {
   }
 
   return (
-    <form
-      onSubmit={(e) => void submit(e)}
-      className="space-y-4 rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line"
-    >
-      <p className="text-[0.9375rem] text-muted">
+    <form onSubmit={(e) => void submit(e)} className="card space-y-4 p-5">
+      <p className="text-body text-muted">
         Want something? Add it here and give it 48 hours. If you still want it then, go for it.
       </p>
       <Field id="impulse-name" label="What is it?">
@@ -161,9 +155,7 @@ function ReadyCard({ items }: { items: ImpulseItem[] }) {
       className="animate-fade-in space-y-4 rounded-3xl bg-accent-soft p-5"
     >
       <div>
-        <p className="text-xs font-semibold tracking-wider text-accent uppercase">
-          48 hours are up
-        </p>
+        <p className="eyebrow text-accent">48 hours are up</p>
         <h3 id="impulse-ready" className="mt-1 text-lg font-medium">
           Still want {items.length === 1 ? 'it' : 'them'}?
         </h3>

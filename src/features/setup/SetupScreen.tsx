@@ -119,7 +119,7 @@ function StepFrame({
             <button
               type="button"
               onClick={onBack}
-              className="-ml-3 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-1.5 text-[0.9375rem] font-medium text-accent hover:bg-accent-soft/60"
+              className="-ml-3 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-1.5 text-body font-medium text-accent hover:bg-accent-soft/60"
             >
               <Icon name="back" size={20} />
               Back
@@ -191,7 +191,7 @@ function AckStep() {
       busy={busy}
       action="I understand"
     >
-      <ul className="space-y-4 rounded-3xl bg-surface p-6 shadow-card ring-1 ring-line">
+      <ul className="card space-y-4 p-6">
         <Point icon="info">
           Steady gives <strong className="font-semibold">estimates</strong> from the numbers you
           enter. It’s not financial advice.
@@ -205,7 +205,7 @@ function AckStep() {
 
 function Point({ icon, children }: { icon: 'info' | 'shield' | 'refresh'; children: ReactNode }) {
   return (
-    <li className="flex gap-3 text-[0.9375rem]">
+    <li className="flex gap-3 text-body">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
         <Icon name={icon} size={18} />
       </span>
@@ -340,7 +340,7 @@ function PayStep({
         <legend id={groupId} className="mb-2 text-sm font-medium">
           I get paid
         </legend>
-        <div className="overflow-hidden rounded-3xl bg-surface shadow-card ring-1 ring-line">
+        <div className="card overflow-hidden">
           {KINDS.map((k) => (
             <label
               key={k.value}
@@ -357,7 +357,7 @@ function PayStep({
                 }}
                 className="h-5 w-5 accent-accent"
               />
-              <span className="text-[0.9375rem] font-medium">{k.label}</span>
+              <span className="text-body font-medium">{k.label}</span>
             </label>
           ))}
         </div>
@@ -451,7 +451,7 @@ function BalanceStep({ onBack }: { onBack?: () => void }) {
       />
       <div className="flex items-center gap-3">
         <label htmlFor={switchId} className="min-w-0 flex-1">
-          <span className="block text-[0.9375rem] font-medium">I’m overdrawn</span>
+          <span className="block text-body font-medium">I’m overdrawn</span>
           <span className="block text-sm text-muted">The balance is below zero.</span>
         </label>
         <Switch id={switchId} checked={overdrawn} onChange={setOverdrawn} label="I’m overdrawn" />

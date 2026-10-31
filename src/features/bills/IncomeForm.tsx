@@ -265,7 +265,7 @@ export function IncomeForm({ id, income, showPrimary, today, onSubmit }: IncomeF
       {showPrimary && (
         <div className="flex items-center gap-3">
           <label htmlFor={primaryId} className="min-w-0 flex-1">
-            <span className="block text-[0.9375rem] font-medium">My main pay</span>
+            <span className="block text-body font-medium">My main pay</span>
             <span className="block text-sm text-muted">
               Pay periods run from one of these paydays to the next.
             </span>

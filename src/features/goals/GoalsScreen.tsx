@@ -16,14 +16,14 @@ export function GoalsScreen() {
       <div className="space-y-8">
         <FundsSection today={today} />
         <section aria-labelledby="goals-debts" className="space-y-3">
-          <h2 id="goals-debts" className="px-1 text-lg font-semibold">
+          <h2 id="goals-debts" className="px-1 text-heading">
             Debts
           </h2>
           <DebtsSection />
         </section>
         <NoSpendCard today={today} />
         <section aria-labelledby="impulse-title" className="space-y-3">
-          <h2 id="impulse-title" className="px-1 text-lg font-semibold">
+          <h2 id="impulse-title" className="px-1 text-heading">
             48-hour list
           </h2>
           <ImpulseList />

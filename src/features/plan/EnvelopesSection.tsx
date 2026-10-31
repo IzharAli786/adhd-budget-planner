@@ -41,13 +41,13 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
   return (
     <section aria-labelledby="envelopes-title" className="space-y-3">
       <div className="flex items-center justify-between gap-3 px-1">
-        <h2 id="envelopes-title" className="text-lg font-semibold">
+        <h2 id="envelopes-title" className="text-heading">
           Envelopes
         </h2>
         <Switch label="Use envelopes" checked={on} onChange={(v) => void toggle(v)} />
       </div>
       {!on ? (
-        <div className="rounded-3xl bg-surface p-5 text-[0.9375rem] text-muted shadow-card ring-1 ring-line">
+        <div className="card p-5 text-body text-muted">
           <p>
             Envelopes give parts of your money a job, like{' '}
             <span className="text-text">Food {f.money(300 * 10 ** f.decimals)}</span> each payday.
@@ -125,7 +125,7 @@ function EnvelopeRow({
         : `${f.money(usage.reserved)} left of ${f.money(env.budget)}`
 
   return (
-    <li className="rounded-3xl bg-surface p-4 shadow-card ring-1 ring-line">
+    <li className="card p-4">
       <div className="flex items-center gap-1">
         <div className="min-w-0 flex-1 pl-1">
           <h3 className="truncate font-semibold">{env.name}</h3>

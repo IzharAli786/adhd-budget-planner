@@ -91,11 +91,11 @@ export function Dialog({
         )}
         <header className="flex items-start gap-3 px-6 pt-5">
           <div className="min-w-0 flex-1 pt-2">
-            <h2 id={titleId} className="text-lg leading-snug font-semibold">
+            <h2 id={titleId} className="text-heading">
               {title}
             </h2>
             {description && (
-              <p id={descId} className="mt-1 text-[0.9375rem] text-muted">
+              <p id={descId} className="mt-1 text-body text-muted">
                 {description}
               </p>
             )}

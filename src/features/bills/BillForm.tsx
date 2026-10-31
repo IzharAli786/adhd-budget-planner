@@ -163,7 +163,7 @@ export function BillForm({
       />
 
       {choice.repeat === 'monthly' && day >= 28 && (
-        <label className="flex min-h-11 items-center gap-3 text-[0.9375rem]">
+        <label className="flex min-h-11 items-center gap-3 text-body">
           <input
             type="checkbox"
             checked={choice.lastDay}
@@ -204,7 +204,7 @@ export function BillForm({
 
       <div className="flex items-center gap-3">
         <label htmlFor={autopayId} className="min-w-0 flex-1">
-          <span className="block text-[0.9375rem] font-medium">Paid automatically</span>
+          <span className="block text-body font-medium">Paid automatically</span>
           <span className="block text-sm text-muted">
             Autopay and direct debits get ticked off when you update your balance.
           </span>

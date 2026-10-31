@@ -14,6 +14,7 @@ import {
 import type { Cents, ISODate, SavingsFund } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
+import { EmptyState } from '../../ui/PageHeader'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { ProgressRing } from '../../ui/Progress'
 import { Segmented } from '../../ui/Segmented'
@@ -35,7 +36,7 @@ export function FundsSection({ today }: { today: ISODate }) {
   return (
     <section aria-labelledby="funds-title" className="space-y-3">
       <div className="flex items-end justify-between gap-3 px-1">
-        <h2 id="funds-title" className="text-lg font-semibold">
+        <h2 id="funds-title" className="text-heading">
           Savings
         </h2>
         {funds.length > 0 && (
@@ -46,16 +47,18 @@ export function FundsSection({ today }: { today: ISODate }) {
         )}
       </div>
       {funds.length === 0 ? (
-        <div className="rounded-3xl bg-surface px-6 py-8 text-center shadow-card ring-1 ring-line">
-          <p className="font-medium">Start one small fund</p>
-          <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">
-            A holiday, a cushion, a birthday. Even a little each payday adds up.
-          </p>
-          <Button className="mt-4" onClick={() => setEditing('new')}>
-            <Icon name="plus" size={18} />
-            New savings fund
-          </Button>
-        </div>
+        <EmptyState
+          art="sprout"
+          title="Start one small fund"
+          action={
+            <Button onClick={() => setEditing('new')}>
+              <Icon name="plus" size={18} />
+              New savings fund
+            </Button>
+          }
+        >
+          A holiday, a cushion, a birthday. Even a little each payday adds up.
+        </EmptyState>
       ) : (
         <ul className="space-y-3">
           {funds.map((fund) => (
@@ -139,14 +142,14 @@ function FundCard({
       : null
 
   return (
-    <li className="rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line">
+    <li className="card p-5">
       <div className="flex items-center gap-4">
         <ProgressRing value={progress} label={`${fund.name} progress`}>
           {fund.target ? `${Math.floor(progress * 100)}%` : <Icon name="leaf" size={20} />}
         </ProgressRing>
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-semibold">{fund.name}</h3>
-          <p className="text-[0.9375rem] tabular-nums">
+          <p className="text-body tabular-nums">
             {f.money(saved)}
             {fund.target !== undefined && (
               <span className="text-muted"> of {f.money(fund.target)}</span>

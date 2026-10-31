@@ -13,7 +13,7 @@ import {
 import { Button, buttonClass } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
 import { Icon, type IconName } from '../../ui/Icon'
-import { PageHeader } from '../../ui/PageHeader'
+import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { useToast } from '../../ui/Toast'
 
 const KIND: Record<SoftDeleteTable, { noun: string; icon: IconName }> = {
@@ -58,23 +58,20 @@ export function RecentlyDeletedScreen() {
       />
 
       {items === undefined ? null : items.length === 0 ? (
-        <section className="animate-fade-in rounded-[1.75rem] bg-surface px-6 py-10 text-center shadow-card ring-1 ring-line">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-            <Icon name="trash" size={26} />
-          </span>
-          <h2 className="mt-4 text-xl font-semibold">Nothing deleted</h2>
-          <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">
-            If you delete a bill or an entry, it waits here in case you want it back.
-          </p>
-          <div className="mt-5">
+        <EmptyState
+          art="tray"
+          title="Nothing deleted"
+          action={
             <Link to="/more" className={buttonClass('secondary')}>
               Back to More
             </Link>
-          </div>
-        </section>
+          }
+        >
+          If you delete a bill or an entry, it waits here in case you want it back.
+        </EmptyState>
       ) : (
         <div className="space-y-6">
-          <ul className="divide-y divide-line overflow-hidden rounded-[1.5rem] bg-surface shadow-card ring-1 ring-line">
+          <ul className="card divide-y divide-line overflow-hidden">
             {items.map((item) => {
               const kind = KIND[item.table]
               const left = daysLeft(item.deletedAt)

@@ -15,7 +15,7 @@ import { DateInput } from '../../ui/DateInput'
 import { Field, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
 import { MoneyInput } from '../../ui/MoneyInput'
-import { PageHeader } from '../../ui/PageHeader'
+import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { Segmented } from '../../ui/Segmented'
 import { Sheet } from '../../ui/Sheet'
 import { useFormat } from '../bills/format'
@@ -56,33 +56,30 @@ export function TransactionsScreen() {
         back={{ to: '/more', label: 'More' }}
       />
       {transactions === undefined ? (
-        <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-3xl bg-surface" />
       ) : days.length === 0 ? (
-        <section className="animate-fade-in rounded-[1.75rem] bg-surface px-6 py-10 text-center shadow-card ring-1 ring-line">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-            <Icon name="list" size={26} />
-          </span>
-          <h2 className="mt-4 text-lg font-semibold">Nothing logged yet</h2>
-          <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">
-            Type “12 coffee” on Today and it shows up here.
-          </p>
-          <div className="mt-5">
+        <EmptyState
+          art="notebook"
+          title="Nothing logged yet"
+          action={
             <Link to="/" className={buttonClass()}>
               Go to Today
             </Link>
-          </div>
-        </section>
+          }
+        >
+          Type “12 coffee” on Today and it shows up here.
+        </EmptyState>
       ) : (
         <div className="space-y-6">
           {days.map(([date, rows]) => (
             <section key={date} className="space-y-2">
-              <h2 className="flex justify-between px-1 text-xs font-semibold tracking-wider text-muted uppercase">
+              <h2 className="flex justify-between px-1 eyebrow text-muted">
                 <span>{dayLabel(date)}</span>
                 <span className="tabular-nums">
                   {f.money(rows.reduce((a, t) => a + t.amount, 0))}
                 </span>
               </h2>
-              <ul className="divide-y divide-line overflow-hidden rounded-[1.5rem] bg-surface shadow-card ring-1 ring-line">
+              <ul className="card divide-y divide-line overflow-hidden">
                 {rows.map((t) => (
                   <li key={t.id}>
                     <button
