@@ -95,6 +95,30 @@ describe('unlock screen (PLAN §7)', () => {
     await waitFor(async () => expect(await getMeta('unlocked')).toBeTruthy())
   })
 
+  it('takes a code pasted with words in front of it', async () => {
+    render(<App />)
+    const field = (await input()) as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'Your code: STEADY-DEMO-0000-0000-0001' } })
+    expect(field.value).toBe('DEM0-0000-0000-0001')
+  })
+
+  it('points out a U, which codes never contain', async () => {
+    render(<App />)
+    fireEvent.change(await input(), { target: { value: 'STEADY-DEMU-0000-0000-0001' } })
+    await userEvent.click(unlockButton())
+    expect(await screen.findByText(/never use the letter U/)).toBeTruthy()
+  })
+
+  it('explains itself when the page cannot hash (plain http on a LAN)', async () => {
+    vi.spyOn(crypto.subtle, 'digest').mockRejectedValue(new TypeError('no subtle'))
+    render(<App />)
+    fireEvent.change(await input(), { target: { value: DEV_CODE } })
+    await userEvent.click(unlockButton())
+    expect(await screen.findByText(/https:\/\/ address/)).toBeTruthy()
+    expect(unlockButton().textContent).toBe('Unlock')
+    vi.restoreAllMocks()
+  })
+
   it('offers the free demo', async () => {
     render(<App />)
     const link = await screen.findByRole('link', { name: /Try the free demo/ })

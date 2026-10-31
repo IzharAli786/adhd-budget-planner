@@ -12,7 +12,8 @@ const PREFIX = 'STEADY'
 
 function body(input) {
   let s = input.toUpperCase().replace(/[^0-9A-Z]/g, '')
-  if (s.startsWith(PREFIX)) s = s.slice(PREFIX.length)
+  const at = s.indexOf(PREFIX)
+  if (at >= 0) s = s.slice(at + PREFIX.length)
   return s.replace(/O/g, '0').replace(/[IL]/g, '1')
 }
 
@@ -20,8 +21,8 @@ function randomBody() {
   for (;;) {
     // 32 symbols divide 256 evenly, so `byte & 31` has no modulo bias.
     const chars = Array.from(randomBytes(16), (b) => CROCKFORD[b & 31]).join('')
-    // The app strips a leading STEADY, so such a body could never be entered.
-    if (!chars.startsWith(PREFIX)) return chars
+    // The app drops everything up to STEADY, so such a body could never be entered.
+    if (!chars.includes(PREFIX)) return chars
   }
 }
 

@@ -14,12 +14,14 @@ export type CheckResult =
 
 /**
  * The code characters, however they were typed or pasted: any case, spaces, dashes
- * (including the typographic ones a PDF viewer may paste), with or without "STEADY".
+ * (including the typographic ones a PDF viewer may paste), with or without "STEADY",
+ * and with any words copied along in front of it ("Your code: STEADY-…").
  */
 export function codeBody(input: string): string {
   let s = input.toUpperCase().replace(/[^0-9A-Z]/g, '')
-  // A random body starting with STEADY is a 1-in-a-billion event (and make-code skips it).
-  if (s.startsWith(CODE_PREFIX)) s = s.slice(CODE_PREFIX.length)
+  // A random body containing STEADY is a 1-in-100-million event (and make-code skips it).
+  const at = s.indexOf(CODE_PREFIX)
+  if (at >= 0) s = s.slice(at + CODE_PREFIX.length)
   return s.replace(/[OIL]/g, (c) => ALIASES[c]!)
 }
 
@@ -28,6 +30,9 @@ export const normalizeCode = (input: string) => CODE_PREFIX + codeBody(input)
 
 const COMPLETE = new RegExp(`^[${CROCKFORD}]{${CODE_LENGTH}}$`)
 export const isCompleteCode = (input: string) => COMPLETE.test(codeBody(input))
+
+/** After normalising, U is the only letter a code can't hold (Crockford leaves it out). */
+export const hasLetterU = (input: string) => codeBody(input).includes('U')
 
 /** What the input field shows: the body in groups of four, e.g. "DEM0-0000-00". */
 export function formatCodeBody(input: string): string {

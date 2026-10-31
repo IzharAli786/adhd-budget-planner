@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney, parseAmount } from '../money'
+import { formatMoney, parseAmount, rescaleCents } from '../money'
 
 describe('parseAmount', () => {
   it.each([
@@ -27,5 +27,17 @@ describe('parseAmount', () => {
 describe('formatMoney', () => {
   it('formats cents as currency', () => {
     expect(formatMoney(1250)).toBe('€12.50')
+  })
+})
+
+describe('rescaleCents', () => {
+  it.each([
+    [250000, 2, 0, 2500], // EUR 2500.00 -> JPY 2500
+    [2500, 0, 2, 250000],
+    [12345, 2, 3, 123450], // -> KWD
+    [123456, 3, 2, 12346], // rounds to the nearest minor unit
+    [999, 2, 2, 999],
+  ])('%i from %i to %i decimals -> %i', (cents, from, to, want) => {
+    expect(rescaleCents(cents, from, to)).toBe(want)
   })
 })

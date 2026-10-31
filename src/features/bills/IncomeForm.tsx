@@ -287,19 +287,23 @@ export function DaySelect({
   value,
   onChange,
   allowLast = true,
+  error,
 }: {
   label: string
   value: DayOfMonth
   onChange: (v: DayOfMonth) => void
   allowLast?: boolean
+  error?: string | null
 }) {
   const id = useId()
   const f = useFormat()
   return (
-    <Field id={id} label={label}>
+    <Field id={id} label={label} error={error}>
       <select
         id={id}
         value={String(value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         onChange={(e) => onChange(e.target.value === 'last' ? 'last' : Number(e.target.value))}
         className={`${inputClass} appearance-none`}
       >

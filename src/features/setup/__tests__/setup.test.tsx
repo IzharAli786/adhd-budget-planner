@@ -160,6 +160,82 @@ describe('first-run setup (PLAN §5)', () => {
     expect(await r.getMeta('unlocked')).toBeTruthy() // the device's unlock is kept
   })
 
+  it('does not take today as the next payday (it already starts the new period)', async () => {
+    render(<App />)
+    await heading('Before we start')
+    await click('I understand')
+    await heading('When do you next get paid?')
+    expect(screen.queryByRole('button', { name: 'Sat 31 Oct' })).toBeNull() // not suggested
+    await userEvent.type(screen.getByLabelText('Or pick the date'), '2026-10-31{Enter}')
+    expect(await screen.findByText(/Paid today\? Then pick the payday after this one/)).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('When do you next get paid?')
+  })
+
+  it('asks again when how often and the next payday disagree', async () => {
+    render(<App />)
+    await heading('Before we start')
+    await click('I understand')
+    await heading('When do you next get paid?')
+    await userEvent.type(screen.getByLabelText('Or pick the date'), '2026-11-20{Enter}')
+    await heading('How often, and how much?')
+    await userEvent.click(screen.getByRole('radio', { name: 'Every week' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'How much lands each time?' }), '400')
+    await click('Continue')
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText(/payday before the date you picked/)).toBeTruthy()
+    expect((await r.getSetupProgress())?.step).toBe('pay')
+
+    // Twice a month: the prefilled other payday already fits (not the 5th, before the 20th).
+    await userEvent.click(screen.getByRole('radio', { name: 'Twice a month' }))
+    expect(
+      (screen.getByRole('combobox', { name: 'My other payday' }) as HTMLSelectElement).value,
+    ).toBe('last')
+    await click('Continue')
+    await heading('What’s in your account right now?')
+  })
+
+  it('keeps the typed pay when the currency changes decimals', async () => {
+    render(<App />)
+    await throughPayday()
+    await userEvent.type(screen.getByRole('textbox', { name: 'How much lands each time?' }), '2500')
+    await click('Change')
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Currency' }), 'JPY')
+    await waitFor(() =>
+      expect(
+        (screen.getByRole('textbox', { name: 'How much lands each time?' }) as HTMLInputElement)
+          .value,
+      ).toBe('2500'),
+    )
+    await click('Continue')
+    await heading('What’s in your account right now?')
+    expect((await r.getSetupProgress())?.amount).toBe(2500) // 2500 yen, not 250000
+  })
+
+  it('asks for the payday again when setup is resumed after it passed', async () => {
+    await r.saveSetupProgress({
+      step: 'balance',
+      ackAt: '2026-10-20T09:00:00.000Z',
+      nextPayday: '2026-10-30',
+      kind: 'monthly',
+      amount: 200000,
+    })
+    render(<App />)
+    await heading('When do you next get paid?')
+  })
+
+  it('records an overdrawn balance of zero as 0, not -0', async () => {
+    render(<App />)
+    await throughPayday()
+    await userEvent.type(screen.getByRole('textbox', { name: 'How much lands each time?' }), '900')
+    await click('Continue')
+    await heading('What’s in your account right now?')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Balance today' }), '0')
+    await userEvent.click(screen.getByRole('switch', { name: 'I’m overdrawn' }))
+    await click('Show my number')
+    await screen.findByRole('navigation', { name: 'Main' })
+    expect(Object.is((await r.listCheckIns())[0]!.balance, 0)).toBe(true)
+  })
+
   it('a finished setup sends /setup back to Today', async () => {
     await r.saveSetupProgress({ step: 'done' })
     window.history.replaceState(null, '', '/setup')

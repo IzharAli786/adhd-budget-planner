@@ -11,15 +11,18 @@ import {
   updateSettings,
 } from '../../db/repos'
 import { addDays, isValidISODate } from '../../domain/dates'
+import { rescaleCents } from '../../domain/money'
 import {
-  defaultOtherDay,
   MAX_PAYDAY_AHEAD,
   paydaySuggestions,
   previousStep,
   resumeStep,
   SETUP_STEPS,
   stepNumber,
+  suggestOtherDay,
   validateNextPayday,
+  validateOtherDay,
+  validatePayKind,
   type PayKind,
   type SetupProgress,
   type SetupStep,
@@ -52,7 +55,8 @@ export function SetupScreen() {
 }
 
 function SetupFlow({ progress }: { progress: SetupProgress | undefined }) {
-  const step = resumeStep(progress)
+  const today = useToday()
+  const step = resumeStep(progress, today)
   const back = previousStep(step)
   const goBack = back ? () => void saveSetupProgress({ step: back }) : undefined
 
@@ -222,7 +226,13 @@ function PaydayStep({ progress }: { progress: SetupProgress | undefined }) {
   async function next() {
     const problem = validateNextPayday(date, today)
     setError(problem)
-    if (!problem) await saveSetupProgress({ step: 'pay', nextPayday: date })
+    if (problem) return
+    await saveSetupProgress({
+      step: 'pay',
+      nextPayday: date,
+      // A twice-a-month "other payday" was picked relative to the old date; re-guess it.
+      ...(date !== progress?.nextPayday ? { otherDay: undefined } : {}),
+    })
   }
 
   return (
@@ -278,20 +288,37 @@ function PayStep({
   onBack?: () => void
 }) {
   const f = useFormat()
+  const today = useToday()
   const nextPayday = progress?.nextPayday ?? ''
   const [kind, setKind] = useState<PayKind>(progress?.kind ?? 'monthly')
   const [otherDay, setOtherDay] = useState<DayOfMonth>(
-    progress?.otherDay ?? defaultOtherDay(nextPayday),
+    progress?.otherDay ?? suggestOtherDay(nextPayday, today),
   )
   const [amount, setAmount] = useState<Cents | null>(progress?.amount ?? null)
   const [error, setError] = useState<string | null>(null)
+  const [kindError, setKindError] = useState<string | null>(null)
   const groupId = useId()
 
+  // Switching currency on the locale line keeps the number as typed: "2500" stays 2500
+  // in yen, instead of the stored cents silently meaning 250000 (state adjusted during
+  // render, React's pattern for state derived from a changing input).
+  const [amountDecimals, setAmountDecimals] = useState(f.decimals)
+  if (amountDecimals !== f.decimals) {
+    setAmountDecimals(f.decimals)
+    if (amount !== null) setAmount(rescaleCents(amount, amountDecimals, f.decimals))
+  }
+
   async function next() {
-    if (amount === null || amount <= 0) {
-      setError('Roughly how much lands in your account? A round number is fine.')
-      return
-    }
+    const scheduleProblem =
+      (kind === 'semimonthly' ? validateOtherDay(nextPayday, otherDay) : null) ??
+      validatePayKind(kind, nextPayday, today, kind === 'semimonthly' ? otherDay : undefined)
+    setKindError(scheduleProblem)
+    const amountProblem =
+      amount === null || amount <= 0
+        ? 'Roughly how much lands in your account? A round number is fine.'
+        : null
+    setError(amountProblem)
+    if (scheduleProblem || amountProblem || amount === null) return
     await saveSetupProgress({
       step: 'balance',
       kind,
@@ -324,17 +351,33 @@ function PayStep({
                 name={groupId}
                 value={k.value}
                 checked={kind === k.value}
-                onChange={() => setKind(k.value)}
+                onChange={() => {
+                  setKind(k.value)
+                  setKindError(null)
+                }}
                 className="h-5 w-5 accent-accent"
               />
               <span className="text-[0.9375rem] font-medium">{k.label}</span>
             </label>
           ))}
         </div>
+        {kindError && kind !== 'semimonthly' && (
+          <p role="alert" className="mt-2 text-sm font-medium text-accent">
+            {kindError}
+          </p>
+        )}
       </fieldset>
 
       {kind === 'semimonthly' && (
-        <DaySelect label="My other payday" value={otherDay} onChange={setOtherDay} />
+        <DaySelect
+          label="My other payday"
+          value={otherDay}
+          onChange={(d) => {
+            setOtherDay(d)
+            setKindError(null)
+          }}
+          error={kindError}
+        />
       )}
 
       {/* Keyed on decimals: switching EUR to JPY changes what the typed digits mean. */}
@@ -376,7 +419,8 @@ function BalanceStep({ onBack }: { onBack?: () => void }) {
     }
     setBusy(true)
     try {
-      await completeSetup(overdrawn ? -amount : amount, today)
+      // Overdrawn by 0 is still 0, not -0.
+      await completeSetup(overdrawn && amount > 0 ? -amount : amount, today)
       navigate('/', { replace: true })
     } finally {
       setBusy(false)

@@ -6,6 +6,7 @@ import {
   CROCKFORD,
   formatCodeBody,
   hashCode,
+  hasLetterU,
   isCompleteCode,
   normalizeCode,
   parseHashes,
@@ -26,6 +27,7 @@ describe('normalizeCode', () => {
     ['STEADY–DEMO—0000-0000-0001', 'STEADYDEM0000000000001'], // dashes a PDF may paste
     ['STEADY-ABCD-EFGH-IJKL-MNOP', 'STEADYABCDEFGH1JK1MN0P'], // I, L -> 1; O -> 0
     ['steady-oooo-iiii-llll-0000', 'STEADY0000111111110000'],
+    ['Your code: STEADY-DEMO-0000-0000-0001', 'STEADYDEM0000000000001'], // copied with a label
   ])('%s -> %s', (input, want) => {
     expect(normalizeCode(input)).toBe(want)
   })
@@ -51,7 +53,7 @@ describe('formatCodeBody (what the input shows)', () => {
     const body = fc.string({ unit: fc.constantFrom(...CROCKFORD), minLength: 16, maxLength: 16 })
     fc.assert(
       fc.property(body, (b) => {
-        fc.pre(!b.startsWith('STEADY'))
+        fc.pre(!b.includes('STEADY'))
         return normalizeCode(formatCodeBody(b)) === `STEADY${b}`
       }),
     )
@@ -67,6 +69,16 @@ describe('isCompleteCode', () => {
     ['', false],
   ])('%s -> %s', (input, want) => {
     expect(isCompleteCode(input)).toBe(want)
+  })
+})
+
+describe('hasLetterU', () => {
+  it.each([
+    ['STEADY-DEMU-0000-0000-0001', true],
+    [DEV_CODE, false], // the U-less prefix itself never counts
+    ['', false],
+  ])('%s -> %s', (input, want) => {
+    expect(hasLetterU(input)).toBe(want)
   })
 })
 

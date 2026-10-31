@@ -1,5 +1,12 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
-import { checkCode, CODE_LENGTH, CODE_PREFIX, codeBody, formatCodeBody } from '../../unlock/unlock'
+import {
+  checkCode,
+  CODE_LENGTH,
+  CODE_PREFIX,
+  codeBody,
+  formatCodeBody,
+  hasLetterU,
+} from '../../unlock/unlock'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { inputClass } from '../../ui/Field'
@@ -41,9 +48,11 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
       if (result.reason === 'incomplete') {
         const n = codeBody(value).length
         setError(
-          n === 0
-            ? 'Type or paste the code from your PDF. It starts with STEADY.'
-            : `That’s ${n} of ${CODE_LENGTH} characters. The rest is in your PDF, after STEADY.`,
+          hasLetterU(value)
+            ? 'Codes never use the letter U. Is that one a V?'
+            : n === 0
+              ? 'Type or paste the code from your PDF. It starts with STEADY.'
+              : `That’s ${n} of ${CODE_LENGTH} characters. The rest is in your PDF, after STEADY.`,
         )
       } else {
         misses.current += 1
@@ -54,6 +63,10 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
         )
       }
       inputRef.current?.focus()
+    } catch {
+      // crypto.subtle only exists on https (and localhost): a phone opening a dev build
+      // over plain http on the LAN lands here. The real app is always served on https.
+      setError('This page can’t check codes. Open Steady from its https:// address.')
     } finally {
       setChecking(false)
     }
