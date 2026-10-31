@@ -20,7 +20,7 @@ const PARTS: readonly Part[] = [
   {
     icon: 'bills',
     name: 'Bills',
-    body: 'What’s due and when your pay lands, as a list and a calendar. Bills before payday are kept out of today’s number until you tick them off.',
+    body: 'What’s due and when your pay lands, as a list and a calendar. Bills due before payday are already set aside in today’s number, so you don’t have to remember them.',
   },
   {
     icon: 'plan',

@@ -16,6 +16,17 @@ test('works offline once the service worker is ready', async ({ page, context, b
   await context.setOffline(true)
   await page.reload()
   await expect.poll(() => heroCents(page)).toBeGreaterThan(0)
+  // Both faces come from the precache: titles and the hero keep Fraunces offline.
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        await document.fonts.ready
+        return ['Inter Variable', 'Fraunces Variable'].map((family) =>
+          [...document.fonts].some((f) => f.family.includes(family) && f.status === 'loaded'),
+        )
+      }),
+    )
+    .toEqual([true, true])
 
   const before = await logExpense(page, '4.50 bus')
   await expect.poll(() => heroCents(page)).toBe(before - 450)

@@ -60,7 +60,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className={cx(
           'pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 md:pl-28 lg:pl-60',
           atTop
-            ? 'top-[max(env(safe-area-inset-top),1rem)]'
+            ? // Below the demo's sticky banner when there is one.
+              'top-[calc(var(--demo-banner-h,0px)+max(env(safe-area-inset-top),1rem))]'
             : 'bottom-[calc(9.5rem+env(safe-area-inset-bottom))] md:bottom-6',
         )}
       >
@@ -77,9 +78,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
  * where the toast would appear: the toast then shows at the top instead of covering
  * the next thing the person types.
  */
-function coversFocusedField(): boolean {
+export function coversFocusedField(): boolean {
   const el = document.activeElement
   if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return false
+  // A field in a modal: the save that shows the toast also closes the dialog, so the
+  // field is gone by the time anyone reads the toast. Moving up then just looks random.
+  if (el.closest('dialog')) return false
+  // An on-screen keyboard is open (the visual viewport shrank): a bottom toast, Undo
+  // included, would sit behind it.
+  const vv = window.visualViewport
+  if (vv && vv.height < window.innerHeight - 150) return true
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
   // The bottom offsets used below, and about 4.5rem for one toast above that edge.
   const wide = window.matchMedia?.('(min-width: 48rem)').matches ?? false

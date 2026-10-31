@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../../app/App'
 import { resetDb, seedReadyInstall } from '../../../db/__tests__/helpers'
 import * as r from '../../../db/repos'
-import { dismissInstallBanner, installBannerDismissed } from '../../../lib/install'
+import { captureInstallPrompt, installBannerDismissed } from '../../../lib/install'
+import { InstallBanner } from '../../install/InstallGate'
 
 // Wed 4 Nov 2026, noon local.
 const NOW = new Date(2026, 10, 4, 12, 0)
@@ -88,9 +89,24 @@ describe('Goals strip', () => {
 })
 
 describe('install banner', () => {
-  it('"Not now" is remembered on this device', () => {
-    expect(installBannerDismissed()).toBe(false)
-    dismissInstallBanner()
+  it('"Not now" stays dismissed after a reload', async () => {
+    // A browser that offers the native install dialog.
+    captureInstallPrompt(window)
+    const prompt = Object.assign(new Event('beforeinstallprompt'), {
+      prompt: async () => {},
+      userChoice: Promise.resolve({ outcome: 'dismissed' }),
+    })
+    window.dispatchEvent(prompt)
+
+    const first = render(<InstallBanner />)
+    expect(await screen.findByText(/Install Steady to use it offline/)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(screen.queryByText(/Install Steady/)).toBeNull()
+
+    // A reload: a fresh component with only what this device remembered.
+    first.unmount()
+    render(<InstallBanner />)
+    expect(screen.queryByText(/Install Steady/)).toBeNull()
     expect(installBannerDismissed()).toBe(true)
   })
 })
