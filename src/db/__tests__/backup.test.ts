@@ -297,6 +297,17 @@ describe('validateBackup accepts and cleans', () => {
     expect(clean.data.meta.find((m) => m.key === 'settings')?.value).not.toHaveProperty('evil')
   })
 
+  it('carries the payday carry-overs (Look back), and refuses a malformed one', async () => {
+    const file = (await fixtureFile()) as unknown as Loose
+    const log = { '2026-10-30': { carried: 4800, at: '2026-11-02T08:00:00.000Z' } }
+    file.data.meta.push({ key: 'periodClose', value: log })
+    const { file: clean } = mustValidate(clone(file))
+    expect(clean.data.meta.find((m) => m.key === 'periodClose')?.value).toEqual(log)
+
+    file.data.meta.at(-1).value = { 'not-a-date': { carried: 1.5, at: 'x' } }
+    expect(validateBackup(file)).toMatchObject({ ok: false })
+  })
+
   it('normalises instants with an offset to UTC toISOString form', async () => {
     const file = (await fixtureFile()) as unknown as Loose
     file.data.checkIns[0].at = '2026-10-27T21:00:00+02:00'

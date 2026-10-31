@@ -18,7 +18,7 @@ export function DemoBanner() {
     <div
       role="region"
       aria-label="Demo"
-      className="sticky top-0 z-50 border-b border-line bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl"
+      className="print-hide sticky top-0 z-50 border-b border-line bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl"
     >
       <p className="mx-auto flex min-h-11 max-w-2xl flex-wrap items-center justify-center gap-x-1.5 px-4 text-center text-sm">
         <span className="text-muted">Free demo ·</span>

@@ -9,6 +9,7 @@ const SCREENS = [
   { path: '/goals', heading: 'Goals' },
   { path: '/more', heading: 'More' },
   { path: '/more/settings', heading: 'Appearance & settings' },
+  { path: '/more/review', heading: 'Look back' },
 ]
 
 async function seriousViolations(page: Page) {
@@ -22,7 +23,7 @@ async function seriousViolations(page: Page) {
 
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`no serious axe violations on each tab, Full mode, ${colorScheme}`, async ({ page }) => {
-    test.setTimeout(120_000) // seven full axe scans
+    test.setTimeout(120_000) // eight full axe scans
     // Reduced motion, or axe can read colours halfway through a fade-in.
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' })
     await unlockAndSetup(page)

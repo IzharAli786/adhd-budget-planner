@@ -1,6 +1,9 @@
+import type { Cents } from '../../domain/money'
 import { Button } from '../../ui/Button'
 import { Sheet } from '../../ui/Sheet'
 import { useToast } from '../../ui/Toast'
+import { useFormat } from '../bills/format'
+import { carryLine } from '../review/carry'
 import { SaveBackupButton, useBackupFile } from './SaveBackup'
 
 /**
@@ -8,7 +11,17 @@ import { SaveBackupButton, useBackupFile } from './SaveBackup'
  * backup. The file is prepared the moment this sheet opens, so that tap can go straight
  * to the share sheet.
  */
-export function BackupMomentSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function BackupMomentSheet({
+  open,
+  onClose,
+  carried = null,
+}: {
+  open: boolean
+  onClose: () => void
+  /** What was carried into this payday, once worked out (Look back keeps it too). */
+  carried?: Cents | null
+}) {
+  const f = useFormat()
   return (
     <Sheet
       open={open}
@@ -16,6 +29,11 @@ export function BackupMomentSheet({ open, onClose }: { open: boolean; onClose: (
       title="Payday done. Save a backup?"
       description="One tap. Keep the file in Files, iCloud Drive or Google Drive."
     >
+      {carried !== null && (
+        <p role="status" className="mb-4 rounded-2xl bg-accent-soft/70 px-4 py-3 text-body">
+          {carryLine(carried, f.money)}
+        </p>
+      )}
       {open && <BackupMoment onClose={onClose} />}
     </Sheet>
   )

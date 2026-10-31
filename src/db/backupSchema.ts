@@ -185,6 +185,8 @@ export const metaValueSchemas: Record<(typeof EXPORTED_META_KEYS)[number], z.Zod
   lastOpened: z.union([isoDate, instant]),
   gardenPoints: int.check(z.nonnegative()),
   setupProgress: setupProgressSchema,
+  // domain/review.ts PeriodCloseLog: carry-over per payday, for Look back.
+  periodClose: z.record(isoDate, z.object({ carried: cents, at: instant })),
 }
 
 export const headerSchema = z.object({

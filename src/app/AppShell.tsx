@@ -18,9 +18,10 @@ export function AppShell() {
     void requestPersist()
     void purgeDeleted()
   }, [])
-  // Today and Bills earn two columns on wide screens; reading screens keep a calm measure.
+  // Today and Bills earn two columns on wide screens, Look back its four tiles and wide
+  // table; reading screens keep a calm measure.
   const { pathname } = useLocation()
-  const wide = pathname === '/' || pathname === '/bills'
+  const wide = pathname === '/' || pathname === '/bills' || pathname === '/more/review'
 
   return (
     // Quick-add lives here, not per screen: the floating + and the `n` key work on every tab.

@@ -27,3 +27,10 @@ it('stops every animation and transition when motion is reduced or off', () => {
   expect(reduce).toMatch(/animation: none !important/)
   expect(css).toMatch(/:root\[data-motion='off'\] \*,[\s\S]*?animation: none !important/)
 })
+
+it('prints only the report: chrome hidden, the report shown, on white', () => {
+  const print = /@media print\s*\{([\s\S]*?)\n\}/.exec(css)?.[1]
+  expect(print).toMatch(/nav,[\s\S]*\.print-hide\s*\{\s*display: none !important/)
+  expect(print).toMatch(/\.print-report\s*\{\s*display: block !important/)
+  expect(print).toMatch(/--bg: #ffffff/)
+})
