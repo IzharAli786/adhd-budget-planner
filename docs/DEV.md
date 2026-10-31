@@ -181,3 +181,10 @@ A phone on the LAN is not a secure context over plain http, so `crypto.subtle` (
 `crypto.randomUUID` (new rows) would be missing. `dev:phone` serves a self-signed certificate:
 accept the warning once on the phone. Install-to-home-screen and offline still need a trusted
 certificate (mkcert) or a real https host.
+
+The unlock screen's "Try the free demo" link points at the production demo URL in builds. In
+dev it points at port 5174 on the same host, served by:
+
+```bash
+npm run demo:phone   # builds the demo and serves it on https://<your-ip>:5174
+```

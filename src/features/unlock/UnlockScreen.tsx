@@ -13,7 +13,12 @@ import { inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
 import { InstallBanner } from '../install/InstallGate'
 
-export const DEMO_URL = import.meta.env.VITE_DEMO_URL || 'https://demo.steadyplanner.app'
+// In dev the demo runs next to the app (`npm run demo:phone`, port 5174), so the link follows
+// whichever host the page was opened on: localhost on the laptop, the LAN IP on a phone.
+export const DEMO_URL =
+  import.meta.env.DEV && import.meta.env.MODE !== 'test'
+    ? `${location.protocol}//${location.hostname}:5174`
+    : import.meta.env.VITE_DEMO_URL || 'https://demo.steadyplanner.app'
 
 /** After this many misses each try takes a second. Cosmetic: it only slows guessing a bit. */
 export const FREE_TRIES = 5
