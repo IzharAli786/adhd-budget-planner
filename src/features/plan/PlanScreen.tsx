@@ -1,18 +1,27 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { useFunds, useIncomes, usePaydayOverrides, useTransactions } from '../../db/hooks'
+import {
+  useCheckIns,
+  useFunds,
+  useIncomes,
+  usePaydayOverrides,
+  useTransactions,
+} from '../../db/hooks'
 import { addDays } from '../../domain/dates'
 import { paydayEntriesBetween } from '../../domain/bills'
+import { periodIncome, type PeriodIncome } from '../../domain/plan'
 import { simpleLines } from '../../domain/safeToSpend'
-import { fundProgress, fundSaved } from '../../domain/savings'
+import { fundPace, fundProgress, fundSaved } from '../../domain/savings'
 import type { ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { buttonClass } from '../../ui/Button'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { ProgressBar } from '../../ui/Progress'
+import { StatStrip } from '../../ui/StatStrip'
 import { useFormat } from '../bills/format'
+import { paceText, SavingsTiles, usePaydays } from '../goals/FundsSection'
 import { CanFitForm } from '../today/CanFitSheet'
 import { useTodayModel, type TodayModel } from '../today/useTodayModel'
 import { EnvelopesSection } from './EnvelopesSection'
@@ -24,6 +33,7 @@ export function PlanScreen() {
   const now = useNow()
   const model = useTodayModel(today, now)
   const { settings } = useAppSettings()
+  const income = usePeriodIncome(model)
 
   return (
     <>
@@ -47,42 +57,103 @@ export function PlanScreen() {
         </div>
       ) : (
         <div className="space-y-8">
-          <PeriodCard model={model} today={today} />
-          <section aria-labelledby="fit-title" className="card p-5">
-            <h2 id="fit-title" className="mb-1 text-heading">
-              Can this fit?
-            </h2>
-            <p className="mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
-            <CanFitForm
-              total={model.plan.safe.total}
-              runway={model.plan.runway}
-              envelopes={settings.envelopesEnabled ? model.plan.safe.envelopes : []}
-            />
-          </section>
-          <EnvelopesSection envelopes={model.envelopes} usage={model.plan.safe.envelopes} />
-          <SavingsSummary />
+          {income && <PlanStrip model={model} income={income} />}
+          {/* Desktop: the period and the "try a price" box side by side, then envelopes
+              beside savings. Phones keep the same order in one column. */}
+          <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+            {income && <PeriodCard model={model} today={today} income={income} />}
+            <section aria-labelledby="fit-title" className="card p-5">
+              <h2 id="fit-title" className="mb-1 text-heading">
+                Can this fit?
+              </h2>
+              <p className="mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
+              <CanFitForm
+                total={model.plan.safe.total}
+                runway={model.plan.runway}
+                envelopes={settings.envelopesEnabled ? model.plan.safe.envelopes : []}
+              />
+            </section>
+          </div>
+          <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+            <EnvelopesSection envelopes={model.envelopes} usage={model.plan.safe.envelopes} />
+            <SavingsSummary today={today} />
+          </div>
         </div>
       )}
     </>
   )
 }
 
-function PeriodCard({ model, today }: { model: TodayModel; today: ISODate }) {
-  const f = useFormat()
+/** This period's pay, or the next pay in the first period (see periodIncome). */
+function usePeriodIncome(model: TodayModel): PeriodIncome | null {
   const incomes = useIncomes()
   const overrides = usePaydayOverrides()
-  const plan = model.plan
-  const period = plan?.kind === 'ready' ? plan.period : null
-  const pay = useMemo(
-    () =>
-      incomes && overrides && period
-        ? paydayEntriesBetween(incomes, overrides, period.start, period.end)
-        : [],
-    [incomes, overrides, period],
-  )
-  if (plan?.kind !== 'ready' || !period || !incomes || !overrides) return null
+  const checkIns = useCheckIns()
+  const period = model.plan?.kind === 'ready' ? model.plan.period : null
+  return useMemo(() => {
+    if (!incomes || !overrides || !checkIns || !period) return null
+    const firstBalance = checkIns.reduce<ISODate | undefined>(
+      (min, c) => (min === undefined || c.date < min ? c.date : min),
+      undefined,
+    )
+    return periodIncome(
+      paydayEntriesBetween(incomes, overrides, period.start, period.end),
+      paydayEntriesBetween(incomes, overrides, period.end, addDays(period.end, 1)),
+      firstBalance,
+    )
+  }, [incomes, overrides, checkIns, period])
+}
 
-  const income = pay.reduce((a, p) => a + p.amount, 0)
+const incomeLabel = (income: PeriodIncome) =>
+  income.kind === 'expected' ? 'Expected pay' : 'Income this period'
+
+/** Income · Set aside · Safe to spend, above the detail. */
+function PlanStrip({ model, income }: { model: TodayModel; income: PeriodIncome }) {
+  const f = useFormat()
+  if (model.plan?.kind !== 'ready') return null
+  const { safe, period } = model.plan
+  const [, , setAside, total] = simpleLines(safe)
+  return (
+    <StatStrip
+      label="This period at a glance"
+      items={[
+        {
+          label: incomeLabel(income),
+          value: f.money(income.total),
+          hint:
+            income.kind === 'expected'
+              ? `On ${f.day(period.end)}`
+              : `${f.day(period.start)} – ${f.day(addDays(period.end, -1))}`,
+        },
+        {
+          label: 'Set aside',
+          value: f.money(setAside!.amount),
+          hint: 'Savings, envelopes, buffer',
+        },
+        {
+          label: safe.status === 'short' ? 'Short until payday' : 'Safe to spend',
+          value: f.money(total!.amount),
+          hint: `Until payday · ${f.day(period.end)}`,
+        },
+      ]}
+    />
+  )
+}
+
+function PeriodCard({
+  model,
+  today,
+  income,
+}: {
+  model: TodayModel
+  today: ISODate
+  income: PeriodIncome
+}) {
+  const f = useFormat()
+  const plan = model.plan
+  if (plan?.kind !== 'ready') return null
+  const { period } = plan
+  const pay = income.entries
   const [balance, bills, setAside, total] = simpleLines(plan.safe)
 
   return (
@@ -95,8 +166,14 @@ function PeriodCard({ model, today }: { model: TodayModel; today: ISODate }) {
         This period
       </h2>
       <dl className="mt-4 divide-y divide-line text-body">
-        <Row label="Income this period" value={f.money(income)}>
-          {pay.length > 0 && (
+        <Row
+          label={
+            income.kind === 'expected' ? `Expected pay · ${f.day(period.end)}` : incomeLabel(income)
+          }
+          value={f.money(income.total)}
+        >
+          {/* The expected pay is the label itself; a breakdown would only repeat it. */}
+          {income.kind === 'received' && pay.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-sm text-muted">
               {pay.map((p) => (
                 <li key={`${p.incomeId}|${p.nominal}`} className="flex justify-between gap-4">
@@ -148,11 +225,12 @@ function Row({
   )
 }
 
-function SavingsSummary() {
+function SavingsSummary({ today }: { today: ISODate }) {
   const f = useFormat()
   const funds = useFunds()
   const transactions = useTransactions()
-  if (!funds || !transactions) return null
+  const paydays = usePaydays(today)
+  if (!funds || !transactions || !paydays) return null
 
   return (
     <section aria-labelledby="savings-title" className="space-y-3">
@@ -164,6 +242,7 @@ function SavingsSummary() {
           Open Goals
         </Link>
       </div>
+      <SavingsTiles funds={funds} transactions={transactions} />
       {funds.length === 0 ? (
         <p className="card p-5 text-body text-muted">
           No savings funds yet. Start one in Goals; even a little each payday adds up.
@@ -172,6 +251,7 @@ function SavingsSummary() {
         <ul className="card divide-y divide-line">
           {funds.map((fund) => {
             const saved = fundSaved(fund, transactions)
+            const pace = paceText(fundPace(fund, saved, today, paydays), fund.perPeriod, f)
             return (
               <li key={fund.id} className="px-5 py-3.5">
                 <div className="flex justify-between gap-4 text-body">
@@ -195,6 +275,7 @@ function SavingsSummary() {
                     ? `${f.money(fund.perPeriod)} set aside each payday`
                     : 'Whatever fits, when it fits'}
                 </p>
+                {pace && <p className="mt-0.5 text-sm text-muted">{pace}</p>}
               </li>
             )
           })}

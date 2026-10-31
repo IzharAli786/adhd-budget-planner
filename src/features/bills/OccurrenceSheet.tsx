@@ -128,7 +128,7 @@ function Body({
               )
           }}
         >
-          <DateInput label="Move to" value={moveTo} onChange={setMoveTo} />
+          <DateInput format={f.dayFull} label="Move to" value={moveTo} onChange={setMoveTo} />
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => setMode('view')}>
               Cancel

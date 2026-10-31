@@ -6,10 +6,12 @@ interface SwitchProps {
   /** Accessible name when no visible label points at it. */
   label: string
   id?: string
+  /** Id of a helper line that explains the setting. */
+  describedBy?: string
 }
 
 /** A button with role="switch": screen readers announce "on/off", not "checked". */
-export function Switch({ checked, onChange, label, id }: SwitchProps) {
+export function Switch({ checked, onChange, label, id, describedBy }: SwitchProps) {
   return (
     <button
       id={id}
@@ -17,6 +19,7 @@ export function Switch({ checked, onChange, label, id }: SwitchProps) {
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      aria-describedby={describedBy}
       onClick={() => onChange(!checked)}
       className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center"
     >

@@ -135,6 +135,7 @@ function FundForm({
         decimals={f.decimals}
       />
       <DateInput
+        format={f.dayFull}
         label="Reach it by (optional)"
         value={targetDate}
         onChange={setTargetDate}

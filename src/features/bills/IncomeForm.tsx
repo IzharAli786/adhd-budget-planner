@@ -177,6 +177,7 @@ export function IncomeForm({ id, income, showPrimary, today, onSubmit }: IncomeF
 
       {(d.kind === 'weekly' || d.kind === 'biweekly') && (
         <DateInput
+          format={f.dayFull}
           label="One payday"
           value={d.anchor}
           onChange={(anchor) => set({ anchor })}
@@ -212,6 +213,7 @@ export function IncomeForm({ id, income, showPrimary, today, onSubmit }: IncomeF
             <div key={i} className="flex items-end gap-2">
               <div className="flex-1">
                 <DateInput
+                  format={f.dayFull}
                   label={<span className="sr-only">Payday {i + 1}</span>}
                   value={date}
                   onChange={(v) => set({ expected: d.expected.map((x, j) => (j === i ? v : x)) })}

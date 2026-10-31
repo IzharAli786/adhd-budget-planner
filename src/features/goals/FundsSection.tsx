@@ -6,12 +6,13 @@ import { addDays } from '../../domain/dates'
 import { paydaysBetween, primaryIncome } from '../../domain/paySchedule'
 import {
   challengeStep,
+  fundPace,
   fundProgress,
   fundSaved,
-  perPaydayToReach,
-  reachedOn,
+  savingsTotals,
+  type FundPace,
 } from '../../domain/savings'
-import type { Cents, ISODate, SavingsFund } from '../../domain/types'
+import type { Cents, ISODate, SavingsFund, Transaction } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { EmptyState } from '../../ui/PageHeader'
@@ -19,7 +20,8 @@ import { MoneyInput } from '../../ui/MoneyInput'
 import { ProgressRing } from '../../ui/Progress'
 import { Segmented } from '../../ui/Segmented'
 import { Sheet } from '../../ui/Sheet'
-import { useFormat } from '../bills/format'
+import { StatStrip } from '../../ui/StatStrip'
+import { useFormat, type Formatters } from '../bills/format'
 import { FundSheet } from './FundSheet'
 
 /** Savings funds on Goals: a ring each, the pace in words, and "Add money". */
@@ -60,6 +62,9 @@ export function FundsSection({ today }: { today: ISODate }) {
           A holiday, a cushion, a birthday. Even a little each payday adds up.
         </EmptyState>
       ) : (
+        <SavingsTiles funds={funds} transactions={transactions} withSaved={false} />
+      )}
+      {funds.length > 0 && (
         <ul className="space-y-3">
           {funds.map((fund) => (
             <FundCard
@@ -91,7 +96,7 @@ export function FundsSection({ today }: { today: ISODate }) {
 }
 
 /** Primary-income paydays over the next five years, for pace and "reached around". */
-function usePaydays(today: ISODate): ISODate[] | undefined {
+export function usePaydays(today: ISODate): ISODate[] | undefined {
   const incomes = useIncomes()
   const overrides = usePaydayOverrides()
   return useMemo(() => {
@@ -119,22 +124,7 @@ function FundCard({
 }) {
   const f = useFormat()
   const progress = fundProgress(saved, fund.target)
-  const remaining = (fund.target ?? 0) - saved
-  const pace = paceLine()
-
-  function paceLine(): string | null {
-    if (fund.target === undefined) return null
-    if (remaining <= 0) return 'You reached it. That took patience.'
-    if (fund.targetDate && fund.targetDate >= today) {
-      const left = paydays.filter((d) => d <= fund.targetDate!).length
-      const per = perPaydayToReach(remaining, left)!
-      return `About ${f.money(per)} per payday to reach it by ${f.day(fund.targetDate)}.`
-    }
-    const when = reachedOn(remaining, fund.perPeriod, paydays)
-    return when
-      ? `At ${f.money(fund.perPeriod)} a payday, you’ll get there around ${f.month(when)}.`
-      : null
-  }
+  const pace = paceText(fundPace(fund, saved, today, paydays), fund.perPeriod, f)
 
   const challenge =
     fund.challenge?.kind === '52week'
@@ -187,6 +177,52 @@ function FundCard({
       </Button>
     </li>
   )
+}
+
+/** The pace line in words. Shared with Plan's savings list, so both say the same thing. */
+export function paceText(pace: FundPace | null, perPeriod: Cents, f: Formatters): string | null {
+  switch (pace?.kind) {
+    case 'reached':
+      return 'You reached it. That took patience.'
+    case 'by-date':
+      return `About ${f.money(pace.perPayday)} per payday to reach it by ${f.day(pace.by)}.`
+    case 'eta':
+      return `At ${f.money(perPeriod)} a payday, you’ll get there around ${f.month(pace.when)}.`
+    default:
+      return null
+  }
+}
+
+/**
+ * Total saved, total of the targets, and how far along they are together. `withSaved`
+ * is off on Goals, where the strip at the top already shows the total saved.
+ */
+export function SavingsTiles({
+  funds,
+  transactions,
+  withSaved = true,
+}: {
+  funds: readonly SavingsFund[]
+  transactions: readonly Transaction[]
+  withSaved?: boolean
+}) {
+  const f = useFormat()
+  if (funds.length === 0) return null
+  const t = savingsTotals(funds, transactions)
+  const none = t.target === 0
+  const items = [
+    ...(withSaved ? [{ label: 'Total saved', value: f.money(t.saved) }] : []),
+    {
+      label: 'Total of targets',
+      value: none ? 'No targets yet' : f.money(t.target),
+    },
+    {
+      label: 'Overall',
+      value: none ? '–' : f.percent(Math.floor(t.progress * 100) / 100),
+      hint: none ? 'Add a target to a fund to see this' : 'of the way there',
+    },
+  ]
+  return <StatStrip label="Savings totals" items={items} />
 }
 
 function AddMoneySheet({

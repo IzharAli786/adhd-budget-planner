@@ -10,6 +10,7 @@ import { GoalsScreen } from '../features/goals/GoalsScreen'
 import { ImpulseScreen } from '../features/impulse/ImpulseScreen'
 import { InstallGate } from '../features/install/InstallGate'
 import { InstallScreen } from '../features/install/InstallScreen'
+import { HelpScreen } from '../features/more/HelpScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
 import { PlanScreen } from '../features/plan/PlanScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
@@ -70,6 +71,7 @@ export function App() {
                       />
                       <Route path="more" element={<MoreScreen />} />
                       <Route path="more/settings" element={<SettingsScreen />} />
+                      <Route path="more/help" element={<HelpScreen />} />
                       <Route path="more/backup" element={<BackupScreen />} />
                       <Route path="more/transactions" element={<TransactionsScreen />} />
                       <Route path="more/deleted" element={<RecentlyDeletedScreen />} />

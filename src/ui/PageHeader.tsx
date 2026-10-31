@@ -25,7 +25,7 @@ export function PageHeader({
           {back.label}
         </Link>
       )}
-      <h1 className="text-title">{title}</h1>
+      <h1 className="type-display text-title">{title}</h1>
       {subtitle && <p className="mt-1.5 text-body text-muted">{subtitle}</p>}
     </header>
   )

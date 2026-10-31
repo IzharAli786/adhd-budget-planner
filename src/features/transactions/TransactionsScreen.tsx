@@ -70,7 +70,8 @@ export function TransactionsScreen() {
           Type “12 coffee” on Today and it shows up here.
         </EmptyState>
       ) : (
-        <div className="space-y-6">
+        // Wider on desktop, but not so wide that a note and its amount drift apart.
+        <div className="space-y-6 lg:max-w-4xl">
           {days.map(([date, rows]) => (
             <section key={date} className="space-y-2">
               <h2 className="flex justify-between px-1 eyebrow text-muted">
@@ -179,6 +180,7 @@ function TransactionForm({ tx, onClose }: { tx: Transaction; onClose: () => void
         />
       </Field>
       <DateInput
+        format={f.dayFull}
         label="Date"
         value={date}
         max={today}

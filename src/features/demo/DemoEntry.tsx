@@ -38,7 +38,7 @@ export function DemoEntry() {
           height={56}
           className="mb-6 rounded-2xl shadow-card"
         />
-        <h1 className="text-[2rem] leading-tight font-semibold tracking-tight">Try Steady</h1>
+        <h1 className="type-display text-[2rem] leading-tight">Try Steady</h1>
         <p className="mt-2 text-base text-muted">
           See how much you can spend today, and until payday. Free, and nothing leaves this device.
         </p>

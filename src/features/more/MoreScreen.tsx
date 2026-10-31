@@ -25,7 +25,9 @@ export function MoreScreen() {
   return (
     <>
       <PageHeader title="More" />
-      <div className="space-y-7">
+      {/* Desktop: the groups flow into two balanced columns (CSS columns, so a short group
+          never leaves a hole beside a tall one) instead of one long narrow list. */}
+      <div className="space-y-7 lg:columns-2 lg:gap-8 lg:space-y-0 lg:[&>*]:mb-7 lg:[&>*]:break-inside-avoid">
         {IS_DEMO && <DemoMoreGroup />}
         <ListGroup>
           <ListRow
@@ -124,7 +126,16 @@ export function MoreScreen() {
           />
         </ListGroup>
 
-        <p className="px-1 text-center text-sm text-muted">
+        <ListGroup title="Help">
+          <ListRow
+            icon="info"
+            label="How each part works"
+            detail="Each tab in a few lines, and common questions"
+            to="/more/help"
+          />
+        </ListGroup>
+
+        <p className="px-1 text-center text-sm text-muted lg:pt-6 lg:[column-span:all]">
           Steady keeps everything on this device. No account, no tracking.
           <br />
           Estimates only, not financial advice.

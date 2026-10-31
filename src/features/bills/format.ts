@@ -29,6 +29,8 @@ export interface Formatters {
   day: (date: ISODate) => string
   /** "Friday 7 November" */
   dayLong: (date: ISODate) => string
+  /** "Fri 7 Nov 2026": the date-field preview, in the app's locale whatever the browser's. */
+  dayFull: (date: ISODate) => string
   /** "November 2026" */
   month: (date: ISODate) => string
   /** "Mon" for weekday 1 */
@@ -62,6 +64,11 @@ export function makeFormatters(
       : { weekday: 'short', day: 'numeric', month: 'short' },
   )
   const dayLong = dt({ weekday: 'long', day: 'numeric', month: 'long' })
+  const dayFull = dt(
+    dateStyle === 'numbers'
+      ? { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }
+      : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' },
+  )
   const month = dt({ month: 'long', year: 'numeric' })
   const wd = {
     short: dt({ weekday: 'short' }),
@@ -80,6 +87,7 @@ export function makeFormatters(
     percent: (r) => percent.format(r),
     day: (d) => day.format(utc(d)),
     dayLong: (d) => dayLong.format(utc(d)),
+    dayFull: (d) => dayFull.format(utc(d)),
     month: (d) => month.format(utc(d)),
     // 1970-01-04 was a Sunday, so day 4 + dow is that weekday.
     weekday: (dow, style = 'short') => wd[style].format(new Date(Date.UTC(1970, 0, 4 + dow))),
