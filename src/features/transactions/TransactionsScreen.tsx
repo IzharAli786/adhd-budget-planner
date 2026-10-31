@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
@@ -330,9 +330,29 @@ function ChipRow({
   value: string
   onChange: (key: string) => void
 }) {
+  // On a phone the row starts at January, so October would sit off screen. Bring the
+  // picked chip (or, with none, the latest month) into view: scrollLeft, not
+  // scrollIntoView, so the page itself never jumps.
+  const ref = useRef<HTMLDivElement>(null)
+  // Only when the chips or the pick change, so a re-render never undoes a manual scroll.
+  const keys = options.map((o) => o.key).join()
+  const months = options.some((o) => o.range.kind === 'month')
+  useEffect(() => {
+    const row = ref.current
+    if (!row || row.scrollWidth <= row.clientWidth) return
+    const chip =
+      row.querySelector<HTMLElement>('[aria-pressed="true"]') ??
+      (months ? (row.lastElementChild as HTMLElement | null) : null)
+    if (!chip) return
+    // The row is `relative`, so offsetLeft is already measured from its edge.
+    const left = chip.offsetLeft
+    if (left < row.scrollLeft || left + chip.offsetWidth > row.scrollLeft + row.clientWidth)
+      row.scrollLeft = left + chip.offsetWidth - row.clientWidth + 16
+  }, [keys, months, value])
+
   return (
     // Scrolls sideways on a phone instead of wrapping into a wall of pills; wraps on desktop.
-    <div role="group" aria-label={label} className={rowClass}>
+    <div ref={ref} role="group" aria-label={label} className={rowClass}>
       {options.map((o) => (
         <Chip
           key={o.key}

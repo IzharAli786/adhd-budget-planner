@@ -76,6 +76,23 @@ describe('Settings: name and accent', () => {
     expect(screen.queryByText(/hard to read/)).toBeNull()
   })
 
+  it('in dark mode a colour is judged on the dark background it will sit on', async () => {
+    await r.updateSettings({ mode: 'dark' })
+    window.history.replaceState(null, '', '/more/settings')
+    render(<App />)
+    const input = await screen.findByLabelText('Accent colour')
+    // Pale yellow reads well on dark: accepted, not refused for failing on cream.
+    fireEvent.change(input, { target: { value: '#f4c542' } })
+    await waitFor(async () => expect((await r.getSettings()).accent).toBe('#f4c542'))
+    expect(screen.queryByText(/hard to read/)).toBeNull()
+    expect(await screen.findByText(/deeper shade of it in light mode/)).toBeTruthy()
+    await waitFor(() =>
+      expect(document.documentElement.style.getPropertyValue('--d-accent')).toBe('#f4c542'),
+    )
+    // Light mode still gets a shade that passes there.
+    expect(accentVar()).not.toBe('#f4c542')
+  })
+
   it('both travel in a backup and validate on the way back', async () => {
     await r.updateSettings({ displayName: 'Sam', accent: '#2d6688' })
     const file = await exportBackup(NOW)

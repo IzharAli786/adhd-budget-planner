@@ -159,14 +159,22 @@ export function nearestReadable(hex: string, theme: Theme, mode: Mode): AccentPa
   return readablePair(mode === 'light' ? '#000000' : '#ffffff', theme, mode)!
 }
 
-/** The mode a picked colour is judged in: what the person mostly sees in this theme. */
+/** The mode a theme is seen in by default: Midnight is dark-only, the rest start light. */
 export const primaryMode = (theme: Theme): Mode => (theme === 'midnight' ? 'dark' : 'light')
 
 export type AccentCheck = { ok: true } | { ok: false; suggestion: string }
 
-/** Accept the colour as picked, or refuse it and name the nearest shade that passes. */
-export function checkAccent(hex: string, theme: Theme): AccentCheck {
-  const mode = primaryMode(theme)
+/**
+ * Accept the colour as picked, or refuse it and name the nearest shade that passes.
+ * Judged in the mode on screen: someone in dark mode picking a pale colour sees it pass
+ * there, and light mode gets its own deeper shade from accentTokens.
+ */
+export function checkAccent(
+  hex: string,
+  theme: Theme,
+  mode: Mode = primaryMode(theme),
+): AccentCheck {
+  if (theme === 'midnight') mode = 'dark'
   if (readablePair(hex.toLowerCase(), theme, mode)) return { ok: true }
   return { ok: false, suggestion: nearestReadable(hex, theme, mode).accent }
 }

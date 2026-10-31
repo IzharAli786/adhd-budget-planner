@@ -29,6 +29,19 @@ describe('checkAccent', () => {
     expect(contrast(result.suggestion, '#ffffff')).toBeGreaterThanOrEqual(AA)
   })
 
+  it('judges in the mode on screen: a pale colour passes in dark mode, light gets a deeper shade', () => {
+    expect(checkAccent('#f4c542', 'clay', 'dark')).toEqual({ ok: true })
+    const tokens = accentTokens('#f4c542', 'clay')
+    expect(tokens.dark.accent).toBe('#f4c542')
+    expect(contrast(tokens.light.accent, '#ffffff')).toBeGreaterThanOrEqual(AA)
+    // And a deep colour picked in dark mode is refused there, with a lighter shade offered.
+    const deep = checkAccent('#2d6688', 'ocean', 'dark')
+    expect(deep.ok).toBe(false)
+    if (!deep.ok) expect(checkAccent(deep.suggestion, 'ocean', 'dark')).toEqual({ ok: true })
+    // Midnight has no light mode to judge in.
+    expect(checkAccent('#2d6688', 'midnight', 'light').ok).toBe(false)
+  })
+
   it('judges Midnight against its dark background', () => {
     expect(checkAccent('#2d6688', 'midnight').ok).toBe(false)
     expect(checkAccent('#9db2ff', 'midnight')).toEqual({ ok: true })

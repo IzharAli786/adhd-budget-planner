@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { accentTokens, checkAccent, HEX_COLOR } from '../../domain/accent'
+import { accentTokens, checkAccent, HEX_COLOR, type Mode } from '../../domain/accent'
 import { DISPLAY_NAME_MAX } from '../../domain/greeting'
 import {
   THEMES,
@@ -21,6 +21,7 @@ import {
 import { todayISO } from '../../lib/clock'
 import { askBadgePermission, badgeEnabled, badgePlatform } from '../../lib/badge'
 import { formatBytes, requestPersist, storageStatus, type StorageStatus } from '../../lib/storage'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Field, inputClass } from '../../ui/Field'
@@ -198,16 +199,27 @@ function AccentPicker() {
   const { settings, update } = useAppSettings()
   const id = useId()
   const custom = settings.accent
-  const fallback = useMemo(() => themeAccent(settings.theme), [settings.theme])
-  const shown = custom ?? fallback
+  // Judged and shown in the mode on screen, so a dark-mode pick isn't held to light mode.
+  const osDark = useMediaQuery('(prefers-color-scheme: dark)')
+  const mode: Mode =
+    settings.theme === 'midnight' ||
+    settings.mode === 'dark' ||
+    (settings.mode === 'auto' && osDark)
+      ? 'dark'
+      : 'light'
+  const other: Mode = mode === 'light' ? 'dark' : 'light'
+  const tokens = custom ? accentTokens(custom, settings.theme) : null
+  const fallback = useMemo(() => themeAccent(settings.theme, mode), [settings.theme, mode])
+  const shown = tokens?.[mode].accent ?? fallback
   const [draft, setDraft] = useState('')
   const [suggestion, setSuggestion] = useState<string | null>(null)
-  const dark = custom ? accentTokens(custom, settings.theme).dark.accent : null
+  const otherShade =
+    tokens !== null && settings.theme !== 'midnight' && tokens[other].accent !== tokens[mode].accent
 
   function pick(color: string) {
     setDraft(color)
     if (!HEX_COLOR.test(color)) return
-    const check = checkAccent(color, settings.theme)
+    const check = checkAccent(color, settings.theme, mode)
     if (check.ok) {
       setSuggestion(null)
       void update({ accent: color.toLowerCase() })
@@ -231,7 +243,7 @@ function AccentPicker() {
           </label>
           <p className="text-sm text-muted">
             {custom
-              ? `Your own colour${dark && dark !== custom ? ', with a lighter shade of it in dark mode' : ''}.`
+              ? `Your own colour${otherShade ? `, with a ${other === 'dark' ? 'lighter' : 'deeper'} shade of it in ${other} mode` : ''}.`
               : 'Using the theme’s colour. Pick any colour that stays easy to read.'}
           </p>
         </div>
@@ -274,12 +286,15 @@ function AccentPicker() {
 
 // The theme's own accent as the picker's starting point. Read from the stylesheet, so it
 // is whatever app.css says, for the mode on screen.
-function themeAccent(theme: Theme): string {
+function themeAccent(theme: Theme, mode: Mode): string {
   const probe = document.createElement('span')
   probe.dataset.theme = theme
   probe.hidden = true
   document.body.append(probe)
-  const value = getComputedStyle(probe).getPropertyValue('--l-accent').trim().toLowerCase()
+  const value = getComputedStyle(probe)
+    .getPropertyValue(mode === 'dark' ? '--d-accent' : '--l-accent')
+    .trim()
+    .toLowerCase()
   probe.remove()
   return HEX_COLOR.test(value) ? value : '#a9502b'
 }
