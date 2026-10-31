@@ -3,7 +3,7 @@
 // named with every number in it, and a small tip that shows the same words on screen.
 // The buttons tile the whole width, so a tap anywhere on the chart hits a column even
 // when twelve narrow months share a phone screen.
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { cx } from './cx'
 
 export interface TipLine {
@@ -20,6 +20,25 @@ export interface ChartColumn {
   lines: TipLine[]
   /** Centre of the column, 0 (left edge) to 1 (right edge). */
   at: number
+}
+
+/**
+ * Closes a tapped-open tip when the next tap lands outside `ref`. Blur alone can't do it:
+ * iOS Safari never focuses a tapped button, so there is no blur to hear.
+ */
+export function useDismissOnOutsideTap(
+  ref: RefObject<HTMLElement | null>,
+  active: boolean,
+  dismiss: () => void,
+) {
+  useEffect(() => {
+    if (!active) return
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node | null)) dismiss()
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+  }, [ref, active, dismiss])
 }
 
 export const columnLabel = (c: ChartColumn) =>
@@ -44,6 +63,12 @@ export function ChartTips({ columns, label, onActive, className }: Props) {
   // Roving tabindex: one Tab stop for the chart, arrows move between columns.
   const [current, setCurrent] = useState(Math.max(0, columns.length - 1))
   const refs = useRef<(HTMLButtonElement | null)[]>([])
+  const group = useRef<HTMLDivElement>(null)
+  const unpin = useCallback(() => {
+    setPinned(null)
+    setFocused(null)
+  }, [])
+  useDismissOnOutsideTap(group, pinned !== null, unpin)
   const shown = hover ?? pinned ?? focused
   const column = shown === null ? undefined : columns[shown]
   useEffect(() => onActive?.(shown), [shown, onActive])
@@ -81,6 +106,7 @@ export function ChartTips({ columns, label, onActive, className }: Props) {
 
   return (
     <div
+      ref={group}
       role="group"
       aria-label={label}
       className={cx('absolute inset-0', className)}

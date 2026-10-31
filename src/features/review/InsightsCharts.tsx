@@ -3,9 +3,10 @@
 // tech; each bar is a button that names its numbers and shows them in a small tip on tap,
 // hover or focus, and every number is also in a table (visually hidden until asked for),
 // per PLAN §8. No red: going past a plan is plain text.
-import { useId, useState } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
 import { niceMax } from '../../domain/chartScale'
 import { topCategories } from '../../domain/insights'
+import { useDismissOnOutsideTap } from '../../ui/ChartTips'
 import { cx } from '../../ui/cx'
 import type { Formatters } from '../bills/format'
 import type { InsightRow } from './insightRows'
@@ -177,6 +178,9 @@ function Bar({
   // Hover shows the tip while the pointer is over the bar; focus or a tap keep it open.
   const [hover, setHover] = useState(false)
   const [open, setOpen] = useState(false)
+  const rowRef = useRef<HTMLLIElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  useDismissOnOutsideTap(rowRef, open, close)
   const w = (v: number) => `${Math.min(100, (v / scale) * 100)}%`
   // A budget of 0 is "no budget yet", not a plan that was blown: no track to fill, just
   // the actual, so a full-looking bar never suggests a limit that was never set.
@@ -195,6 +199,7 @@ function Bar({
   const label = `${row.name}: ${tip.map((t) => `${t.label.toLowerCase()} ${t.value}`).join(', ')}${noBudget ? ', no budget yet' : ''}`
   return (
     <li
+      ref={rowRef}
       className="relative"
       onPointerEnter={(e) => {
         if (e.pointerType === 'mouse') setHover(true)
@@ -255,7 +260,11 @@ function Bar({
       <button
         type="button"
         aria-label={label}
-        aria-expanded={open}
+        // Keyboard focus shows the tip too; a mouse click focuses without :focus-visible,
+        // so it only toggles.
+        onFocus={(e) => {
+          if (e.currentTarget.matches(':focus-visible')) setOpen(true)
+        }}
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setOpen(false)}
         onKeyDown={(e) => {
