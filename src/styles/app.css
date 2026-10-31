@@ -116,6 +116,51 @@
   --muted: #a3acc2;
 }
 
+/*
+ * Envelope colours (domain/categories.ts keys). Dots and bars, never text, so the bar is
+ * 3:1 against every theme's surface and background (WCAG 1.4.11); contrast.test.ts checks
+ * each pair. Muted, mid-tone hues: tellable apart, none of them alarm red.
+ */
+:root {
+  --env-clay: #b25a35;
+  --env-sage: #4f7d5b;
+  --env-ocean: #3a6f93;
+  --env-sand: #8f6b2a;
+  --env-rose: #b04a68;
+  --env-plum: #7d5394;
+  --env-teal: #2f7d78;
+  --env-slate: #5a6678;
+  --env-olive: #6c7531;
+  --env-amber: #a8611a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode='light']) {
+    --env-clay: #e3946f;
+    --env-sage: #8ec39b;
+    --env-ocean: #86b9dc;
+    --env-sand: #d6b26a;
+    --env-rose: #eb9fb3;
+    --env-plum: #c6a2dc;
+    --env-teal: #7fc8c1;
+    --env-slate: #a9b5c7;
+    --env-olive: #bcc47a;
+    --env-amber: #eeaa63;
+  }
+}
+:root[data-mode='dark'],
+:root[data-theme='midnight'] {
+  --env-clay: #e3946f;
+  --env-sage: #8ec39b;
+  --env-ocean: #86b9dc;
+  --env-sand: #d6b26a;
+  --env-rose: #eb9fb3;
+  --env-plum: #c6a2dc;
+  --env-teal: #7fc8c1;
+  --env-slate: #a9b5c7;
+  --env-olive: #bcc47a;
+  --env-amber: #eeaa63;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);

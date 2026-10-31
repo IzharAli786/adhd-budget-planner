@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ENVELOPE_COLORS } from '../../domain/categories'
 import { THEMES } from '../../domain/settings'
 import { readFileSync } from 'node:fs'
 
@@ -97,6 +98,35 @@ it.each([
   ['#767676', '#ffffff', 4.54],
 ])('computes the WCAG ratio of %s on %s as %d', (a, b, expected) => {
   expect(ratio(a, b)).toBeCloseTo(expected, 1)
+})
+
+describe('envelope colours', () => {
+  // Every declaration in order: the light block, then the two dark blocks.
+  const decls = [...css.matchAll(/--env-([\w]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1]!, m[2]!])
+  const light = Object.fromEntries(decls.slice(0, ENVELOPE_COLORS.length))
+  const darkMedia = Object.fromEntries(
+    decls.slice(ENVELOPE_COLORS.length, 2 * ENVELOPE_COLORS.length),
+  )
+  const darkForced = Object.fromEntries(decls.slice(2 * ENVELOPE_COLORS.length))
+
+  it('defines every palette key once per mode, the same dark value in both dark blocks', () => {
+    expect(decls).toHaveLength(3 * ENVELOPE_COLORS.length)
+    for (const block of [light, darkMedia, darkForced])
+      expect(Object.keys(block).sort()).toEqual([...ENVELOPE_COLORS].sort())
+    expect(darkForced).toEqual(darkMedia)
+    expect(new Set(Object.values(light)).size).toBe(ENVELOPE_COLORS.length)
+  })
+
+  // Non-text marks (dots, bars): WCAG 1.4.11 asks 3:1 against what they sit on.
+  const surfaces = (prefix: 'l' | 'd') =>
+    THEMES.filter((t) => prefix === 'd' || t !== 'midnight').flatMap((t) => {
+      const tk = tokens(t)
+      return [tk[`${prefix}-bg`]!, tk[`${prefix}-surface`]!].map((bg) => [t, bg] as const)
+    })
+  it.each(ENVELOPE_COLORS)('%s is 3:1 on every light and dark surface', (key) => {
+    for (const [, bg] of surfaces('l')) expect(ratio(light[key]!, bg)).toBeGreaterThanOrEqual(3)
+    for (const [, bg] of surfaces('d')) expect(ratio(darkMedia[key]!, bg)).toBeGreaterThanOrEqual(3)
+  })
 })
 
 describe.each(THEMES)('theme %s meets WCAG AA (4.5:1)', (theme) => {

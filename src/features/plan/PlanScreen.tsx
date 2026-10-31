@@ -13,6 +13,7 @@ import { buttonClass } from '../../ui/Button'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { ProgressBar } from '../../ui/Progress'
 import { useFormat } from '../bills/format'
+import { PaydayNote } from '../notes/PaydayNote'
 import { CanFitForm } from '../today/CanFitSheet'
 import { useTodayModel, type TodayModel } from '../today/useTodayModel'
 import { EnvelopesSection } from './EnvelopesSection'
@@ -48,6 +49,7 @@ export function PlanScreen() {
       ) : (
         <div className="space-y-8">
           <PeriodCard model={model} today={today} />
+          <PaydayNote periodStart={model.plan.period.start} />
           <section aria-labelledby="fit-title" className="card p-5">
             <h2 id="fit-title" className="mb-1 text-heading">
               Can this fit?

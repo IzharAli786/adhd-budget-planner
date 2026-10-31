@@ -63,6 +63,14 @@ After unlocking, `/setup` asks four quick things and stores progress in
 longer after today is asked again. Setup counts as done when
 `setupProgress.step` is `done` or any income exists (an older backup was restored).
 
+## Schema versions
+
+- v1: the first release.
+- v2: debts gain `originalBalance` (a transform in `migrations.ts`).
+- v3: a `notes` table (`id, date, periodStart`) for day notes and "Note for this payday". No
+  transform: older databases and backups simply have no notes. A step's upgrade only reads
+  stores that already exist, since a later version's tables are created after it runs.
+
 ## End-to-end tests (Playwright)
 
     npx playwright install chromium webkit   # once

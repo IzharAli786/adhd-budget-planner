@@ -3,14 +3,18 @@ import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import {
   addEnvelope,
+  addStarterEnvelopes,
   deleteEnvelope,
   ensureDefaultEnvelope,
   reorderEnvelopes,
   updateEnvelope,
 } from '../../db/repos'
+import { ENVELOPE_COLORS, nextEnvelopeColor, STARTER_CATEGORIES } from '../../domain/categories'
 import type { EnvelopeUsage } from '../../domain/safeToSpend'
 import type { Cents, Envelope } from '../../domain/types'
 import { Button } from '../../ui/Button'
+import { cx } from '../../ui/cx'
+import { EnvelopeDot, envelopeColor } from '../../ui/EnvelopeDot'
 import { Field, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
 import { MoneyInput } from '../../ui/MoneyInput'
@@ -30,7 +34,10 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
   const { settings, update } = useAppSettings()
   const f = useFormat()
   const [editing, setEditing] = useState<Envelope | 'new' | null>(null)
+  const [skipped, setSkipped] = useState(readSkipped)
   const on = settings.envelopesEnabled
+  // Offered while only Everyday exists: the moment right after turning envelopes on.
+  const offerStarters = on && !skipped && envelopes.every((e) => e.isDefault)
 
   async function toggle(next: boolean) {
     // "Everyday" exists before the switch flips, so untagged spending always has a home.
@@ -59,6 +66,14 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
         </div>
       ) : (
         <>
+          {offerStarters && (
+            <StarterOffer
+              onSkip={() => {
+                writeSkipped()
+                setSkipped(true)
+              }}
+            />
+          )}
           <ul className="space-y-3">
             {envelopes.map((env, i) => (
               <EnvelopeRow
@@ -89,9 +104,76 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
       )}
       <EnvelopeSheet
         envelope={editing === 'new' ? null : editing}
+        envelopes={envelopes}
         open={editing !== null}
         onClose={() => setEditing(null)}
       />
+    </section>
+  )
+}
+
+const SKIP_KEY = 'steady:starter-categories'
+// Per device on purpose: it only hides an offer, and storage can be unavailable (private
+// mode), in which case the offer simply shows again. Adding any envelope also hides it.
+function readSkipped() {
+  try {
+    return localStorage.getItem(SKIP_KEY) === 'skipped'
+  } catch {
+    return false
+  }
+}
+function writeSkipped() {
+  try {
+    localStorage.setItem(SKIP_KEY, 'skipped')
+  } catch {
+    // Nothing to do: the offer is hidden for this visit anyway.
+  }
+}
+
+/** One tap to a sensible set, skippable; budgets stay empty so nothing is decided for you. */
+function StarterOffer({ onSkip }: { onSkip: () => void }) {
+  const undoToast = useUndoToast()
+  const [busy, setBusy] = useState(false)
+
+  async function add() {
+    setBusy(true)
+    try {
+      const added = await addStarterEnvelopes()
+      // Nothing added means no undo step, so no Undo to offer either.
+      if (added > 0) undoToast(added === 1 ? 'Added 1 category' : `Added ${added} categories`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section aria-labelledby="starter-title" className="card p-5">
+      <h3 id="starter-title" className="text-heading">
+        Start with common categories?
+      </h3>
+      <p className="mt-1 text-body text-muted">
+        Ten everyday envelopes, ready to use. Budgets start empty: fill in only the ones you care
+        about, rename or delete the rest.
+      </p>
+      <ul aria-label="Categories it adds" className="mt-4 flex flex-wrap gap-1.5">
+        {STARTER_CATEGORIES.map((c) => (
+          <li
+            key={c.name}
+            className="inline-flex items-center gap-1.5 rounded-full bg-bg px-2.5 py-1 text-caption ring-1 ring-line"
+          >
+            <EnvelopeDot color={c.color} className="h-2 w-2" />
+            {c.name}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button onClick={() => void add()} disabled={busy}>
+          Start with common categories
+        </Button>
+        <Button variant="ghost" onClick={onSkip}>
+          I’ll make my own
+        </Button>
+      </div>
     </section>
   )
 }
@@ -127,7 +209,8 @@ function EnvelopeRow({
   return (
     <li className="card p-4">
       <div className="flex items-center gap-1">
-        <div className="min-w-0 flex-1 pl-1">
+        <EnvelopeDot color={env.color} className="ml-1" />
+        <div className="min-w-0 flex-1 pl-2">
           <h3 className="truncate font-semibold">{env.name}</h3>
           <p className="text-sm text-muted tabular-nums">{status}</p>
         </div>
@@ -178,10 +261,12 @@ function IconButton({
 
 function EnvelopeSheet({
   envelope,
+  envelopes,
   open,
   onClose,
 }: {
   envelope: Envelope | null
+  envelopes: readonly Envelope[]
   open: boolean
   onClose: () => void
 }) {
@@ -192,23 +277,32 @@ function EnvelopeSheet({
       title={envelope ? `Edit ${envelope.name}` : 'New envelope'}
       description={envelope?.isDefault ? 'Everyday catches all spending without a tag.' : undefined}
     >
-      {open && <EnvelopeForm envelope={envelope} onDone={onClose} />}
+      {open && <EnvelopeForm envelope={envelope} envelopes={envelopes} onDone={onClose} />}
     </Sheet>
   )
 }
 
-function EnvelopeForm({ envelope, onDone }: { envelope: Envelope | null; onDone: () => void }) {
+function EnvelopeForm({
+  envelope,
+  envelopes,
+  onDone,
+}: {
+  envelope: Envelope | null
+  envelopes: readonly Envelope[]
+  onDone: () => void
+}) {
   const f = useFormat()
   const undoToast = useUndoToast()
   const [name, setName] = useState(envelope?.name ?? '')
   const [budget, setBudget] = useState<Cents | null>(envelope?.budget ?? null)
+  const [color, setColor] = useState(envelope?.color ?? nextEnvelopeColor(envelopes))
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    const row = { name: name.trim(), budget: budget ?? 0 }
+    const row = { name: name.trim(), budget: budget ?? 0, color }
     if (envelope) await updateEnvelope(envelope.id, row, `Edit ${row.name}`)
-    else await addEnvelope({ ...row, color: 'accent' })
+    else await addEnvelope(row)
     undoToast(envelope ? `Saved ${row.name}` : `Added ${row.name}`)
     onDone()
   }
@@ -239,6 +333,7 @@ function EnvelopeForm({ envelope, onDone }: { envelope: Envelope | null; onDone:
         symbol={f.symbol}
         decimals={f.decimals}
       />
+      <ColorPicker value={color} onChange={setColor} allowTheme={envelope?.isDefault ?? false} />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
         {envelope && !envelope.isDefault ? (
           <Button variant="ghost" className="text-muted" onClick={() => void remove()}>
@@ -252,5 +347,66 @@ function EnvelopeForm({ envelope, onDone }: { envelope: Envelope | null; onDone:
         </Button>
       </div>
     </form>
+  )
+}
+
+const COLOR_NAMES: Record<string, string> = {
+  accent: 'Theme colour',
+  clay: 'Clay',
+  sage: 'Sage',
+  ocean: 'Ocean',
+  sand: 'Sand',
+  rose: 'Rose',
+  plum: 'Plum',
+  teal: 'Teal',
+  slate: 'Slate',
+  olive: 'Olive',
+  amber: 'Amber',
+}
+
+/** Radio swatches: the dot colour shown next to this envelope everywhere. */
+function ColorPicker({
+  value,
+  onChange,
+  allowTheme,
+}: {
+  value: string
+  onChange: (color: string) => void
+  /** Everyday may keep the theme's own colour. */
+  allowTheme: boolean
+}) {
+  const options =
+    allowTheme || value === 'accent' ? ['accent', ...ENVELOPE_COLORS] : ENVELOPE_COLORS
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-sm font-medium">Colour</legend>
+      <div className="-ml-1.5 flex flex-wrap">
+        {options.map((c) => (
+          <label
+            key={c}
+            className="relative inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full"
+          >
+            <input
+              type="radio"
+              name="envelope-color"
+              value={c}
+              checked={value === c}
+              onChange={() => onChange(c)}
+              aria-label={COLOR_NAMES[c] ?? c}
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className={cx(
+                'h-7 w-7 rounded-full ring-offset-2 ring-offset-surface transition-shadow',
+                'peer-focus-visible:ring-2 peer-focus-visible:ring-accent',
+                value === c && 'ring-2 ring-text',
+              )}
+              style={{ backgroundColor: envelopeColor(c) }}
+            />
+          </label>
+        ))}
+      </div>
+    </fieldset>
   )
 }

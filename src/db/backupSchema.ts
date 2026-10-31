@@ -5,6 +5,7 @@
 import * as z from 'zod/mini'
 import { isValidISODate } from '../domain/dates'
 import { isSupportedCurrency } from '../domain/currencies'
+import { NOTE_MAX_LENGTH } from '../domain/types'
 import { DATE_STYLES, THEMES } from '../domain/settings'
 import type { EXPORTED_META_KEYS } from './repos/meta'
 
@@ -145,6 +146,15 @@ export const rowSchemas = {
     decidedAt: z.optional(instant),
   }),
   noSpend: z.object({ date: isoDate }),
+  // Exactly one of date / periodStart, and the id derived from it, is checked in backup.ts
+  // with the other cross-field rules.
+  notes: z.object({
+    id,
+    date: z.optional(isoDate),
+    periodStart: z.optional(isoDate),
+    text: z.string().check(z.maxLength(NOTE_MAX_LENGTH)),
+    updatedAt: instant,
+  }),
   meta: z.object({ key: z.string(), value: z.unknown() }),
 }
 

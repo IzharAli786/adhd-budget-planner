@@ -10,9 +10,12 @@ import {
   totalsOf,
   type BillEntry,
 } from '../../domain/bills'
+import { useFunds, useNotes, useTransactions } from '../../db/hooks'
 import { monthGrid } from '../../domain/calendar'
 import { addDays, addMonths } from '../../domain/dates'
+import { primaryIncome } from '../../domain/paySchedule'
 import { expandOccurrences, ruleDates } from '../../domain/recurrence'
+import { fundSaved, savingsOnPaydays } from '../../domain/savings'
 import type { ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
 import { useToday } from '../../lib/useToday'
@@ -97,6 +100,9 @@ function BillsView({
   const { bills, occurrences, incomes, paydayOverrides, period, laterEnd } = data
   const [month, setMonth] = useState(today)
   const [panel, setPanel] = useState<Panel>(null)
+  const funds = useFunds()
+  const transactions = useTransactions()
+  const notes = useNotes()
 
   const groups = useMemo(() => {
     const entries = billEntriesBetween(bills, occurrences, addDays(today, -OVERDUE_DAYS), laterEnd)
@@ -113,6 +119,16 @@ function BillsView({
       paydays: groupByDate(paydayEntriesBetween(incomes, paydayOverrides, gridFrom, gridTo)),
     }),
     [bills, occurrences, incomes, paydayOverrides, gridFrom, gridTo],
+  )
+  const savings = useMemo(() => {
+    if (!funds || !transactions) return undefined
+    const saved = new Map(funds.map((fund) => [fund.id, fundSaved(fund, transactions)]))
+    const paydays = [...calendar.paydays.values()].flat()
+    return savingsOnPaydays(paydays, funds, primaryIncome(incomes)?.id, saved)
+  }, [funds, transactions, calendar.paydays, incomes])
+  const noteDays = useMemo(
+    () => new Set((notes ?? []).flatMap((n) => (n.date ? [n.date] : []))),
+    [notes],
   )
 
   // The sheet reads its occurrence live, so a change made elsewhere (another tab) shows.
@@ -193,6 +209,8 @@ function BillsView({
           weekStart={settings.weekStart}
           bills={calendar.bills}
           paydays={calendar.paydays}
+          savings={savings}
+          notes={noteDays}
           onMonthChange={(d) => setMonth(d === 0 ? today : addMonths(grid.month, d))}
           onSelectDay={(date) => setPanel({ kind: 'day', date })}
         />
@@ -236,6 +254,7 @@ function BillsView({
         today={today}
         bills={panel?.kind === 'day' ? (calendar.bills.get(panel.date) ?? []) : []}
         paydays={panel?.kind === 'day' ? (calendar.paydays.get(panel.date) ?? []) : []}
+        savings={panel?.kind === 'day' ? (savings?.get(panel.date) ?? []) : []}
         onClose={() => setPanel(null)}
         onOpenBill={open}
         onAddBill={addBill}

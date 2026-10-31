@@ -137,6 +137,27 @@ export interface NoSpendDay {
   date: ISODate
 }
 
+/**
+ * A few words for a day ("dentist, card at home") or a pay period ("birthday month, go
+ * easy"). Exactly one of date / periodStart is set; the id is derived from it (noteId), so
+ * there is at most one note per day and per period and a save is a plain put.
+ */
+export interface Note {
+  id: string
+  date?: ISODate
+  periodStart?: ISODate
+  text: string
+  updatedAt: Instant
+}
+
+/** Notes are a few words; the cap only stops a pasted essay (or an edited backup). */
+export const NOTE_MAX_LENGTH = 2000
+
+export type NoteTarget = { date: ISODate } | { periodStart: ISODate }
+
+export const noteId = (target: NoteTarget) =>
+  'date' in target ? `day|${target.date}` : `period|${target.periodStart}`
+
 export interface UndoEntry {
   seq?: number
   at: Instant

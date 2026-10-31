@@ -11,6 +11,7 @@ import type {
   IncomeSource,
   Meta,
   NoSpendDay,
+  Note,
   PaydayOverride,
   SavingsFund,
   Transaction,
@@ -46,6 +47,8 @@ export const VERSIONS: readonly SchemaVersion[] = [
   },
   // v2: debts gain originalBalance (filled by MIGRATIONS[2]). No index changes.
   { version: 2, stores: {} },
+  // v3: day and pay-period notes. A new table only, so no transform: older rows pass through.
+  { version: 3, stores: { notes: 'id, date, periodStart' } },
 ]
 
 export const SCHEMA_VERSION = VERSIONS[VERSIONS.length - 1]!.version
@@ -63,6 +66,7 @@ export const DATA_TABLES = [
   'debts',
   'impulse',
   'noSpend',
+  'notes',
   'meta',
 ] as const
 export type DataTableName = (typeof DATA_TABLES)[number]
@@ -80,6 +84,7 @@ export interface RowTypes {
   debts: Debt
   impulse: ImpulseItem
   noSpend: NoSpendDay
+  notes: Note
   meta: Meta
 }
 
@@ -96,6 +101,7 @@ export const PRIMARY_KEY: Record<DataTableName, string> = {
   debts: 'id',
   impulse: 'id',
   noSpend: 'date',
+  notes: 'id',
   meta: 'key',
 }
 
@@ -115,6 +121,7 @@ export class SteadyDB extends Dexie {
   debts!: EntityTable<Debt, 'id'>
   impulse!: EntityTable<ImpulseItem, 'id'>
   noSpend!: EntityTable<NoSpendDay, 'date'>
+  notes!: EntityTable<Note, 'id'>
   undo!: EntityTable<UndoEntry, 'seq'>
   meta!: EntityTable<Meta, 'key'>
 
@@ -146,8 +153,11 @@ export class SteadyDB extends Dexie {
 // (thousands of rows at most), so read-all / write-all is fine and keeps transforms pure.
 async function runMigrationInTx(tx: DexieTransaction, migrate: Migration) {
   const data: TableData = {}
+  // storeNames lists the LATEST schema, but a step runs before later versions create their
+  // tables (v2's transform runs before v3 adds notes), so only read stores that exist now.
+  const existing = tx.idbtrans.objectStoreNames
   for (const table of tx.storeNames) {
-    if (table === 'undo') continue
+    if (table === 'undo' || !existing.contains(table)) continue
     data[table] = await tx.table(table).toArray()
   }
   const next = migrate(data)

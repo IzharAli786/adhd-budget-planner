@@ -143,5 +143,8 @@ export async function openFixture(name: string, version: number, rows: TableData
   raw.close()
 }
 
+/** The v1 fixture as a v2 install stored it (debts carry originalBalance). */
+export const V2_ROWS: TableData = migrateData(structuredClone(V1_ROWS), 1, 2)
+
 /** The v1 fixture in today's shape, for tests that write straight into the current schema. */
 export const LATEST_ROWS: TableData = migrateData(structuredClone(V1_ROWS), 1, SCHEMA_VERSION)

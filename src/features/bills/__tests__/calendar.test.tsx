@@ -33,9 +33,10 @@ function renderBills() {
 }
 
 describe('calendarDayLabel', () => {
-  const f = { dayLong: (d: string) => d }
+  const f = { dayLong: (d: string) => d, money: (c: number) => `€${c / 100}` }
   const due = { status: 'due' as const }
   const paid = { status: 'paid' as const }
+  const debt = { status: 'due' as const, debtId: 'card' }
   it.each([
     ['2026-10-31', [], 0, 'Today, 2026-10-31'],
     ['2026-11-01', [due], 1, '2026-11-01, 1 bill, payday'],
@@ -44,8 +45,16 @@ describe('calendarDayLabel', () => {
     ['2026-10-01', [paid, paid], 2, '2026-10-01, 2 bills, all paid, 2 paydays'],
     ['2026-10-01', [due, paid], 0, '2026-10-01, 2 bills, 1 unpaid'],
     ['2026-10-01', [due], 0, '2026-10-01, 1 bill, unpaid'],
+    ['2026-11-20', [due, debt], 0, '2026-11-20, 2 bills, 1 debt minimum'],
+    ['2026-11-20', [debt], 0, '2026-11-20, 1 bill, debt minimum'],
   ])('%s %j', (date, bills, paydays, expected) => {
     expect(calendarDayLabel(date, '2026-10-31', bills, paydays, f)).toBe(expected)
+  })
+
+  it('speaks savings set aside on a payday and a note', () => {
+    expect(
+      calendarDayLabel('2026-11-06', '2026-10-31', [], 1, f, { saving: 4000, note: true }),
+    ).toBe('2026-11-06, payday, set aside €40, note')
   })
 })
 

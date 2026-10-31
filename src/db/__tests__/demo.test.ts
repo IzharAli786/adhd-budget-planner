@@ -1,5 +1,6 @@
 import fc from 'fast-check'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { STARTER_CATEGORIES } from '../../domain/categories'
 import { addDays, daysBetween, isValidISODate } from '../../domain/dates'
 import { gardenPoints, spendDates } from '../../domain/garden'
 import { isImpulseExpired } from '../../domain/impulse'
@@ -140,6 +141,20 @@ describe('sample data', () => {
     expect(data.impulse.filter((i) => isImpulseExpired(i, now))).toHaveLength(1)
 
     expect(data.transactions.some((t) => t.date === TODAY && isSpend(t))).toBe(true)
+
+    // The common categories, as Plan's one tap makes them, with spending tagged into them.
+    expect(data.envelopes.filter((e) => e.isDefault).map((e) => e.name)).toEqual(['Everyday'])
+    expect(data.envelopes.map((e) => e.name)).toEqual(
+      expect.arrayContaining(STARTER_CATEGORIES.map((c) => c.name)),
+    )
+    expect(data.envelopes.every((e) => e.budget === 0)).toBe(true)
+    const ids = new Set(data.envelopes.map((e) => e.id))
+    const tagged = data.transactions.filter((t) => t.envelopeId !== undefined)
+    expect(tagged.length).toBeGreaterThan(10)
+    for (const t of tagged) expect(ids.has(t.envelopeId!)).toBe(true)
+    // One payday note, one day note.
+    expect(data.notes.filter((n) => n.periodStart).length).toBe(1)
+    expect(data.notes.filter((n) => n.date).length).toBe(1)
     expect(data.gardenPoints).toBeGreaterThanOrEqual(
       gardenPoints({ ...data, occurrences: data.billOccurrences }),
     )
