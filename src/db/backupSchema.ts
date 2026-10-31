@@ -129,6 +129,7 @@ export const rowSchemas = {
     name: z.string(),
     balance: amount,
     balanceAsOf: isoDate,
+    originalBalance: amount,
     aprBps: ranged(0, 100_000),
     minPayment: amount,
     dueDay: ranged(1, 31),

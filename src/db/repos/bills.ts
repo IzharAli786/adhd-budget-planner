@@ -73,9 +73,11 @@ export function editBill(id: Id, changes: BillPatch, today: ISODate) {
   })
 }
 
-const SPLIT_TABLES = ['bills', 'billOccurrences', 'transactions'] as const
+/** Tables a split writes; a caller running splitBill inside its own mutate needs them all. */
+export const SPLIT_TABLES = ['bills', 'billOccurrences', 'transactions'] as const
 
-async function splitBill(
+/** The split itself, inside a caller's transaction (editBillFrom, editBill, debts). */
+export async function splitBill(
   w: Writer,
   bill: Bill,
   date: ISODate,

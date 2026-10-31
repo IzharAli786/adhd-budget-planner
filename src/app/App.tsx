@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { BackupScreen } from '../features/backup/BackupScreen'
 import { BillsScreen } from '../features/bills/BillsScreen'
+import { DebtsScreen } from '../features/debts/DebtsScreen'
 import { GoalsScreen } from '../features/goals/GoalsScreen'
 import { InstallGate } from '../features/install/InstallGate'
 import { InstallScreen } from '../features/install/InstallScreen'
@@ -60,6 +61,7 @@ export function App() {
                     <Route path="more/settings" element={<SettingsScreen />} />
                     <Route path="more/backup" element={<BackupScreen />} />
                     <Route path="more/transactions" element={<TransactionsScreen />} />
+                    <Route path="more/debts" element={<DebtsScreen />} />
                     <Route path="more/install" element={<InstallScreen embedded />} />
                     <Route path="start" element={<StartRoute />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

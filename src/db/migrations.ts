@@ -7,9 +7,24 @@
 export type TableData = Record<string, unknown[]>
 export type Migration = (data: TableData) => TableData
 
-// Empty for v1. Example for a future v2 that renames a field:
-//   2: (d) => ({ ...d, bills: d.bills?.map((b) => ({ ...b, note: b.memo ?? '' })) ?? [] }),
-export const MIGRATIONS: Partial<Record<number, Migration>> = {}
+type DebtRow = { balance?: unknown; originalBalance?: unknown }
+
+export const MIGRATIONS: Partial<Record<number, Migration>> = {
+  // v2: "% paid" needs the balance a debt started from. Older rows never stored it, so the
+  // best honest guess is the balance as last entered: they start at 0% paid, not a made-up number.
+  2: (d) =>
+    d.debts === undefined
+      ? d
+      : {
+          ...d,
+          debts: d.debts.map((row) => {
+            const debt = row as DebtRow
+            return debt.originalBalance === undefined
+              ? { ...debt, originalBalance: debt.balance }
+              : debt
+          }),
+        },
+}
 
 /**
  * Applies every transform from `from` (exclusive) to `to` (inclusive). A version without

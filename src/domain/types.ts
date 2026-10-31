@@ -114,6 +114,8 @@ export interface Debt {
   name: string
   balance: Cents
   balanceAsOf: ISODate
+  /** Balance when the debt was added (schema v2), so "% paid" survives balance edits. */
+  originalBalance: Cents
   aprBps: number
   minPayment: Cents
   dueDay: number

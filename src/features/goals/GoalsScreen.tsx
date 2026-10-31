@@ -1,14 +1,19 @@
-import { EmptyState, PageHeader } from '../../ui/PageHeader'
-import { Icon } from '../../ui/Icon'
+import { DebtsSection } from '../debts/DebtsSection'
+import { PageHeader } from '../../ui/PageHeader'
 
 export function GoalsScreen() {
   return (
     <>
       <PageHeader title="Goals" subtitle="Small steps that add up." />
-      <EmptyState icon={<Icon name="goals" size={26} />} title="Goals are coming">
-        Savings funds, a debt payoff plan that compares snowball and avalanche, and no-spend days.
-        Progress only grows.
-      </EmptyState>
+      <section aria-labelledby="goals-debts" className="space-y-3">
+        <h2
+          id="goals-debts"
+          className="px-1 text-xs font-semibold tracking-wider text-muted uppercase"
+        >
+          Debts
+        </h2>
+        <DebtsSection />
+      </section>
     </>
   )
 }
