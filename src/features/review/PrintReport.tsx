@@ -5,9 +5,11 @@ import { paidBillsIn, type DateRange } from '../../domain/insights'
 import { carryOver, flowsIn, historyStart, type PeriodSummary } from '../../domain/review'
 import { fundSaved } from '../../domain/savings'
 import type { ISODate } from '../../domain/types'
+import type { DebtsYear, FundYear } from '../../domain/yearSummary'
 import type { Formatters } from '../bills/format'
 import { insightRows } from './insightRows'
 import { InsightsTable } from './InsightsTable'
+import { DebtTable, SavingsTable } from './YearCards'
 import type { ReviewData } from './useReviewData'
 
 export type PrintTarget =
@@ -19,6 +21,10 @@ export type PrintTarget =
       rows: PeriodSummary[]
       rowLabel: (r: PeriodSummary) => string
       periods: number
+      /** Look back's year cards, printed as their tables. */
+      funds: FundYear[]
+      debts: DebtsYear | null
+      when: string
     }
 
 /**
@@ -128,7 +134,29 @@ export function PrintReport({
         )}
       </Block>
 
-      {(data.funds.length > 0 || data.debts.length > 0) && (
+      {target.kind === 'year' && target.funds.length > 0 && (
+        <Block title={`Savings ${target.when}`}>
+          <SavingsTable
+            funds={target.funds}
+            f={f}
+            caption={`Savings ${target.when}`}
+            when={target.when}
+          />
+        </Block>
+      )}
+
+      {target.kind === 'year' && target.debts && (
+        <Block title={`Debt ${target.when}`}>
+          <DebtTable
+            debts={target.debts}
+            f={f}
+            caption={`Debt ${target.when}`}
+            when={target.when}
+          />
+        </Block>
+      )}
+
+      {target.kind === 'period' && (data.funds.length > 0 || data.debts.length > 0) && (
         <Block title="Funds and debts">
           <table className="w-full tabular-nums">
             <tbody className="divide-y divide-line">

@@ -6,7 +6,7 @@ import { useId, useState } from 'react'
 import { topCategories } from '../../domain/insights'
 import { cx } from '../../ui/cx'
 import type { Formatters } from '../bills/format'
-import { seriesColor, type InsightRow } from './insightRows'
+import type { InsightRow } from './insightRows'
 import { InsightsTable } from './InsightsTable'
 
 interface Props {
@@ -29,11 +29,9 @@ export default function InsightsCharts({ rows, f, caption, centerLabel = 'Spent'
   const [showTable, setShowTable] = useState(false)
   const tableId = useId()
   const { top, rest, total } = topCategories(rows)
-  // One colour per row, so a slice and its bar always match: by rank for the slices, then
-  // the rows with nothing spent yet (bars only). Rows rolled into "Everything else" are muted.
-  const unspent = rows.filter((r) => r.actual <= 0).map((r) => r.key)
-  const ranked = [...top.map((s) => s.row.key), ...(rest > 0 ? [] : unspent)]
-  const color = new Map(ranked.slice(0, 6).map((key, i) => [key, seriesColor(i)]))
+  // Each row brings its own colour (an envelope's, as in the envelope list), so a slice,
+  // its legend line and its bar always match. Rows rolled into "Everything else" are muted.
+  const color = new Map(rows.map((r) => [r.key, r.color]))
   const colorOf = (key: string) => color.get(key) ?? 'var(--muted)'
   const slices = [
     ...top.map((s) => ({ key: s.row.key, name: s.row.name, amount: s.row.actual, share: s.share })),
@@ -162,7 +160,11 @@ function Bar({
   f: Formatters
 }) {
   const w = (v: number) => `${Math.min(100, (v / scale) * 100)}%`
-  const over = row.planned !== null && row.planned > 0 && row.actual > row.planned
+  // A budget of 0 is "no budget yet", not a plan that was blown: no track to fill, just
+  // the actual, so a full-looking bar never suggests a limit that was never set.
+  const noBudget = row.planned === 0
+  const planned = noBudget ? null : row.planned
+  const over = planned !== null && planned > 0 && row.actual > planned
   return (
     <li>
       <div className="flex items-center gap-2.5 whitespace-nowrap text-body">
@@ -170,16 +172,16 @@ function Bar({
         <span className="min-w-0 flex-1 truncate">{row.name}</span>
         <span className="shrink-0 tabular-nums">
           {f.money(row.actual)}
-          {row.planned !== null && <span className="text-muted"> of {f.money(row.planned)}</span>}
+          {planned !== null && <span className="text-muted"> of {f.money(planned)}</span>}
         </span>
       </div>
       <div className="relative mt-1.5 h-2.5 overflow-hidden rounded-full bg-bg ring-1 ring-line">
-        {row.planned !== null && (
+        {planned !== null && (
           // The plan as a soft track of the same colour; the actual sits on top of it.
           <div
             className="absolute inset-y-0 left-0 rounded-full"
             style={{
-              width: w(row.planned),
+              width: w(planned),
               background: `color-mix(in oklab, ${color} 22%, var(--surface))`,
             }}
           />
@@ -191,13 +193,19 @@ function Bar({
         {over && (
           <div
             className="absolute inset-y-0 w-0.5 bg-text/60"
-            style={{ left: `calc(${w(row.planned!)} - 1px)` }}
+            style={{ left: `calc(${w(planned!)} - 1px)` }}
           />
         )}
       </div>
+      {/* Under the bar, so a long envelope name keeps its room on a phone. */}
+      {noBudget && (
+        <p className="mt-1 text-caption text-muted tabular-nums">
+          {f.money(row.actual)} spent · no budget yet
+        </p>
+      )}
       {over && (
         <p className="mt-1 text-caption text-muted tabular-nums">
-          {f.money(row.actual - row.planned!)} past the plan. It came from what was free.
+          {f.money(row.actual - planned!)} past the plan. It came from what was free.
         </p>
       )}
     </li>

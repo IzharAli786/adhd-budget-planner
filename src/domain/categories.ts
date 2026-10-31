@@ -67,3 +67,16 @@ export function nextEnvelopeColor(
     ENVELOPE_COLORS[live.length % ENVELOPE_COLORS.length]!
   )
 }
+
+/** The starter category new bills land in, so a bill shows up under it in Insights. */
+export const BILLS_CATEGORY = 'Bills & utilities'
+
+/**
+ * Where a new bill goes by default: the live "Bills & utilities" envelope when there is one
+ * (common categories added), else none. Only a default: the bill form lets you change it.
+ */
+export function defaultBillEnvelope(
+  envelopes: readonly Pick<Envelope, 'id' | 'name' | 'deletedAt'>[],
+): Envelope['id'] | undefined {
+  return envelopes.find((e) => e.deletedAt === undefined && key(e.name) === key(BILLS_CATEGORY))?.id
+}

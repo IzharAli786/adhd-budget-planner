@@ -130,6 +130,53 @@ describe('Look back', () => {
     await waitFor(() => expect(container.querySelector('.print-report')).toBeNull())
   })
 
+  it('shows savings and debt for the year, as a list or a table, and prints both', async () => {
+    await seedHistory()
+    const fund = await r.addFund({
+      name: 'Holiday',
+      target: 100000,
+      perPeriod: 5000,
+      openingSaved: 10000,
+    })
+    await r.addToFund(fund, 15000, '2026-10-30')
+    await r.addDebt({
+      name: 'Card',
+      balance: 120000,
+      balanceAsOf: '2026-10-25',
+      aprBps: 2000,
+      minPayment: 3500,
+      dueDay: 2,
+    })
+    const card = (await r.listBills()).find((b) => b.debtId)!
+    await r.markPaid(card.id, '2026-11-02', 3500)
+    const print = vi.fn()
+    window.print = print
+    goto('/more/review')
+    const { container } = render(<App />)
+
+    const savings = await screen.findByRole('region', { name: 'Savings this year' })
+    expect(within(savings).getByText(/€150\.00 moved into your funds this year/)).toBeTruthy()
+    await userEvent.click(within(savings).getByRole('button', { name: 'Show as a table' }))
+    const fundRow = within(within(savings).getByRole('table')).getByRole('row', { name: /Holiday/ })
+    expect(within(fundRow).getByText('€150.00')).toBeTruthy()
+    expect(within(fundRow).getByText(/25\s?%/)).toBeTruthy() // 250 of 1,000
+
+    const debt = screen.getByRole('region', { name: 'Debt this year' })
+    await userEvent.click(within(debt).getByRole('button', { name: 'Show as a table' }))
+    const debtTable = within(debt).getByRole('table')
+    const cardRow = within(debtTable).getByRole('row', { name: /^Card/ })
+    expect(within(cardRow).getByText('€35.00')).toBeTruthy()
+    expect(within(cardRow).getByText('€1,200.00')).toBeTruthy()
+    // The interest figure says what it is: a rough estimate.
+    expect(within(debtTable).getByText(/an estimate at today’s balances/)).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Print this year' }))
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1))
+    const report = container.querySelector('.print-report') as HTMLElement
+    expect(within(report).getByRole('heading', { name: 'Savings this year' })).toBeTruthy()
+    expect(within(report).getByRole('heading', { name: 'Debt this year' })).toBeTruthy()
+  })
+
   it('prints the latest period on its own', async () => {
     await seedHistory()
     const print = vi.fn()
@@ -175,6 +222,27 @@ describe('Insights on Plan', () => {
     expect(within(insights).getByText(/money is going, by envelope/)).toBeTruthy()
     // Over the plan reads as calm words, never red.
     expect(await within(insights).findByText(/€5\.00 past the plan/)).toBeTruthy()
+    // Rent is in no envelope, yet still shows where the money goes; Everyday has no budget.
+    await userEvent.click(within(insights).getByRole('button', { name: 'Show as a table' }))
+    const table = within(insights).getByRole('table')
+    const bills = within(table).getByRole('row', { name: /Bills/ })
+    expect(within(bills).getAllByText('€900.00')).toHaveLength(2)
+    const everyday = within(table).getByRole('row', { name: /Everyday/ })
+    expect(within(everyday).getByText('No budget yet')).toBeTruthy()
+  })
+
+  it('says “no budget yet” for spending in an envelope without one, with no plan track', async () => {
+    await seedHistory()
+    await r.updateSettings({ envelopesEnabled: true })
+    await r.ensureDefaultEnvelope()
+    goto('/plan')
+    const { container } = render(<App />)
+    const insights = await screen.findByRole('region', { name: 'Insights' })
+    // Everyday: the €12 coffee since payday, in an envelope with no budget.
+    expect(await within(insights).findByText(/spent · no budget yet/)).toBeTruthy()
+    // Its legend colour is the envelope's own (Everyday follows the accent).
+    const swatches = [...container.querySelectorAll<HTMLElement>('figure [aria-hidden] span')]
+    expect(swatches.some((el) => el.style.background === 'var(--accent)')).toBe(true)
   })
 
   it('steps back to an earlier pay period, read-only', async () => {

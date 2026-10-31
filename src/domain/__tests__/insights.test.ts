@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   spendByCategory,
   spendByEnvelope,
+  spendOutsideEnvelopes,
   topCategories,
   type DateRange,
   type EnvelopeSpend,
@@ -161,10 +162,10 @@ describe('spendByCategory (envelopes off)', () => {
       PERIOD,
     )
     expect(rows).toEqual([
-      { id: 'everyday', name: 'Everyday', planned: null, actual: 2000 },
+      { id: 'everyday', name: 'Everyday spending', planned: null, actual: 2000 },
       { id: 'bills', name: 'Bills', planned: 92000, actual: 90000 },
       { id: 'savings', name: 'Savings', planned: 5000, actual: 4000 },
-      { id: 'debt', name: 'Debt payments', planned: 5000, actual: 7500 },
+      { id: 'debt', name: 'Debt', planned: 5000, actual: 7500 },
     ])
   })
 
@@ -182,6 +183,41 @@ describe('spendByCategory (envelopes off)', () => {
   it('scales the savings plan by the number of pay periods', () => {
     const rows = spendByCategory([], [], [], [fund], PERIOD, 12)
     expect(rows.find((r) => r.id === 'savings')!.planned).toBe(60000)
+  })
+})
+
+describe('spendOutsideEnvelopes (envelopes on)', () => {
+  const debtMin = bill('card', 5000, '2026-11-15', { debtId: 'card' })
+  const rent = bill('rent', 90000, '2026-11-01')
+  const water = bill('water', 3000, '2026-11-02', { envelopeId: 'food' })
+  const gone = bill('gym', 2500, '2026-11-03', { envelopeId: 'deleted-env' })
+
+  it('shows unlinked bills and debt payments, never a bill already in an envelope', () => {
+    const rows = spendOutsideEnvelopes(
+      [tx(-2500, { debtId: 'card' }), tx(-1200)],
+      [paid(rent), paid(debtMin), paid(water), paid(gone)],
+      [rent, debtMin, water, gone],
+      ENVS,
+      PERIOD,
+    )
+    expect(rows).toEqual([
+      // A bill linked to a deleted envelope has no envelope to sit in, so it is a bill here.
+      { id: 'bills', name: 'Bills', planned: 92500, actual: 92500 },
+      { id: 'debt', name: 'Debt', planned: 5000, actual: 7500 },
+    ])
+    // ...and the linked one is in its envelope, exactly once.
+    expect(actualOf(spendByEnvelope([], [paid(water)], [water], ENVS, PERIOD), 'food')).toBe(3000)
+  })
+
+  it('counts a minimum paid through a logged entry once', () => {
+    const rows = spendOutsideEnvelopes(
+      [tx(-5000, { debtId: 'card', billOccurrenceId: 'card|2026-11-15' })],
+      [paid(debtMin)],
+      [debtMin],
+      ENVS,
+      PERIOD,
+    )
+    expect(rows.find((r) => r.id === 'debt')!.actual).toBe(5000)
   })
 })
 

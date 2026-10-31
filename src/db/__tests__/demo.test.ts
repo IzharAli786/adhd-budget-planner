@@ -5,6 +5,10 @@ import { addDays, daysBetween, isValidISODate } from '../../domain/dates'
 import { gardenPoints, spendDates } from '../../domain/garden'
 import { isImpulseExpired } from '../../domain/impulse'
 import { isSpend } from '../../domain/reconcile'
+import { addedOnMap, billEntriesBetween } from '../../domain/bills'
+import { isDebtPayment, isEverydaySpend } from '../../domain/insights'
+import { payPeriodRanges, periodSummaries } from '../../domain/review'
+import { planToday } from '../../domain/today'
 import { todayISO } from '../../lib/clock'
 import { exportBackup, importBackup, validateBackup } from '../backup'
 import {
@@ -20,7 +24,7 @@ import {
 } from '../demo'
 import * as r from '../repos'
 import { db } from '../schema'
-import { buildDemoData, seedDemo } from '../seed/demo'
+import { buildDemoData, DEMO_PAST_PERIODS, seedDemo } from '../seed/demo'
 import { setCreateGuard, undoLast } from '../undo'
 import { resetDb } from './helpers'
 
@@ -50,7 +54,8 @@ describe('sample data', () => {
         for (const t of data.transactions) {
           expect(isValidISODate(t.date)).toBe(true)
           expect(daysBetween(t.date, today)).toBeGreaterThanOrEqual(0)
-          expect(daysBetween(t.date, today)).toBeLessThanOrEqual(14)
+          // About nine months back, never more than a year.
+          expect(daysBetween(t.date, today)).toBeLessThanOrEqual(14 * (DEMO_PAST_PERIODS + 1) + 7)
           expect(t.createdAt <= nowISO).toBe(true)
         }
         for (const c of data.checkIns) {
@@ -115,16 +120,49 @@ describe('sample data', () => {
     const data = buildDemoData(TODAY, NOW)
     const regular = data.bills.filter((b) => !b.debtId)
     expect(regular.length).toBeGreaterThanOrEqual(6)
-    expect(data.bills.length).toBeLessThanOrEqual(8)
+    expect(data.bills.length).toBeLessThanOrEqual(9)
     expect(regular.map((b) => b.name)).toEqual(
       expect.arrayContaining(['Rent', 'Phone', 'Streaming', 'Home insurance']),
     )
-    // Some bills paid, some still to come.
-    expect(data.billOccurrences.length).toBeGreaterThan(0)
-    expect(data.bills.length).toBeGreaterThan(data.billOccurrences.length)
+    // Every bill paid on each of its past dates (nothing overdue), each everyday one in a
+    // category, so rent and the rest show up in Insights.
+    const start = data.checkIns[0]!.date
+    const past = billEntriesBetween(data.bills, [], start, TODAY)
+    expect(past.length).toBeGreaterThan(6 * data.bills.length)
+    const paid = new Set(data.billOccurrences.map((o) => o.id))
+    for (const e of past) expect(paid.has(`${e.billId}|${e.originalDate}`)).toBe(true)
+    for (const b of regular) expect(b.envelopeId).toBeDefined()
+    // ...and some still to come before payday.
+    expect(billEntriesBetween(data.bills, [], TODAY, addDays(TODAY, 14)).length).toBeGreaterThan(0)
 
-    expect(data.transactions.length).toBeGreaterThanOrEqual(23)
-    expect(data.transactions.length).toBeLessThanOrEqual(27)
+    // 6-12 months of history, with 8-15 tagged everyday entries in every past pay period.
+    expect(daysBetween(start, TODAY)).toBeGreaterThanOrEqual(183)
+    expect(daysBetween(start, TODAY)).toBeLessThanOrEqual(366)
+    const income = data.incomes[0]!
+    const periods = payPeriodRanges(
+      { incomes: data.incomes, paydayOverrides: [] },
+      { start, end: addDays(TODAY, -14) },
+    ).filter((r) => r.end <= addDays(TODAY, -13))
+    expect(periods.length).toBeGreaterThanOrEqual(12)
+    for (const r of periods) {
+      const spends = data.transactions.filter(
+        (t) => isEverydaySpend(t) && t.envelopeId && t.date >= r.start && t.date < r.end,
+      )
+      expect(spends.length).toBeGreaterThanOrEqual(8)
+      expect(spends.length).toBeLessThanOrEqual(15)
+    }
+    // A check-in every payday, so each one has a carry-over to show.
+    const checkInDays = new Set(data.checkIns.map((c) => c.date))
+    if (income.schedule.kind === 'biweekly')
+      for (const r of periods) expect(checkInDays.has(r.start)).toBe(true)
+    // Both funds and both debts have history.
+    for (const f of data.funds)
+      expect(data.transactions.filter((t) => t.fundId === f.id).length).toBeGreaterThan(6)
+    for (const d of data.debts) {
+      const min = data.bills.find((b) => b.debtId === d.id)!
+      expect(data.billOccurrences.filter((o) => o.billId === min.id).length).toBeGreaterThan(5)
+    }
+    expect(data.transactions.some((t) => isDebtPayment(t))).toBe(true)
     expect(data.funds).toHaveLength(2)
     expect(data.funds.some((f) => f.challenge?.kind === '52week')).toBe(true)
     expect(data.debts).toHaveLength(2)
@@ -147,7 +185,9 @@ describe('sample data', () => {
     expect(data.envelopes.map((e) => e.name)).toEqual(
       expect.arrayContaining(STARTER_CATEGORIES.map((c) => c.name)),
     )
-    expect(data.envelopes.every((e) => e.budget === 0)).toBe(true)
+    // Budgets on the everyday categories; the bill ones read "no budget yet".
+    expect(data.envelopes.find((e) => e.name === 'Groceries')!.budget).toBeGreaterThan(0)
+    expect(data.envelopes.find((e) => e.name === 'Rent & housing')!.budget).toBe(0)
     const ids = new Set(data.envelopes.map((e) => e.id))
     const tagged = data.transactions.filter((t) => t.envelopeId !== undefined)
     expect(tagged.length).toBeGreaterThan(10)
@@ -155,16 +195,56 @@ describe('sample data', () => {
     // One payday note, one day note.
     expect(data.notes.filter((n) => n.periodStart).length).toBe(1)
     expect(data.notes.filter((n) => n.date).length).toBe(1)
-    expect(data.gardenPoints).toBeGreaterThanOrEqual(
-      gardenPoints({ ...data, occurrences: data.billOccurrences }),
+    expect(data.gardenPoints).toBe(gardenPoints({ ...data, occurrences: data.billOccurrences }))
+  })
+
+  it('keeps today sensible on any day: ready, positive, and the history adds up', () => {
+    fc.assert(
+      fc.property(someDay, ({ today, now, decimals }) => {
+        const data = buildDemoData(today, now, decimals)
+        const plan = planToday({
+          today,
+          incomes: data.incomes,
+          paydayOverrides: [],
+          bills: data.bills,
+          occurrences: data.billOccurrences,
+          transactions: data.transactions,
+          checkIn: data.checkIns.at(-1),
+          funds: data.funds,
+          envelopes: data.envelopes,
+          envelopesEnabled: true,
+          addedOn: addedOnMap(data.bills, (at) => todayISO(new Date(at))),
+        })
+        expect(plan.kind).toBe('ready')
+        if (plan.kind !== 'ready') return
+        // Nothing overdue, nothing short, and a balance never below zero at a check-in.
+        expect(plan.safe.dueEntries.every((e) => e.date >= today)).toBe(true)
+        expect(plan.safe.total).toBeGreaterThan(0)
+        for (const c of data.checkIns) expect(c.balance).toBeGreaterThan(0)
+        // Look back: each payday's carry-over comes straight from its check-in, and none
+        // of the paydays is a loss on paper the household never had.
+        const input = {
+          today,
+          incomes: data.incomes,
+          paydayOverrides: [],
+          bills: data.bills,
+          occurrences: data.billOccurrences,
+          transactions: data.transactions,
+          checkIns: data.checkIns,
+        }
+        const year = Number(today.slice(0, 4))
+        for (const row of periodSummaries(year, 'payday', input))
+          if (row.carried) expect(row.carried.amount).toBeGreaterThanOrEqual(0)
+      }),
+      { numRuns: 40 },
     )
   })
 
   it('keeps amounts in whole currency units for any decimals', () => {
     const yen = buildDemoData(TODAY, NOW, 0)
     const euro = buildDemoData(TODAY, NOW, 2)
-    expect(yen.incomes[0]!.amount).toBe(1640)
-    expect(euro.incomes[0]!.amount).toBe(164000)
+    expect(yen.incomes[0]!.amount).toBe(1125)
+    expect(euro.incomes[0]!.amount).toBe(112500)
   })
 })
 
@@ -209,7 +289,7 @@ describe('seedDemo', () => {
   it('uses the decimals of the currency already chosen', async () => {
     await r.updateSettings({ currency: 'JPY', decimals: 0 })
     await seedDemo(NOW)
-    expect((await db.incomes.toArray())[0]!.amount).toBe(1640)
+    expect((await db.incomes.toArray())[0]!.amount).toBe(1125)
     expect((await r.getSettings()).currency).toBe('JPY')
   })
 })
@@ -376,7 +456,7 @@ describe('bring your setup into the full app', () => {
     await importBackup(result.backup, NOW)
 
     expect(await db.incomes.count()).toBe(1)
-    expect(await db.bills.count()).toBe(8)
+    expect(await db.bills.count()).toBe(9)
     expect(await db.funds.count()).toBe(2)
     expect(await db.debts.count()).toBe(2)
     for (const table of ['transactions', 'checkIns', 'billOccurrences', 'impulse', 'noSpend']) {

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { defaultBillEnvelope } from '../../domain/categories'
 import { choiceFromRule, ruleFromChoice, type Repeat, type RepeatChoice } from '../../domain/bills'
 import { isValidISODate } from '../../domain/dates'
 import type { Bill, Envelope, Id, ISODate } from '../../domain/types'
@@ -70,7 +71,11 @@ export function BillForm({
   const [name, setName] = useState(bill?.name ?? '')
   const [amount, setAmount] = useState<number | null>(bill?.amount ?? null)
   const [autopay, setAutopay] = useState(bill?.autopay ?? false)
-  const [envelopeId, setEnvelopeId] = useState<Id | undefined>(bill?.envelopeId)
+  // A new bill starts in "Bills & utilities" when that envelope exists, so it shows up in
+  // Insights under it; an existing bill keeps whatever it had.
+  const [envelopeId, setEnvelopeId] = useState<Id | undefined>(
+    bill ? bill.envelopeId : defaultBillEnvelope(envelopes),
+  )
   const [choice, setChoice] = useState<RepeatChoice>(initial)
   // Rules the form can't show exactly (from a split or a backup) stay as stored unless
   // the user actually changes the repeat fields.

@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { answerSetup, hero } from './helpers'
+import { answerSetup, hero, heroCents } from './helpers'
 
 async function seriousViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
@@ -45,5 +45,35 @@ test('sample data opens a filled-in Today', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: /Look around with sample data/ }).click()
   await expect(hero(page)).toHaveText(/\d/)
+  // Months of history behind it, and still a calm, positive number for today.
+  expect(await heroCents(page)).toBeGreaterThan(0)
+  expect(await seriousViolations(page)).toEqual([])
+})
+
+test('sample data fills Insights and Look back', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Look around with sample data/ }).click()
+  await expect(hero(page)).toHaveText(/\d/)
+
+  // Insights on Plan: the envelopes plus the debt payments, rent included (in its envelope).
+  await page.getByRole('link', { name: 'Plan' }).first().click()
+  const insights = page.getByRole('region', { name: 'Insights' })
+  await expect(insights.getByText('Planned and actual')).toBeVisible()
+  await insights.getByRole('button', { name: 'Show as a table' }).click()
+  const table = insights.getByRole('table')
+  for (const name of ['Rent & housing', 'Groceries', 'Eating out', 'Debt'])
+    await expect(table.getByRole('rowheader', { name, exact: true })).toBeVisible()
+  expect(await seriousViolations(page)).toEqual([])
+
+  // Look back: months of money in and out, carry-over per payday, savings and debt.
+  await page.getByRole('link', { name: 'More' }).first().click()
+  await page.getByRole('link', { name: /Look back/ }).click()
+  await expect(page.getByRole('region', { name: 'Savings this year' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Debt this year' })).toBeVisible()
+  const months = page.getByRole('region', { name: 'Period table' }).getByRole('row')
+  expect(await months.count()).toBeGreaterThan(3)
+  await page.getByRole('radio', { name: 'Per payday' }).click()
+  await expect(page.getByText(/You carried .+ into this payday\./)).toBeVisible()
   expect(await seriousViolations(page)).toEqual([])
 })

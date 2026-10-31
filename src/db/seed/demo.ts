@@ -1,8 +1,15 @@
 // "Look around with sample data" (PLAN §7): one calm, believable household, built
 // relative to TODAY so the demo never shows stale dates. buildDemoData is pure (dates and
 // the clock are parameters), which is what the tests check; seedDemo writes it.
+//
+// It carries about nine months of history (paydays, paid bills, tagged spending, savings
+// and debt payments, a check-in every payday), so Insights, Look back and the carry-over
+// have something real to show. None of it counts toward the demo's 25 entries: seedDemo
+// writes the rows directly, never through the capped repos.
+import { billEntriesBetween } from '../../domain/bills'
 import { STARTER_CATEGORIES } from '../../domain/categories'
-import { addDays, addMonths, isWeekend, parseISODate } from '../../domain/dates'
+import { addDays, addMonths, isWeekend, makeDate, parseISODate } from '../../domain/dates'
+import { gardenPoints } from '../../domain/garden'
 import { challengeTotal } from '../../domain/savings'
 import { withDefaults, type Settings } from '../../domain/settings'
 import type {
@@ -57,6 +64,89 @@ export const SEEDED_TABLES = [
   'notes',
 ] as const satisfies readonly (keyof DemoData)[]
 
+/** Pay periods of history before the current one: about nine months, so Look back has a
+ *  year that reads like one and Insights has past periods to step back through. */
+export const DEMO_PAST_PERIODS = 19
+
+// A small seeded generator (mulberry32), so the household is the same on every visit and
+// in tests while its spending still looks real and uneven.
+function rng(seed: number) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+type Spend = readonly [note: string, min: number, max: number]
+/** What everyday spending looks like: a category, how often it comes up, typical prices. */
+const SPENDS: readonly { category?: string; weight: number; kinds: readonly Spend[] }[] = [
+  {
+    category: 'Groceries',
+    weight: 30,
+    kinds: [
+      ['Groceries', 32, 95],
+      ['Market', 12, 30],
+    ],
+  },
+  {
+    category: 'Eating out',
+    weight: 30,
+    kinds: [
+      ['Coffee', 2.8, 4.2],
+      ['Lunch', 7.5, 13],
+      ['Takeaway', 15, 27],
+      ['Dinner out', 26, 52],
+    ],
+  },
+  {
+    category: 'Transport',
+    weight: 18,
+    kinds: [
+      ['Bus', 2.4, 2.8],
+      ['Petrol', 40, 62],
+      ['Train', 7, 19],
+    ],
+  },
+  {
+    category: 'Fun',
+    weight: 9,
+    kinds: [
+      ['Cinema', 10, 14],
+      ['Books', 9, 24],
+      ['Concert', 28, 55],
+    ],
+  },
+  {
+    category: 'Personal care',
+    weight: 6,
+    kinds: [
+      ['Pharmacy', 6, 22],
+      ['Haircut', 18, 28],
+    ],
+  },
+  { category: 'Gifts', weight: 4, kinds: [['Gift', 15, 45]] },
+  { category: 'Other', weight: 5, kinds: [['Hardware shop', 6, 24]] },
+  // Untagged: lands in Everyday, as an untagged entry does in the app.
+  { weight: 6, kinds: [['Snacks', 2, 6]] },
+]
+const SPEND_WEIGHT = SPENDS.reduce((a, s) => a + s.weight, 0)
+
+// Per-pay-period budgets on the categories everyday spending goes into. The bill
+// categories stay at 0 ("no budget yet"): their bills are planned on the calendar.
+const BUDGETS: Record<string, number> = {
+  Groceries: 200,
+  'Eating out': 90,
+  Transport: 90,
+  Fun: 40,
+  'Personal care': 30,
+  Gifts: 30,
+  Other: 25,
+}
+
 /**
  * @param today the local calendar day
  * @param now   the current instant (for "added 10 hours ago" and today's entries)
@@ -76,16 +166,22 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     while (parseISODate(date).day > 28) date = addDays(date, offset < 0 ? -1 : 1)
     return date
   }
-  const setUpOn = at(day(-40), 19)
 
-  // Paid every other week; last payday a few weekdays ago.
+  // Paid every other week; last payday a few weekdays ago, with nine months of paydays
+  // before it. Steps of 14 days keep every one on the same weekday.
   let lastPayday = day(-5)
   while (isWeekend(lastPayday)) lastPayday = addDays(lastPayday, -1)
+  const paydays = Array.from({ length: DEMO_PAST_PERIODS + 1 }, (_, i) =>
+    addDays(lastPayday, -14 * (DEMO_PAST_PERIODS - i)),
+  )
+  const historyStart = paydays[0]!
+  const setUpOn = at(addDays(historyStart, -1), 19)
+  const pay = money(1125)
   const incomes: IncomeSource[] = [
     {
       id: 'demo-pay',
       name: 'Pay',
-      amount: money(1640),
+      amount: pay,
       schedule: { kind: 'biweekly', anchor: lastPayday },
       weekendRule: 'before',
       primary: true,
@@ -93,75 +189,94 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     },
   ]
 
-  const checkIns: BalanceCheckIn[] = [
-    { id: 'demo-checkin-1', at: at(lastPayday, 18), date: lastPayday, balance: money(2105.4) },
-    { id: 'demo-checkin-2', at: at(day(-1), 21), date: day(-1), balance: money(1486.2) },
+  // The "common categories" set, as one tap in Plan makes it, plus Everyday, with budgets
+  // on the everyday ones so Insights can show planned against actual.
+  const envelopes: Envelope[] = [
+    {
+      id: 'demo-env-everyday',
+      name: 'Everyday',
+      budget: 0,
+      isDefault: true,
+      color: 'accent',
+      sort: 0,
+    },
+    ...STARTER_CATEGORIES.map((c, i) => ({
+      id: `demo-env-${i + 1}`,
+      name: c.name,
+      budget: money(BUDGETS[c.name] ?? 0),
+      isDefault: false,
+      color: c.color,
+      sort: i + 1,
+    })),
   ]
-  const lastCheckIn = checkIns[1]!
+  const env = (name: string) => envelopes.find((e) => e.name === name)!.id
 
+  // Every past occurrence is paid on its day, so nothing shows as overdue and the paid
+  // bills fill Insights and Look back.
   const bills: Bill[] = []
   const billOccurrences: BillOccurrence[] = []
-  function bill(id: string, name: string, amount: number, offset: number, autopay: boolean) {
-    const due = dueNear(offset)
-    const { day: dom } = parseISODate(due)
-    const row: Bill = {
-      id: `demo-bill-${id}`,
-      name,
-      amount: money(amount),
-      // Anchored on this occurrence: no earlier month exists to show up as "overdue".
-      rule: { freq: 'monthly', interval: 1, day: dom, anchor: due },
-      autopay,
+  const firstOnOrAfter = (from: ISODate, dom: number) => {
+    const { year, month } = parseISODate(from)
+    const date = makeDate(year, month, dom)
+    return date >= from ? date : addMonths(date, 1)
+  }
+  function monthly(row: Omit<Bill, 'rule' | 'createdAt'>, dom: number) {
+    const bill: Bill = {
+      ...row,
+      rule: { freq: 'monthly', interval: 1, day: dom, anchor: firstOnOrAfter(historyStart, dom) },
       createdAt: setUpOn,
     }
-    bills.push(row)
-    // Past ones are paid, before the last check-in, so they're already in that balance.
-    if (due < today) {
+    bills.push(bill)
+    for (const e of billEntriesBetween([bill], [], historyStart, today))
       billOccurrences.push({
-        id: occurrenceId(row.id, due),
-        billId: row.id,
-        originalDate: due,
+        id: occurrenceId(bill.id, e.originalDate),
+        billId: bill.id,
+        originalDate: e.originalDate,
         status: 'paid',
-        paidAmount: row.amount,
-        paidAt: due < lastCheckIn.date ? at(due, 9) : at(lastCheckIn.date, 20),
-        ...(autopay ? { auto: true } : {}),
+        paidAmount: bill.amount,
+        paidAt: at(e.originalDate, 9),
+        ...(bill.autopay ? { auto: true } : {}),
       })
-    }
-    return row
   }
-  bill('rent', 'Rent', 950, -4, false)
-  bill('streaming', 'Streaming', 12.99, -8, true)
-  bill('gym', 'Gym', 29, -2, true)
-  bill('phone', 'Phone', 25, 3, true)
-  bill('insurance', 'Home insurance', 38.5, 6, false)
-  bill('electricity', 'Electricity', 64, 10, false)
+  function bill(
+    id: string,
+    name: string,
+    amount: number,
+    offset: number,
+    autopay: boolean,
+    category: string,
+  ) {
+    const dom = parseISODate(dueNear(offset)).day
+    monthly(
+      { id: `demo-bill-${id}`, name, amount: money(amount), autopay, envelopeId: env(category) },
+      dom,
+    )
+  }
+  bill('rent', 'Rent', 1100, -4, false, 'Rent & housing')
+  bill('streaming', 'Streaming', 12.99, -8, true, 'Subscriptions')
+  bill('gym', 'Gym', 29, -2, true, 'Subscriptions')
+  bill('phone', 'Phone', 25, 3, true, 'Bills & utilities')
+  bill('insurance', 'Home insurance', 38.5, 6, false, 'Bills & utilities')
+  bill('electricity', 'Electricity', 64, 10, false, 'Bills & utilities')
+  bill('internet', 'Internet', 35, 12, true, 'Bills & utilities')
 
   // Two debts, each with its linked minimum-payment bill (as addDebt would make them).
   const balanceAsOf = day(-10)
   const debts: Debt[] = []
   function debt(id: string, d: Omit<Debt, 'id' | 'balanceAsOf' | 'dueDay'>, dueOffset: number) {
-    const due = dueNear(dueOffset)
-    const row: Debt = { ...d, id: `demo-debt-${id}`, balanceAsOf, dueDay: parseISODate(due).day }
+    const dueDay = parseISODate(dueNear(dueOffset)).day
+    const row: Debt = { ...d, id: `demo-debt-${id}`, balanceAsOf, dueDay }
     debts.push(row)
-    const min: Bill = {
-      id: `demo-bill-${id}-min`,
-      name: row.name,
-      amount: row.minPayment,
-      rule: { freq: 'monthly', interval: 1, day: row.dueDay, anchor: balanceAsOf },
-      debtId: row.id,
-      autopay: false,
-      createdAt: setUpOn,
-    }
-    bills.push(min)
-    if (due < today) {
-      billOccurrences.push({
-        id: occurrenceId(min.id, due),
-        billId: min.id,
-        originalDate: due,
-        status: 'paid',
-        paidAmount: min.amount,
-        paidAt: due < lastCheckIn.date ? at(due, 9) : at(lastCheckIn.date, 20),
-      })
-    }
+    monthly(
+      {
+        id: `demo-bill-${id}-min`,
+        name: row.name,
+        amount: row.minPayment,
+        debtId: row.id,
+        autopay: false,
+      },
+      dueDay,
+    )
   }
   debt(
     'card',
@@ -191,47 +306,86 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     {
       id: 'demo-fund-holiday',
       name: 'Summer holiday',
-      target: money(600),
+      target: money(1200),
       targetDate: addMonths(today, 5),
       perPeriod: money(40),
-      openingSaved: money(150),
+      openingSaved: 0,
     },
     {
       id: 'demo-fund-52',
       name: '52-week challenge',
       target: challengeTotal(unit),
       perPeriod: 0,
-      // Weeks 1-4 already put away: 1 + 2 + 3 + 4.
-      openingSaved: unit * 10,
-      challenge: { kind: '52week', start: day(-31) },
+      openingSaved: 0,
+      challenge: { kind: '52week', start: historyStart },
     },
   ]
+
+  const transactions: Transaction[] = []
+  // On every payday: the holiday's 40, and the challenge's last two weeks (weeks 2j-1 and
+  // 2j ask for 4j-1 units together). Now and then a little extra on the card, never in
+  // this period (a debt payment there would read as Everyday spending on Today).
+  for (const [j, date] of paydays.entries()) {
+    transactions.push({
+      id: `demo-tx-holiday-${j + 1}`,
+      date,
+      amount: -money(40),
+      note: 'Summer holiday',
+      fundId: 'demo-fund-holiday',
+      createdAt: at(date, 17),
+    })
+    if (j > 0)
+      transactions.push({
+        id: `demo-tx-52-${j}`,
+        date,
+        amount: -unit * (4 * j - 1),
+        note: '52-week challenge',
+        fundId: 'demo-fund-52',
+        createdAt: at(date, 17, 5),
+      })
+    if (j % 4 === 2 && j < DEMO_PAST_PERIODS) {
+      const next = addDays(date, 1)
+      transactions.push({
+        id: `demo-tx-card-${j}`,
+        date: next,
+        amount: -money(50),
+        note: 'Extra on the card',
+        debtId: 'demo-debt-card',
+        createdAt: at(next, 12),
+      })
+    }
+  }
+
+  // Everyday spending before the last two weeks: 9 to 14 entries a pay period across its
+  // days, tagged into the common categories (a few left untagged, as people do).
+  const random = rng(20261031)
+  const handFrom = day(-13)
+  let n = 0
+  for (const start of paydays.slice(0, -1)) {
+    const count = 9 + Math.floor(random() * 6)
+    for (let k = 0; k < count; k++) {
+      const date = addDays(start, Math.floor(random() * 14))
+      let pick = random() * SPEND_WEIGHT
+      const group = SPENDS.find((s) => (pick -= s.weight) < 0) ?? SPENDS[0]!
+      const [note, min, max] = group.kinds[Math.floor(random() * group.kinds.length)]!
+      // To the nearest 5 cents, so amounts look like prices rather than noise.
+      const amount = Math.round((min + random() * (max - min)) * 20) / 20
+      if (date >= handFrom) continue
+      transactions.push({
+        id: `demo-tx-past-${++n}`,
+        date,
+        amount: -money(amount),
+        note,
+        createdAt: at(date, 8 + (k % 4) * 3),
+        ...(group.category ? { envelopeId: env(group.category) } : {}),
+      })
+    }
+  }
 
   // A few days with no spending, marked; the spending list below leaves them empty.
   const noSpendOffsets = [-9, -6, -3]
   const noSpend: NoSpendDay[] = noSpendOffsets.map((o) => ({ date: day(o) }))
 
-  // The "common categories" set, as one tap in Plan makes it, plus Everyday. Budgets stay
-  // empty, so the sample numbers on Today are the same with envelopes on or off.
-  const envelopes: Envelope[] = [
-    {
-      id: 'demo-env-everyday',
-      name: 'Everyday',
-      budget: 0,
-      isDefault: true,
-      color: 'accent',
-      sort: 0,
-    },
-    ...STARTER_CATEGORIES.map((c, i) => ({
-      id: `demo-env-${i + 1}`,
-      name: c.name,
-      budget: 0,
-      isDefault: false,
-      color: c.color,
-      sort: i + 1,
-    })),
-  ]
-  const env = (name: string) => envelopes.find((e) => e.name === name)!.id
   const [groceries, eatingOut, transport, care, fun] = [
     env('Groceries'),
     env('Eating out'),
@@ -239,7 +393,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     env('Personal care'),
     env('Fun'),
   ]
-
+  // The last two weeks by hand, so Today and this period read like a real fortnight.
   const spending: [offset: number, note: string, amount: number, envelope?: string][] = [
     [-13, 'Groceries', 46.8, groceries],
     [-13, 'Coffee', 3.2, eatingOut],
@@ -265,7 +419,6 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     [0, 'Coffee', 3.2, eatingOut],
     [0, 'Lunch', 9.8, eatingOut],
   ]
-  const transactions: Transaction[] = []
   let todayCount = 0
   for (const [i, [offset, note, amount, envelopeId]] of spending.entries()) {
     const date = day(offset)
@@ -284,25 +437,27 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
       ...(envelopeId ? { envelopeId } : {}),
     })
   }
-  // Moves into savings: they leave the balance but are saving, not spending.
-  transactions.push(
-    {
-      id: 'demo-tx-holiday',
-      date: lastPayday,
-      amount: -money(40),
-      note: 'Summer holiday',
-      fundId: 'demo-fund-holiday',
-      createdAt: at(lastPayday, 17),
-    },
-    {
-      id: 'demo-tx-52',
-      date: day(-2),
-      amount: -unit * 5,
-      note: '52-week challenge',
-      fundId: 'demo-fund-52',
-      createdAt: at(day(-2), 19),
-    },
-  )
+
+  // A check-in every payday evening and one last night. Each balance is the opening one
+  // plus everything above up to that day, so Look back's carry-over adds up exactly.
+  const checkInDays = new Set([...paydays, day(-1)])
+  const moved = new Map<ISODate, number>()
+  const move = (date: ISODate, amount: number) => moved.set(date, (moved.get(date) ?? 0) + amount)
+  for (const t of transactions) if (t.date < today) move(t.date, t.amount)
+  for (const o of billOccurrences) move(o.originalDate, -(o.paidAmount ?? 0))
+  for (const p of paydays) move(p, pay)
+  const checkIns: BalanceCheckIn[] = []
+  let balance = money(200)
+  for (let date = historyStart; date < today; date = addDays(date, 1)) {
+    balance += moved.get(date) ?? 0
+    if (checkInDays.has(date))
+      checkIns.push({
+        id: `demo-checkin-${checkIns.length + 1}`,
+        at: at(date, date === day(-1) ? 21 : 18),
+        date,
+        balance,
+      })
+  }
 
   const impulse: ImpulseItem[] = [
     {
@@ -348,7 +503,14 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     noSpend,
     envelopes,
     notes,
-    gardenPoints: 14,
+    // What the garden counts for all this history; it only grows from here.
+    gardenPoints: gardenPoints({
+      checkIns,
+      occurrences: billOccurrences,
+      noSpend,
+      impulse,
+      transactions,
+    }),
   }
 }
 

@@ -42,7 +42,9 @@ export function InsightsTable({
               {r.name}
             </th>
             {anyPlan && (
-              <td className="py-2 text-right">{r.planned === null ? '–' : f.money(r.planned)}</td>
+              <td className="py-2 text-right">
+                {r.planned === null ? '–' : r.planned === 0 ? 'No budget yet' : f.money(r.planned)}
+              </td>
             )}
             <td className="py-2 text-right">{f.money(r.actual)}</td>
             <td className="py-2 text-right">
