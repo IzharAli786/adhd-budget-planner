@@ -211,7 +211,8 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
  * linked to an envelope uses it up like spending does, so the bill is counted once:
  * while unpaid it sits in billsDue and shrinks the reserve; once paid it counts as spent
  * instead. Overdue linked bills from an earlier period belonged to that period's budget.
- * Untagged spending (or spending tagged with a deleted envelope) uses the default one.
+ * Untagged spending (or spending tagged with a deleted envelope) uses the default one;
+ * untagged income does not.
  */
 function envelopesUsage({
   today,
@@ -245,6 +246,10 @@ function envelopesUsage({
               t.fundId === undefined &&
               t.billOccurrenceId === undefined &&
               inPeriod(t.date, period.start, today) &&
+              // Money in counts only when tagged (a refund back into Food). Untagged
+              // income like a salary is not Everyday's money; counting it would refill
+              // the reserve and make later spending come off safe-to-spend twice.
+              (t.amount < 0 || (t.envelopeId !== undefined && known.has(t.envelopeId))) &&
               envelopeOf(t.envelopeId) === env.id,
           )
           .map((t) => t.amount),

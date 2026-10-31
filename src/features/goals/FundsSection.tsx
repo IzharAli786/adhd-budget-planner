@@ -77,7 +77,12 @@ export function FundsSection({ today }: { today: ISODate }) {
         today={today}
         fund={editing === 'new' || editing === null ? undefined : editing}
       />
-      <AddMoneySheet fund={adding} today={today} onClose={() => setAdding(null)} />
+      <AddMoneySheet
+        fund={adding}
+        saved={adding ? fundSaved(adding, transactions) : 0}
+        today={today}
+        onClose={() => setAdding(null)}
+      />
     </section>
   )
 }
@@ -117,7 +122,7 @@ function FundCard({
   function paceLine(): string | null {
     if (fund.target === undefined) return null
     if (remaining <= 0) return 'You reached it. That took patience.'
-    if (fund.targetDate) {
+    if (fund.targetDate && fund.targetDate >= today) {
       const left = paydays.filter((d) => d <= fund.targetDate!).length
       const per = perPaydayToReach(remaining, left)!
       return `About ${f.money(per)} per payday to reach it by ${f.day(fund.targetDate)}.`
@@ -179,10 +184,12 @@ function FundCard({
 
 function AddMoneySheet({
   fund,
+  saved,
   today,
   onClose,
 }: {
   fund: SavingsFund | null
+  saved: Cents
   today: ISODate
   onClose: () => void
 }) {
@@ -193,17 +200,19 @@ function AddMoneySheet({
       title={fund ? `Add to ${fund.name}` : ''}
       description="Moves money out of what you can spend and into this fund."
     >
-      {fund && <AddMoneyForm fund={fund} today={today} onDone={onClose} />}
+      {fund && <AddMoneyForm fund={fund} saved={saved} today={today} onDone={onClose} />}
     </Sheet>
   )
 }
 
 function AddMoneyForm({
   fund,
+  saved,
   today,
   onDone,
 }: {
   fund: SavingsFund
+  saved: Cents
   today: ISODate
   onDone: () => void
 }) {
@@ -211,9 +220,12 @@ function AddMoneyForm({
   const undoToast = useUndoToast()
   const [amount, setAmount] = useState<Cents | null>(fund.perPeriod || null)
   const [direction, setDirection] = useState<'in' | 'out'>('in')
+  // A fund can't go below zero: taking out more than is in it isn't a saving move.
+  const tooMuch = direction === 'out' && amount !== null && amount > saved
+  const valid = !!amount && !tooMuch
 
   async function save() {
-    if (!amount) return
+    if (!valid) return
     await addToFund(fund, direction === 'in' ? amount : -amount, today)
     undoToast(
       direction === 'in'
@@ -246,8 +258,10 @@ function AddMoneyForm({
         onChange={setAmount}
         symbol={f.symbol}
         decimals={f.decimals}
+        hint={direction === 'out' ? `${f.money(saved)} in ${fund.name} now.` : undefined}
+        error={tooMuch ? `That’s more than the ${f.money(saved)} in it.` : undefined}
       />
-      <Button type="submit" block disabled={!amount}>
+      <Button type="submit" block disabled={!valid}>
         {direction === 'in' ? 'Add money' : 'Take it out'}
       </Button>
     </form>

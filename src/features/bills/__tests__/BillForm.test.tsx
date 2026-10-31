@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettingsProvider } from '../../../app/SettingsProvider'
 import { resetDb } from '../../../db/__tests__/helpers'
-import type { Bill } from '../../../domain/types'
+import type { Bill, Envelope } from '../../../domain/types'
 import { BillForm, validateBill } from '../BillForm'
 
 afterEach(cleanup)
@@ -13,13 +13,14 @@ beforeEach(resetDb)
 
 const wrap = (ui: ReactNode) => render(<SettingsProvider>{ui}</SettingsProvider>)
 
-function renderForm(bill?: Bill) {
+function renderForm(bill?: Bill, envelopes?: Envelope[]) {
   const onSubmit = vi.fn()
   wrap(
     <>
       <BillForm
         id="f"
         bill={bill}
+        envelopes={envelopes}
         defaultDate="2026-11-05"
         today="2026-10-31"
         onSubmit={onSubmit}
@@ -70,6 +71,33 @@ describe('BillForm', () => {
       autopay: false,
       rule: { freq: 'monthly', interval: 1, day: 5, anchor: '2026-11-05' },
     })
+  })
+
+  it('links a bill to an envelope when envelopes are shown, and leaves it alone otherwise', async () => {
+    const food: Envelope = {
+      id: 'food',
+      name: 'Food',
+      budget: 30000,
+      isDefault: false,
+      color: 'accent',
+      sort: 1,
+    }
+    const onSubmit = renderForm(undefined, [food])
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Veg box')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Amount' }), '40')
+    await userEvent.click(screen.getByRole('button', { name: 'Food' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSubmit.mock.calls[0]![0]).toMatchObject({ envelopeId: 'food' })
+    cleanup()
+
+    // Picker hidden (envelopes off / Simple mode): the change carries no envelope key, so
+    // an existing link survives the edit.
+    const again = renderForm()
+    expect(screen.queryByText('Comes out of an envelope?')).toBeNull()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Rent')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Amount' }), '900')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect('envelopeId' in again.mock.calls[0]![0]).toBe(false)
   })
 
   it('every 2 weeks with autopay', async () => {

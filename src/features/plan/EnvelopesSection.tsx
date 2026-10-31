@@ -28,6 +28,7 @@ interface Props {
 /** Envelopes (off by default, PLAN §10 M9): an optional budget per kind of spending. */
 export function EnvelopesSection({ envelopes, usage }: Props) {
   const { settings, update } = useAppSettings()
+  const f = useFormat()
   const [editing, setEditing] = useState<Envelope | 'new' | null>(null)
   const on = settings.envelopesEnabled
 
@@ -49,8 +50,8 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
         <div className="rounded-3xl bg-surface p-5 text-[0.9375rem] text-muted shadow-card ring-1 ring-line">
           <p>
             Envelopes give parts of your money a job, like{' '}
-            <span className="text-text">Food €300</span> each payday. What’s still in them is set
-            aside, so today’s number only shows what’s truly free.
+            <span className="text-text">Food {f.money(300 * 10 ** f.decimals)}</span> each payday.
+            What’s still in them is set aside, so today’s number only shows what’s truly free.
           </p>
           <p className="mt-2">
             Off is fine too: everything then shares one Everyday pot. Turn it on any time.

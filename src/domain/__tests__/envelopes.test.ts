@@ -76,6 +76,16 @@ describe('envelopeReserved (PLAN §4.1)', () => {
       0,
     ],
     [
+      // Review fix: a salary logged as "+1500" used to refill Everyday, so the next
+      // €1500 of spending came off safe-to-spend while Everyday stayed fully reserved.
+      'untagged income is not Everyday money',
+      [spend(-150000), spend(5000)],
+      [],
+      15000,
+      30000,
+      0,
+    ],
+    [
       'savings moves are not envelope spending',
       [spend(5000, { fundId: 'f' })],
       [],
@@ -106,6 +116,22 @@ describe('envelopeReserved (PLAN §4.1)', () => {
           const u = r.envelopes[0]!
           expect(u.reserved).toBe(Math.min(budget, Math.max(0, budget - spent)))
           expect(u.over).toBe(Math.max(0, spent - budget))
+        },
+      ),
+    )
+  })
+
+  it('property: after untagged income, spending inside the room never moves the total', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 500000 }), // income
+        fc.integer({ min: 1, max: 20000 }), // spend within Everyday's €200
+        (income, x) => {
+          const paid = spend(-income, { id: 'salary' })
+          const before = safeToSpend({ ...base, transactions: [paid] })
+          const after = safeToSpend({ ...base, transactions: [paid, spend(x, { id: 'x' })] })
+          expect(after.total).toBe(before.total)
+          expect(before.total).toBe(base.checkIn.balance + income - 50000)
         },
       ),
     )

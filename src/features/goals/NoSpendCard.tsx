@@ -1,7 +1,8 @@
 import { useUndoToast } from '../../app/useUndoToast'
-import { useNoSpend } from '../../db/hooks'
+import { useNoSpend, useTransactions } from '../../db/hooks'
 import { toggleNoSpend } from '../../db/repos'
 import { dayOfWeek, parseISODate } from '../../domain/dates'
+import { spendDates } from '../../domain/garden'
 import { noSpendCount, noSpendStrip } from '../../domain/noSpend'
 import type { ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
@@ -15,12 +16,18 @@ import { useFormat } from '../bills/format'
  */
 export function NoSpendCard({ today }: { today: ISODate }) {
   const days = useNoSpend()
+  const transactions = useTransactions()
   const f = useFormat()
   const undoToast = useUndoToast()
-  if (!days) return <div aria-hidden="true" className="h-48 animate-pulse rounded-3xl bg-surface" />
+  if (!days || !transactions)
+    return <div aria-hidden="true" className="h-48 animate-pulse rounded-3xl bg-surface" />
 
   const strip = noSpendStrip(days, today)
   const markedToday = strip.at(-1)!.marked
+  // A day with spending logged can't be marked (it wouldn't grow the garden anyway), but
+  // an old mark can always be taken off.
+  const spent = spendDates(transactions)
+  const spentToday = spent.has(today)
   const { year, month } = parseISODate(today)
   const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
   const count = noSpendCount(days, monthStart, today)
@@ -51,13 +58,14 @@ export function NoSpendCard({ today }: { today: ISODate }) {
             <button
               type="button"
               aria-pressed={d.marked}
-              aria-label={`${f.dayLong(d.date)}${d.marked ? ', no-spend day' : ''}`}
+              aria-label={`${f.dayLong(d.date)}${d.marked ? ', no-spend day' : spent.has(d.date) ? ', spending logged' : ''}`}
+              disabled={!d.marked && spent.has(d.date)}
               onClick={() => toggle(d.date)}
               className={cx(
-                'flex min-h-14 w-full flex-col items-center justify-center rounded-2xl text-xs transition-colors',
+                'flex min-h-14 w-full flex-col items-center justify-center rounded-2xl text-xs transition-colors disabled:opacity-50',
                 d.marked
                   ? 'bg-accent text-accent-contrast'
-                  : 'bg-bg text-muted ring-1 ring-line hover:bg-accent-soft/60',
+                  : 'bg-bg text-muted ring-1 ring-line enabled:hover:bg-accent-soft/60',
                 d.date === today && !d.marked && 'ring-accent/50',
               )}
             >
@@ -69,21 +77,27 @@ export function NoSpendCard({ today }: { today: ISODate }) {
           </li>
         ))}
       </ol>
-      <Button
-        block
-        variant={markedToday ? 'secondary' : 'primary'}
-        aria-pressed={markedToday}
-        onClick={() => toggle(today)}
-      >
-        {markedToday ? (
-          <>
-            <Icon name="check" size={18} />
-            Today is a no-spend day
-          </>
-        ) : (
-          'Mark today as no-spend'
-        )}
-      </Button>
+      {spentToday && !markedToday ? (
+        <p className="rounded-2xl bg-bg px-4 py-3 text-center text-[0.9375rem] text-muted">
+          Today has spending logged, and that’s fine. Any day can be the next one.
+        </p>
+      ) : (
+        <Button
+          block
+          variant={markedToday ? 'secondary' : 'primary'}
+          aria-pressed={markedToday}
+          onClick={() => toggle(today)}
+        >
+          {markedToday ? (
+            <>
+              <Icon name="check" size={18} />
+              Today is a no-spend day
+            </>
+          ) : (
+            'Mark today as no-spend'
+          )}
+        </Button>
+      )}
     </section>
   )
 }

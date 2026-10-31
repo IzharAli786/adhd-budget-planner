@@ -137,4 +137,40 @@ describe('Goals: no-spend days and garden', () => {
     expect(await screen.findByText(/A day without spending is a small win/)).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'A sprout' })).toBeTruthy()
   })
+
+  it('a day with spending logged is not offered as a no-spend day, and earns no points', async () => {
+    await r.addTransaction({ date: '2026-11-04', amount: -1200, note: 'lunch' })
+    await r.addTransaction({ date: '2026-11-03', amount: -5000, note: 'Holiday', fundId: 'f' })
+    render(<App />)
+    expect(await screen.findByText(/Today has spending logged/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Mark today as no-spend' })).toBeNull()
+    const todayBox = screen.getByRole('button', {
+      name: /(4 November|November 4), spending logged/,
+    })
+    expect((todayBox as HTMLButtonElement).disabled).toBe(true)
+    // Moving money into savings isn't spending: yesterday can still be marked.
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Tuesday,? (3 November|November 3)$/ }),
+    )
+    expect(await screen.findByText(/1 this month/)).toBeTruthy()
+  })
+})
+
+describe('Goals: taking money out of a fund', () => {
+  it('never takes out more than is in the fund', async () => {
+    await r.addFund({ name: 'Cushion', perPeriod: 0, openingSaved: 3000 })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Add money' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Add to Cushion' })
+    await userEvent.click(within(sheet).getByRole('radio', { name: 'Take out' }))
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '40')
+    expect(within(sheet).getByText(/more than the €30\.00 in it/)).toBeTruthy()
+    const go = within(sheet).getByRole('button', { name: 'Take it out' }) as HTMLButtonElement
+    expect(go.disabled).toBe(true)
+    await userEvent.clear(within(sheet).getByRole('textbox', { name: 'Amount' }))
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '30')
+    await userEvent.click(go)
+    await waitFor(async () => expect(await db.transactions.toArray()).toHaveLength(1))
+    expect((await db.transactions.toArray())[0]).toMatchObject({ amount: 3000 })
+  })
 })

@@ -1,20 +1,30 @@
 // The garden (PLAN §4.5): progress that only grows. Points come from OUTCOMES (a balance
 // checked, a bill paid, a day without spending, an impulse skipped), never from how many
 // entries were logged, so there is nothing to farm and nothing to lose.
-import type { BillOccurrence, ImpulseItem, ISODate, NoSpendDay } from './types'
+import { isSpend } from './reconcile'
+import type { BillOccurrence, ImpulseItem, ISODate, NoSpendDay, Transaction } from './types'
 
 export interface GardenOutcomes {
   checkIns: readonly { date: ISODate }[]
   occurrences: readonly Pick<BillOccurrence, 'status'>[]
   noSpend: readonly NoSpendDay[]
   impulse: readonly Pick<ImpulseItem, 'decision'>[]
+  /** To tell a real no-spend day from a tap: a day with logged spending isn't one. */
+  transactions: readonly SpendLike[]
 }
 
-/** One point per outcome. Check-ins count once per day: checking in twice isn't progress. */
+type SpendLike = Pick<Transaction, 'date' | 'amount' | 'fundId' | 'billOccurrenceId' | 'deletedAt'>
+
+/**
+ * One point per outcome. Check-ins count once per day: checking in twice isn't progress.
+ * A no-spend mark counts only on a day with no spending logged, so the mark is an outcome
+ * rather than a button press.
+ */
 export function gardenPoints(o: GardenOutcomes): number {
   const checkInDays = new Set(o.checkIns.map((c) => c.date)).size
   const billsPaid = o.occurrences.filter((x) => x.status === 'paid').length
-  const noSpendDays = new Set(o.noSpend.map((d) => d.date)).size
+  const spendDays = spendDates(o.transactions)
+  const noSpendDays = new Set(o.noSpend.map((d) => d.date).filter((d) => !spendDays.has(d))).size
   const skipped = o.impulse.filter((i) => i.decision === 'skipped').length
   return checkInDays + billsPaid + noSpendDays + skipped
 }
@@ -60,3 +70,8 @@ export function gardenStage(points: number): GardenStage {
  */
 export const keptPoints = (stored: number | undefined, computed: number) =>
   Math.max(stored ?? 0, computed)
+
+/** Days with spending logged (savings moves and bill payments aren't day-to-day spending). */
+export function spendDates(txs: readonly SpendLike[]): Set<ISODate> {
+  return new Set(txs.filter((t) => t.deletedAt === undefined && isSpend(t)).map((t) => t.date))
+}

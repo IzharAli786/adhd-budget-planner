@@ -130,6 +130,22 @@ describe('Today with envelopes on (open issue)', () => {
   })
 })
 
+describe('Simple mode keeps envelopes out of sight', () => {
+  it('Today’s "Can this fit?" offers no envelope picker in Simple mode', async () => {
+    await r.updateSettings({ envelopesEnabled: true, simpleMode: true })
+    await r.ensureDefaultEnvelope()
+    await r.addEnvelope({ name: 'Food', budget: 10000, color: 'accent' })
+    goto('/')
+    render(<App />)
+    await hero()
+    await userEvent.click(screen.getByRole('button', { name: 'Can this fit?' }))
+    const fit = await screen.findByRole('dialog', { name: 'Can this fit?' })
+    await userEvent.type(within(fit).getByRole('textbox', { name: 'Price' }), '40')
+    expect(within(fit).queryByText('From an envelope?')).toBeNull()
+    expect(within(fit).queryByRole('button', { name: /Food/ })).toBeNull()
+  })
+})
+
 describe('Just today', () => {
   it('shows only the number and one card', async () => {
     goto('/')

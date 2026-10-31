@@ -1,6 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo } from 'react'
-import { useBillOccurrences, useCheckIns, useImpulse, useNoSpend } from '../../db/hooks'
+import {
+  useBillOccurrences,
+  useCheckIns,
+  useImpulse,
+  useNoSpend,
+  useTransactions,
+} from '../../db/hooks'
 import { getMeta, setMeta } from '../../db/repos'
 import { gardenPoints, gardenStage, keptPoints } from '../../domain/garden'
 
@@ -10,12 +16,13 @@ export function useGarden() {
   const occurrences = useBillOccurrences()
   const noSpend = useNoSpend()
   const impulse = useImpulse()
+  const transactions = useTransactions()
   // `?? 0` inside the query: useLiveQuery's own undefined means "still loading".
   const stored = useLiveQuery(async () => (await getMeta<number>('gardenPoints')) ?? 0)
 
   const computed =
-    checkIns && occurrences && noSpend && impulse
-      ? gardenPoints({ checkIns, occurrences, noSpend, impulse })
+    checkIns && occurrences && noSpend && impulse && transactions
+      ? gardenPoints({ checkIns, occurrences, noSpend, impulse, transactions })
       : undefined
 
   // Persist a new high-water mark so the garden never shrinks after an undo or delete.

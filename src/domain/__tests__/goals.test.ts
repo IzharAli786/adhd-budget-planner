@@ -30,8 +30,51 @@ describe('garden', () => {
         occurrences: [{ status: 'paid' }, { status: 'skipped' }, { status: 'moved' }],
         noSpend: [{ date: '2026-11-02' }, { date: '2026-11-04' }],
         impulse: [{ decision: 'skipped' }, { decision: 'bought' }, {}],
+        transactions: [],
       }),
     ).toBe(2 + 1 + 2 + 1)
+  })
+
+  it('a no-spend mark on a day with spending logged is not an outcome', () => {
+    const tx = (date: string, amount: number, extra: Partial<Transaction> = {}) => ({
+      date,
+      amount,
+      ...extra,
+    })
+    expect(
+      gardenPoints({
+        checkIns: [],
+        occurrences: [],
+        noSpend: [{ date: '2026-11-01' }, { date: '2026-11-02' }, { date: '2026-11-03' }],
+        impulse: [],
+        transactions: [
+          tx('2026-11-01', -1200), // spending: the mark doesn't count
+          tx('2026-11-02', 150000), // income is fine
+          tx('2026-11-03', -5000, { fundId: 'f' }), // so is moving money into savings
+          tx('2026-11-03', -900, { deletedAt: '2026-11-03T12:00:00.000Z' }),
+        ],
+      }),
+    ).toBe(2)
+  })
+
+  it('property: logging more entries never adds points', () => {
+    fc.assert(
+      fc.property(fc.nat(40), (n) => {
+        const base = {
+          checkIns: [{ date: '2026-11-01' }],
+          occurrences: [],
+          noSpend: [],
+          impulse: [],
+        }
+        const entries = Array.from({ length: n }, (_, i) => ({
+          date: '2026-11-02',
+          amount: i % 2 ? -100 : 100,
+        }))
+        expect(gardenPoints({ ...base, transactions: entries })).toBe(
+          gardenPoints({ ...base, transactions: [] }),
+        )
+      }),
+    )
   })
 
   it.each([
@@ -176,6 +219,14 @@ describe('48-hour list (clock injected)', () => {
     expect(impulseState(item({ decision: 'skipped' }), at(200))).toBe('decided')
     expect(msLeft(item(), at(47))).toBe(3_600_000)
     expect(msLeft(item(), at(49))).toBe(0)
+  })
+
+  it('48 real hours across the EU clock change (wall clock shows an hour less)', () => {
+    // Sat 24 Oct 2026 12:00 CEST; clocks go back on Sun 25 Oct.
+    const dst = item({ addedAt: '2026-10-24T10:00:00.000Z' })
+    expect(readyAt(dst)).toBe('2026-10-26T10:00:00.000Z') // Mon 11:00 CET
+    expect(impulseState(dst, '2026-10-26T09:59:59.999Z')).toBe('waiting')
+    expect(impulseState(dst, '2026-10-26T10:00:00.000Z')).toBe('ready')
   })
 
   it('splits a list into waiting and ready, so expired ones can be decided together', () => {

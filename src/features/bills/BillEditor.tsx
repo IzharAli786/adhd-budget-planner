@@ -1,5 +1,7 @@
 import { useId, useState } from 'react'
+import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
+import { useEnvelopes } from '../../db/hooks'
 import { addBill, deleteBill } from '../../db/repos'
 import type { Bill, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
@@ -61,6 +63,13 @@ function EditorBody({
   const [pending, setPending] = useState<BillChanges | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const repeating = bill !== undefined && bill.rule.freq !== 'once'
+  const { settings } = useAppSettings()
+  const allEnvelopes = useEnvelopes()
+  // Linking a bill to an envelope is a Full-mode tool, and only while envelopes are on.
+  const envelopes =
+    settings.envelopesEnabled && !settings.simpleMode
+      ? (allEnvelopes ?? []).filter((e) => e.deletedAt === undefined)
+      : []
 
   async function save(changes: BillChanges) {
     if (!bill) {
@@ -69,6 +78,7 @@ function EditorBody({
         amount: changes.amount,
         autopay: changes.autopay,
         rule: changes.rule!,
+        ...(changes.envelopeId ? { envelopeId: changes.envelopeId } : {}),
       })
       undoToast(`Added ${changes.name}`)
       onClose()
@@ -96,6 +106,7 @@ function EditorBody({
         defaultDate={target.defaultDate ?? today}
         today={today}
         onSubmit={(c) => void save(c)}
+        envelopes={envelopes}
       />
       <div className="sticky bottom-0 -mx-6 mt-2 flex flex-col-reverse gap-2 bg-surface px-6 pt-3 pb-4 sm:flex-row sm:items-center">
         {bill && (

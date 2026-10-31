@@ -270,7 +270,8 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
         onClose={() => setPanel(null)}
         total={safe.total}
         runway={runway}
-        envelopes={settings.envelopesEnabled ? safe.envelopes : []}
+        // Simple mode hides envelopes (PLAN §5); they still count in "Set aside".
+        envelopes={settings.envelopesEnabled && !settings.simpleMode ? safe.envelopes : []}
       />
       {checkIn}
     </>

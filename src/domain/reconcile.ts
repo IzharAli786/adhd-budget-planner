@@ -34,7 +34,7 @@ export function askIfInBalance(date: ISODate, checkIn: Pick<CheckInLike, 'date'>
 }
 
 /** Money spent from the balance: outgoing, and not a move into savings or a bill payment. */
-export function isSpend(tx: Transaction): boolean {
+export function isSpend(tx: Pick<Transaction, 'amount' | 'fundId' | 'billOccurrenceId'>): boolean {
   return tx.amount < 0 && tx.fundId === undefined && tx.billOccurrenceId === undefined
 }
 
