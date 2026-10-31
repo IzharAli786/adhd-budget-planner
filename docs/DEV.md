@@ -71,6 +71,17 @@ longer after today is asked again. Setup counts as done when
   transform: older databases and backups simply have no notes. A step's upgrade only reads
   stores that already exist, since a later version's tables are created after it runs.
 
+## Look back and Insights
+
+`src/domain/insights.ts` (spending per envelope or per kind) and `src/domain/review.ts`
+(money in and out per month or pay period, and the carry-over per payday) are pure and
+shared by Plan's Insights card, More > Look back and the printed report. Paydays count
+only from the first check-in or entry (`historyStart`): a pay schedule has no start
+date. The payday backup moment saves what was carried in to `meta.periodClose` (exported
+in backups); otherwise it is worked out from check-ins. Chart colours are the
+`--chart-1..6` tokens, checked for contrast in `contrast.test.ts`. "Print this period /
+year" renders a `.print-report` that only the `@media print` rules in `app.css` show.
+
 ## End-to-end tests (Playwright)
 
     npx playwright install chromium webkit   # once

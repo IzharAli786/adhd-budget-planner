@@ -117,7 +117,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
           aria-keyshortcuts="n"
           title="Quick add (n)"
           className={cx(
-            'fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full',
+            'print-hide fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full',
             'bg-accent text-accent-contrast shadow-card transition-[filter,transform] hover:brightness-105 active:scale-95',
             'md:right-8 md:bottom-8',
           )}

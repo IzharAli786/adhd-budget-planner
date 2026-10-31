@@ -41,7 +41,7 @@ export function UpdateToast() {
   return (
     <div
       role="alert"
-      className="animate-toast-in fixed inset-x-4 top-[max(env(safe-area-inset-top),0.75rem)] z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-surface p-3 pl-4 shadow-card ring-1 ring-line md:top-6"
+      className="print-hide animate-toast-in fixed inset-x-4 top-[max(env(safe-area-inset-top),0.75rem)] z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-surface p-3 pl-4 shadow-card ring-1 ring-line md:top-6"
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
         <Icon name="sparkle" size={18} />

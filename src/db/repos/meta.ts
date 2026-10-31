@@ -14,6 +14,7 @@ export type MetaKey =
   | 'unlocked'
   | 'changesSinceBackup'
   | 'demo'
+  | 'periodClose'
   | `snoozes${string}`
 
 // 'demo' (db/demo.ts) is the demo's clock and entry count: it belongs to that install.
@@ -31,6 +32,7 @@ export const EXPORTED_META_KEYS = [
   'lastOpened',
   'lastBackupAt',
   'gardenPoints',
+  'periodClose',
 ] as const satisfies readonly MetaKey[]
 
 export const isExportedMetaKey = (key: string) =>

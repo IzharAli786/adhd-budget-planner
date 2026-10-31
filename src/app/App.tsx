@@ -13,6 +13,7 @@ import { InstallScreen } from '../features/install/InstallScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
 import { PlanScreen } from '../features/plan/PlanScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
+import { ReviewScreen } from '../features/review/ReviewScreen'
 import { RequireSetup } from '../features/setup/RequireSetup'
 import { SetupScreen } from '../features/setup/SetupScreen'
 import { TodayScreen } from '../features/today/TodayScreen'
@@ -75,6 +76,7 @@ export function App() {
                       <Route path="more/deleted" element={<RecentlyDeletedScreen />} />
                       <Route path="more/wait" element={<ImpulseScreen />} />
                       <Route path="more/debts" element={<DebtsScreen />} />
+                      <Route path="more/review" element={<ReviewScreen />} />
                       <Route path="more/install" element={<InstallScreen embedded />} />
                       {IS_DEMO && <Route path="more/bring" element={<BringSetupScreen />} />}
                       <Route path="start" element={<StartRoute />} />

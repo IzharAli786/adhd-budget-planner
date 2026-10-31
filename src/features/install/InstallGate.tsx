@@ -43,7 +43,7 @@ export function InstallBanner() {
   if ((ctx === 'ios' || ctx === 'in-app') && !continuedInBrowser()) return null
 
   return (
-    <div className="border-b border-line bg-accent-soft pt-[env(safe-area-inset-top)]">
+    <div className="print-hide border-b border-line bg-accent-soft pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex max-w-2xl items-center gap-3 px-5 py-2 md:px-10">
         <Icon name="phone" size={18} className="shrink-0 text-accent" />
         <p className="min-w-0 flex-1 text-sm">

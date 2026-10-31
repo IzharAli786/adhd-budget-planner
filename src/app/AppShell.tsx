@@ -18,15 +18,17 @@ export function AppShell() {
     void requestPersist()
     void purgeDeleted()
   }, [])
-  // Today and Bills earn two columns on wide screens; reading screens keep a calm measure.
+  // Today and Bills earn two columns on wide screens, Look back its four tiles and wide
+  // table; reading screens keep a calm measure.
   const { pathname } = useLocation()
-  const wide = pathname === '/' || pathname === '/bills'
+  const wide = pathname === '/' || pathname === '/bills' || pathname === '/more/review'
 
   return (
     // Quick-add lives here, not per screen: the floating + and the `n` key work on every tab.
     <QuickAddProvider>
       <CatchUpProvider>
-        <div className="min-h-dvh md:pl-24 lg:pl-56">
+        {/* No room kept for the side rail on paper: the rail itself is hidden in print. */}
+        <div className="min-h-dvh md:pl-24 lg:pl-56 print:pl-0!">
           <a
             href="#main"
             className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-surface focus:px-4 focus:py-2"

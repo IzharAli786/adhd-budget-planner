@@ -50,6 +50,12 @@ export function MoreScreen() {
             to="/more/transactions"
           />
           <ListRow
+            icon="history"
+            label="Look back"
+            detail="Your year by month or payday, ready to print"
+            to="/more/review"
+          />
+          <ListRow
             icon="trash"
             label="Recently deleted"
             detail={

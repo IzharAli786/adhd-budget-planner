@@ -134,3 +134,29 @@ describe.each(THEMES)('theme %s meets WCAG AA (4.5:1)', (theme) => {
     expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+// Chart series (Insights, Look back) sit on any theme's surface or background. WCAG asks
+// 3:1 of graphics; we hold them to the text bar (4.5:1) so a slice's colour alone reads.
+const series = (palette: Record<string, string>) =>
+  Object.entries(palette).filter(([k]) => k.startsWith('chart-'))
+
+it('defines six chart series in light and dark', () => {
+  expect(series(LIGHT)).toHaveLength(6)
+  expect(series(DARK)).toHaveLength(6)
+})
+
+describe.each(THEMES)('theme %s: chart colours stand out', (theme) => {
+  const t = tokens(theme)
+  const on = (mode: string, palette: Record<string, string>, surface: string, bg: string) =>
+    series(palette).flatMap(([k, c]): Pair[] => [
+      [`${mode}: ${k} on surface`, c, surface],
+      [`${mode}: ${k} on bg`, c, bg],
+    ])
+  const cases = [
+    ...(theme === 'midnight' ? [] : on('light', LIGHT, t['l-surface']!, t['l-bg']!)),
+    ...on('dark', DARK, t['d-surface']!, t['d-bg']!),
+  ]
+  it.each(cases)('%s', (_, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+})

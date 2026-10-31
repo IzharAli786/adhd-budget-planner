@@ -4,7 +4,8 @@ import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import { catchUp, type CatchUp } from '../../domain/catchUp'
 import { nextAction } from '../../domain/nextAction'
-import type { Instant, ISODate } from '../../domain/types'
+import { recordCarryOver } from '../../db/repos'
+import type { Cents, Instant, ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { BigNumber } from '../../ui/BigNumber'
@@ -90,6 +91,7 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
   const session = useCatchUpSession()
   const [panel, setPanel] = useState<Panel>(null)
   const [offerBackup, setOfferBackup] = useState(false)
+  const [carried, setCarried] = useState<Cents | null>(null)
   const { plan, actionState, snoozes } = model
 
   const action = useMemo(
@@ -145,7 +147,15 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
       onSaved={(summary) => {
         undoToast(summary)
         // Payday is the backup moment (PLAN §6): the sheet prepares the file as it opens.
-        if (offerBackup) setPanel('backup')
+        // It is also when the last period closes: what was carried in is saved for Look back.
+        if (offerBackup) {
+          setCarried(null)
+          setPanel('backup')
+          // Bookkeeping only: if it fails, the sheet simply shows no carry-over line.
+          void recordCarryOver(today)
+            .then((c) => setCarried(c?.amount ?? null))
+            .catch(() => {})
+        }
       }}
     />
   )
@@ -300,7 +310,11 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         envelopes={settings.envelopesEnabled && !settings.simpleMode ? safe.envelopes : []}
       />
       {checkIn}
-      <BackupMomentSheet open={panel === 'backup'} onClose={() => setPanel(null)} />
+      <BackupMomentSheet
+        open={panel === 'backup'}
+        onClose={() => setPanel(null)}
+        carried={carried}
+      />
     </>
   )
 }

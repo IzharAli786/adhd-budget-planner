@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { useUndoToast } from '../../app/useUndoToast'
-import { applyFreshStart } from '../../db/repos'
+import { applyFreshStart, recordCarryOver } from '../../db/repos'
 import type { BillEntry } from '../../domain/bills'
 import type { FreshStart as FreshStartPlan } from '../../domain/catchUp'
 import { occurrenceId, type Cents, type ISODate } from '../../domain/types'
@@ -67,6 +67,8 @@ export function FreshStart({ gap, today, onDone }: Props) {
     } finally {
       setSaving(false)
     }
+    // A fresh start usually spans a payday: keep what was carried in for Look back.
+    void recordCarryOver(today).catch(() => {})
     undoToast('Welcome back. You’re all caught up.')
     onDone()
   }

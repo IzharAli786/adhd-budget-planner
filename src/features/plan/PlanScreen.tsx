@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useFunds, useIncomes, usePaydayOverrides, useTransactions } from '../../db/hooks'
@@ -16,7 +16,11 @@ import { useFormat } from '../bills/format'
 import { PaydayNote } from '../notes/PaydayNote'
 import { CanFitForm } from '../today/CanFitSheet'
 import { useTodayModel, type TodayModel } from '../today/useTodayModel'
+import { InsightsSection } from '../review/InsightsSection'
+import { useReviewData } from '../review/useReviewData'
 import { EnvelopesSection } from './EnvelopesSection'
+import { PastPeriod, PeriodNav } from './PastPeriod'
+import type { DateRange } from '../../domain/insights'
 
 // Plan (Full mode, PLAN §5): where this paycheck goes. The same planToday() result as
 // Today, so the numbers here can never disagree with the hero.
@@ -24,11 +28,16 @@ export function PlanScreen() {
   const today = useToday()
   const now = useNow()
   const model = useTodayModel(today, now)
-  const { settings } = useAppSettings()
+  const data = useReviewData(today)
+  // A past pay period shown read-only; null is the current one.
+  const [viewing, setViewing] = useState<DateRange | null>(null)
 
   return (
     <>
-      <PageHeader title="Plan" subtitle="Where this paycheck goes." />
+      <PageHeader
+        title="Plan"
+        subtitle={viewing ? 'A look back at an earlier paycheck.' : 'Where this paycheck goes.'}
+      />
       {!model.loaded || !model.plan ? (
         <div aria-hidden="true" className="h-64 animate-pulse rounded-3xl bg-surface" />
       ) : model.plan.kind !== 'ready' ? (
@@ -48,23 +57,55 @@ export function PlanScreen() {
         </div>
       ) : (
         <div className="space-y-8">
-          <PeriodCard model={model} today={today} />
-          <PaydayNote periodStart={model.plan.period.start} />
-          <section aria-labelledby="fit-title" className="card p-5">
-            <h2 id="fit-title" className="mb-1 text-heading">
-              Can this fit?
-            </h2>
-            <p className="mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
-            <CanFitForm
-              total={model.plan.safe.total}
-              runway={model.plan.runway}
-              envelopes={settings.envelopesEnabled ? model.plan.safe.envelopes : []}
+          {data && (
+            <PeriodNav
+              data={data}
+              current={model.plan.period}
+              viewing={viewing}
+              onView={setViewing}
             />
-          </section>
-          <EnvelopesSection envelopes={model.envelopes} usage={model.plan.safe.envelopes} />
-          <SavingsSummary />
+          )}
+          {viewing && data ? (
+            <PastPeriod data={data} range={viewing} />
+          ) : (
+            <CurrentPlan model={model} today={today} data={data} />
+          )}
         </div>
       )}
+    </>
+  )
+}
+
+function CurrentPlan({
+  model,
+  today,
+  data,
+}: {
+  model: TodayModel
+  today: ISODate
+  data: ReturnType<typeof useReviewData>
+}) {
+  const { settings } = useAppSettings()
+  const plan = model.plan
+  if (plan?.kind !== 'ready') return null
+  return (
+    <>
+      <PeriodCard model={model} today={today} />
+      <PaydayNote periodStart={plan.period.start} />
+      <section aria-labelledby="fit-title" className="card p-5">
+        <h2 id="fit-title" className="mb-1 text-heading">
+          Can this fit?
+        </h2>
+        <p className="mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
+        <CanFitForm
+          total={plan.safe.total}
+          runway={plan.runway}
+          envelopes={settings.envelopesEnabled ? plan.safe.envelopes : []}
+        />
+      </section>
+      <EnvelopesSection envelopes={model.envelopes} usage={plan.safe.envelopes} />
+      {data && <InsightsSection data={data} range={plan.period} />}
+      <SavingsSummary />
     </>
   )
 }

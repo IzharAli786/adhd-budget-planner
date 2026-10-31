@@ -81,6 +81,14 @@
   --accent-contrast: #ffffff;
   --danger-soft: #f6e3dd;
   --shadow: 0 1px 2px rgb(31 30 28 / 0.04), 0 8px 24px -12px rgb(31 30 28 / 0.12);
+  /* Chart series (Insights, Look back): calm, theme-neutral, each at least 4.5:1 on any
+     surface so slices and bars read without relying on the legend alone. */
+  --chart-1: #3d6e8f;
+  --chart-2: #86558f;
+  --chart-3: #4c7a4f;
+  --chart-4: #a35a35;
+  --chart-5: #7a6524;
+  --chart-6: #5b6573;
   color-scheme: light;
 }
 
@@ -96,6 +104,12 @@
     --accent-contrast: var(--d-bg);
     --danger-soft: #3d2622;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    --chart-1: #8ab6d4;
+    --chart-2: #c7a0d2;
+    --chart-3: #8fc495;
+    --chart-4: #e3a07c;
+    --chart-5: #d1b46a;
+    --chart-6: #aab3bf;
     color-scheme: dark;
   }
 }
@@ -110,6 +124,12 @@
   --accent-contrast: var(--d-bg);
   --danger-soft: #3d2622;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  --chart-1: #8ab6d4;
+  --chart-2: #c7a0d2;
+  --chart-3: #8fc495;
+  --chart-4: #e3a07c;
+  --chart-5: #d1b46a;
+  --chart-6: #aab3bf;
   color-scheme: dark;
 }
 :root[data-theme='midnight'] {
@@ -409,4 +429,60 @@ dialog.sheet[open] {
 :root[data-motion='off'] ::backdrop {
   transition: none !important;
   animation: none !important;
+}
+
+/*
+ * Print (Look back's "Print this period / year"): only the report, on white, in black.
+ * The app chrome (tabs, banners, toasts, buttons) is marked print:hidden or hidden here;
+ * the report itself is hidden on screen and shown only here.
+ */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+  :root,
+  :root[data-mode='dark'],
+  :root[data-theme='midnight'] {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --text: #111111;
+    --muted: #444444;
+    --line: #d4d4d4;
+    --chart-1: #3d6e8f;
+    --chart-2: #86558f;
+    --chart-3: #4c7a4f;
+    --chart-4: #a35a35;
+    --chart-5: #7a6524;
+    --chart-6: #5b6573;
+    color-scheme: light;
+  }
+  html {
+    font-size: 11pt;
+  }
+  body {
+    background: #ffffff !important;
+    background-image: none !important;
+  }
+  nav,
+  [role='status'],
+  [role='alert'],
+  dialog,
+  .print-hide {
+    display: none !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .print-report {
+    display: block !important;
+  }
+  .print-report table {
+    break-inside: auto;
+  }
+  .print-report tr,
+  .print-report section > h2 {
+    break-inside: avoid;
+    break-after: avoid-page;
+  }
 }
