@@ -182,7 +182,8 @@ describe('Insights on Plan', () => {
     goto('/plan')
     render(<App />)
     await screen.findByRole('region', { name: 'This period' })
-    await userEvent.click(screen.getByRole('button', { name: 'Previous period' }))
+    // The pay-period nav waits for the review data, which can land after the plan.
+    await userEvent.click(await screen.findByRole('button', { name: 'Previous period' }))
     const past = await screen.findByRole('region', { name: 'Earlier period' })
     expect(within(past).getByText(/read only/)).toBeTruthy()
     // 30 Sep – 29 Oct: only the groceries were tracked (Steady started 25 Oct).
