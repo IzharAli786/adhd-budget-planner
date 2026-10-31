@@ -14,16 +14,11 @@ export function CatchUpCard({ gap, onDismiss }: { gap: ShortGap; onDismiss: () =
   ].filter((l): l is string => Boolean(l))
 
   return (
-    <section
-      aria-labelledby="catch-up"
-      className="animate-fade-in rounded-[1.75rem] bg-surface p-5 shadow-card ring-1 ring-line"
-    >
+    <section aria-labelledby="catch-up" className="card animate-fade-in p-5">
       <h2 id="catch-up" className="text-lg font-medium">
         Welcome back
       </h2>
-      <p className="text-[0.9375rem] text-muted">
-        In the {gap.daysAway} days since you last looked:
-      </p>
+      <p className="text-body text-muted">In the {gap.daysAway} days since you last looked:</p>
       <ul className="mt-3 space-y-1.5">
         {lines.map((line) => (
           <li key={line} className="flex items-center gap-2.5">

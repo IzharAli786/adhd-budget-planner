@@ -93,7 +93,7 @@ function CheckInForm({ onClose, today, due, onSaved }: Omit<Props, 'open'>) {
       <div className="space-y-4 pb-4">
         <div>
           <h3 className="text-base font-semibold">Did these come out yet?</h3>
-          <p className="text-[0.9375rem] text-muted">
+          <p className="text-body text-muted">
             Untick any that haven’t left your account, so they stay counted.
           </p>
         </div>

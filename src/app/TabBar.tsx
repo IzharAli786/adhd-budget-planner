@@ -21,7 +21,7 @@ export function TabBar() {
     >
       <div className="hidden items-center gap-2.5 px-6 pb-8 md:flex md:justify-center lg:justify-start">
         <img src="/icon.svg" alt="" width={32} height={32} className="rounded-[0.6rem]" />
-        <span className="hidden text-lg font-semibold tracking-tight lg:inline">Steady</span>
+        <span className="hidden text-heading tracking-tight lg:inline">Steady</span>
       </div>
       <ul className="mx-auto flex max-w-md md:max-w-none md:flex-col md:gap-1 md:px-3">
         {tabs.map((tab) => (
@@ -32,7 +32,7 @@ export function TabBar() {
               className={({ isActive }) =>
                 cx(
                   'group flex min-h-14 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium transition-colors',
-                  'md:min-h-16 md:rounded-2xl lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:text-[0.9375rem]',
+                  'md:min-h-16 md:rounded-2xl lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:text-body',
                   isActive ? 'text-accent' : 'text-muted hover:text-text',
                   isActive && 'md:bg-accent-soft',
                 )

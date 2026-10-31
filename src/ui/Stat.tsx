@@ -12,13 +12,14 @@ interface StatProps {
 /** A labelled number. Money values announce politely when they change (PLAN §8). */
 export function Stat({ label, value, hint, size = 'md', className }: StatProps) {
   return (
-    <div className={className}>
+    // The hero size is measured against this box (cqi), so it never outgrows its column.
+    <div className={cx(size === 'hero' && '@container', className)}>
       <p className="text-sm text-muted">{label}</p>
       <p
         aria-live="polite"
         className={cx(
           'font-semibold tracking-tight tabular-nums',
-          size === 'hero' && 'mt-1 text-[clamp(3rem,15vw,4.5rem)] leading-none',
+          size === 'hero' && 'mt-1 text-display',
           size === 'md' && 'mt-0.5 text-2xl',
           size === 'sm' && 'mt-0.5 text-lg',
         )}

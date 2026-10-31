@@ -79,17 +79,17 @@ export function CanFitForm({ total, runway, envelopes = [] }: Omit<Props, 'open'
       <div aria-live="polite">
         {result && (
           <section className="rounded-2xl bg-bg p-4">
-            <p className="text-lg font-semibold">
+            <p className="text-heading">
               {result.fits ? 'Yes, it fits before payday.' : 'Not before payday.'}
             </p>
-            <p className="text-[0.9375rem] text-muted">
+            <p className="text-body text-muted">
               {result.fits
                 ? envelope && price !== null && price <= envelope.reserved
                   ? `It fits inside ${envelope.name}, so payday money stays the same.`
                   : 'Here’s what it would leave you.'
                 : `You’d be ${f.money(-result.after)} short. Could it wait until after payday?`}
             </p>
-            <dl className="mt-3 space-y-2 text-[0.9375rem]">
+            <dl className="mt-3 space-y-2 text-body">
               <div className="flex justify-between gap-4">
                 <dt className="text-muted">Until payday</dt>
                 <dd className="tabular-nums">

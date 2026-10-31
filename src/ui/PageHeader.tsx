@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { cx } from './cx'
 import { Icon } from './Icon'
+import { Illustration, type IllustrationName } from './Illustration'
 
 /** Screen title with an optional back link for nested screens (More > Settings). */
 export function PageHeader({
@@ -13,39 +15,51 @@ export function PageHeader({
   back?: { to: string; label: string }
 }) {
   return (
-    <header className="mb-6">
+    <header className="mb-7">
       {back && (
         <Link
           to={back.to}
-          className="-ml-3 mb-1 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-1.5 text-[0.9375rem] font-medium text-accent hover:bg-accent-soft/60"
+          className="-ml-3 mb-1 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-1.5 text-body font-medium text-accent hover:bg-accent-soft/60"
         >
           <Icon name="back" size={20} />
           {back.label}
         </Link>
       )}
-      <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">{title}</h1>
-      {subtitle && <p className="mt-1 text-[0.9375rem] text-muted">{subtitle}</p>}
+      <h1 className="text-title">{title}</h1>
+      {subtitle && <p className="mt-1.5 text-body text-muted">{subtitle}</p>}
     </header>
   )
 }
 
-/** A calm "coming soon" panel; empty states should explain, never just say "nothing". */
+/**
+ * An empty state: a small picture, what this place is for, and the one next step.
+ * Empty states should explain, never just say "nothing".
+ */
 export function EmptyState({
-  icon,
+  art,
   title,
   children,
+  action,
+  className,
 }: {
-  icon: ReactNode
+  art: IllustrationName
   title: ReactNode
   children?: ReactNode
+  /** The one next step (a button or link). */
+  action?: ReactNode
+  className?: string
 }) {
   return (
-    <section className="animate-fade-in flex flex-col items-center rounded-[1.75rem] bg-surface px-6 py-12 text-center shadow-card ring-1 ring-line">
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-        {icon}
-      </span>
-      <h2 className="mt-4 text-lg font-semibold">{title}</h2>
-      <div className="mt-1 max-w-xs text-[0.9375rem] text-muted">{children}</div>
+    <section
+      className={cx(
+        'card animate-rise-in flex flex-col items-center px-6 pt-8 pb-9 text-center',
+        className,
+      )}
+    >
+      <Illustration name={art} className="h-auto w-36" />
+      <h2 className="mt-3 text-heading">{title}</h2>
+      {children && <div className="mt-1 max-w-xs text-body text-muted">{children}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </section>
   )
 }

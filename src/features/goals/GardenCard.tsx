@@ -13,21 +13,18 @@ export function GardenCard() {
   const toNext = stage.nextAt === null ? null : stage.nextAt - points
 
   return (
-    <section
-      aria-labelledby="garden-title"
-      className="rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line"
-    >
+    <section aria-labelledby="garden-title" className="card p-5">
       <div role="img" aria-label={`Your garden: ${stage.name.toLowerCase()}`}>
         <GardenArt stage={stage.index} />
       </div>
       <div className="mt-2 text-center">
-        <p className="text-xs font-semibold tracking-wider text-muted uppercase">
+        <p className="eyebrow text-muted">
           Stage {stage.index + 1} of {GARDEN_STAGES.length}
         </p>
-        <h2 id="garden-title" className="mt-0.5 text-lg font-semibold">
+        <h2 id="garden-title" className="mt-0.5 text-heading">
           {stage.name}
         </h2>
-        <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">
+        <p className="mx-auto mt-1 max-w-xs text-body text-muted">
           {toNext === null
             ? 'Fully grown. It stays this way, whatever happens.'
             : `${toNext} more ${toNext === 1 ? 'good moment' : 'good moments'} until it grows again.`}
@@ -55,7 +52,7 @@ export function GardenGlance() {
   return (
     <Link
       to="/goals"
-      className="flex min-h-14 items-center gap-3 rounded-3xl bg-surface px-4 py-2 shadow-card ring-1 ring-line transition-colors hover:bg-accent-soft/40"
+      className="card-quiet flex min-h-14 items-center gap-3 px-4 py-2 transition-colors hover:bg-accent-soft/40"
     >
       <span className="w-16 shrink-0">
         <GardenArt stage={garden.stage.index} size={64} />

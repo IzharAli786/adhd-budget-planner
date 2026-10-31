@@ -20,7 +20,8 @@ import { BigNumber } from '../../ui/BigNumber'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { ListGroup, ListRow } from '../../ui/List'
-import { PageHeader } from '../../ui/PageHeader'
+import { EmptyState, PageHeader } from '../../ui/PageHeader'
+import { SectionHeader } from '../../ui/Section'
 import { Segmented } from '../../ui/Segmented'
 import { BillEditor, type BillEditorTarget } from './BillEditor'
 import { BillRow } from './BillRow'
@@ -51,7 +52,7 @@ export function BillsScreen() {
   return (
     <>
       <PageHeader title="Bills" subtitle="What’s due, and when the money comes in." />
-      <div className="mb-6">
+      <div className="mb-6 lg:max-w-sm">
         <Segmented
           label="Show"
           value={view}
@@ -60,7 +61,7 @@ export function BillsScreen() {
         />
       </div>
       {!data.loaded ? (
-        <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-3xl bg-surface" />
       ) : view === 'bills' ? (
         <BillsView
           data={data}
@@ -68,7 +69,9 @@ export function BillsScreen() {
           onShowPaydays={() => setParams({ view: 'paydays' }, { replace: true })}
         />
       ) : (
-        <PaydaysView data={data} today={today} />
+        <div className="lg:max-w-2xl">
+          <PaydaysView data={data} today={today} />
+        </div>
       )}
     </>
   )
@@ -139,61 +142,64 @@ function BillsView({
     setPanel({ kind: 'editor', target: { defaultDate: date ?? today } })
 
   return (
-    <div className="space-y-6">
-      {bills.length === 0 ? (
-        <section className="animate-fade-in rounded-[1.75rem] bg-accent-soft px-6 py-8 text-center">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-surface text-accent">
-            <Icon name="bills" size={24} />
-          </span>
-          <h2 className="mt-3 text-lg font-semibold">No bills yet</h2>
-          <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">
+    <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
+      {/* Sticky only when summary + calendar fit the window: on a short laptop a sticky
+          column taller than the viewport would hide the calendar's last weeks. */}
+      <div className="space-y-6 lg:[@media(min-height:52rem)]:sticky lg:[@media(min-height:52rem)]:top-10">
+        {bills.length === 0 ? (
+          <EmptyState
+            art="calendar"
+            title="No bills yet"
+            action={
+              <Button onClick={() => addBill()}>
+                <Icon name="plus" size={18} />
+                Add your first bill
+              </Button>
+            }
+          >
             Start with the biggest one, usually rent. Steady keeps it out of your spending money
             until it’s paid.
-          </p>
-          <Button className="mt-5" onClick={() => addBill()}>
-            <Icon name="plus" size={18} />
-            Add your first bill
-          </Button>
-        </section>
-      ) : (
-        <section className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line">
-          <p className="text-sm text-muted">
-            {period.fromPayday ? 'Left to pay before payday' : 'Left to pay this month'}
-          </p>
-          <BigNumber text={f.money(dueSoon.due)} maxRem={2.75} className="mt-1" />
-          <p className="mt-3 text-[0.9375rem] text-muted">
-            {summaryLine(dueSoon.dueCount, dueSoon.paidCount, period, f)}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Button onClick={() => addBill()}>
-              <Icon name="plus" size={18} />
-              Add bill
-            </Button>
-            {!period.fromPayday && (
-              <button
-                type="button"
-                onClick={onShowPaydays}
-                className="min-h-11 rounded-full px-1 text-sm font-medium text-accent"
-              >
-                Add your payday to plan by pay period
-              </button>
-            )}
-          </div>
-        </section>
-      )}
+          </EmptyState>
+        ) : (
+          <section className="card @container p-6">
+            <p className="text-sm text-muted">
+              {period.fromPayday ? 'Left to pay before payday' : 'Left to pay this month'}
+            </p>
+            <BigNumber text={f.money(dueSoon.due)} maxRem={2.75} className="mt-1" />
+            <p className="mt-3 text-body text-muted">
+              {summaryLine(dueSoon.dueCount, dueSoon.paidCount, period, f)}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <Button onClick={() => addBill()}>
+                <Icon name="plus" size={18} />
+                Add bill
+              </Button>
+              {!period.fromPayday && (
+                <button
+                  type="button"
+                  onClick={onShowPaydays}
+                  className="min-h-11 rounded-full px-1 text-sm font-medium text-accent"
+                >
+                  Add your payday to plan by pay period
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
-      <MonthCalendar
-        month={month}
-        today={today}
-        weekStart={settings.weekStart}
-        bills={calendar.bills}
-        paydays={calendar.paydays}
-        onMonthChange={(d) => setMonth(d === 0 ? today : addMonths(grid.month, d))}
-        onSelectDay={(date) => setPanel({ kind: 'day', date })}
-      />
+        <MonthCalendar
+          month={month}
+          today={today}
+          weekStart={settings.weekStart}
+          bills={calendar.bills}
+          paydays={calendar.paydays}
+          onMonthChange={(d) => setMonth(d === 0 ? today : addMonths(grid.month, d))}
+          onSelectDay={(date) => setPanel({ kind: 'day', date })}
+        />
+      </div>
 
       {bills.length > 0 && (
-        <>
+        <div className="mt-6 space-y-6 lg:mt-0">
           {groups.overdue.length > 0 && (
             <BillGroup title="Overdue" entries={groups.overdue} today={today} onOpen={open} />
           )}
@@ -222,7 +228,7 @@ function BillsView({
                 />
               ))}
           </ListGroup>
-        </>
+        </div>
       )}
 
       <DaySheet
@@ -281,27 +287,27 @@ function BillGroup({
   const t = totalsOf(entries)
   return (
     <section className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
-        <h2 className="text-xs font-semibold tracking-wider text-muted uppercase">{title}</h2>
-        {entries.length > 0 && (
-          <p className="text-sm text-muted tabular-nums">
-            {t.due > 0 ? (
-              <>
-                <span className="font-medium text-text">{f.money(t.due)}</span> to pay
-              </>
-            ) : (
-              'All paid'
-            )}
-            {t.paid > 0 && t.due > 0 && ` · ${f.money(t.paid)} paid`}
-          </p>
-        )}
-      </div>
+      <SectionHeader
+        title={title}
+        aside={
+          entries.length > 0 && (
+            <p>
+              {t.due > 0 ? (
+                <>
+                  <span className="font-medium text-text">{f.money(t.due)}</span> to pay
+                </>
+              ) : (
+                'All paid'
+              )}
+              {t.paid > 0 && t.due > 0 && ` · ${f.money(t.paid)} paid`}
+            </p>
+          )
+        }
+      />
       {entries.length === 0 ? (
-        <p className="rounded-[1.5rem] bg-surface px-5 py-5 text-[0.9375rem] text-muted ring-1 ring-line">
-          {empty}
-        </p>
+        <p className="card-quiet px-5 py-5 text-body text-muted">{empty}</p>
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-[1.5rem] bg-surface py-1 shadow-card ring-1 ring-line">
+        <ul className="card divide-y divide-line overflow-hidden py-1">
           {entries.map((e) => (
             <BillRow
               key={`${e.billId}|${e.originalDate}`}

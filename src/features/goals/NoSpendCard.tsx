@@ -38,15 +38,12 @@ export function NoSpendCard({ today }: { today: ISODate }) {
     )
 
   return (
-    <section
-      aria-labelledby="nospend-title"
-      className="space-y-4 rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line"
-    >
+    <section aria-labelledby="nospend-title" className="card space-y-4 p-5">
       <div>
-        <h2 id="nospend-title" className="text-lg font-semibold">
+        <h2 id="nospend-title" className="text-heading">
           No-spend days
         </h2>
-        <p className="text-[0.9375rem] text-muted">
+        <p className="text-body text-muted">
           {count === 0
             ? 'A day without spending is a small win. Mark one when it happens.'
             : `${count} this month. Each one counts, in any order.`}
@@ -78,7 +75,7 @@ export function NoSpendCard({ today }: { today: ISODate }) {
         ))}
       </ol>
       {spentToday && !markedToday ? (
-        <p className="rounded-2xl bg-bg px-4 py-3 text-center text-[0.9375rem] text-muted">
+        <p className="rounded-2xl bg-bg px-4 py-3 text-center text-body text-muted">
           Today has spending logged, and that’s fine. Any day can be the next one.
         </p>
       ) : (

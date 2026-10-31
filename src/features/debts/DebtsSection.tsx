@@ -25,21 +25,26 @@ export function DebtsSection() {
   const owing = debts?.some((d) => d.balance > 0) ?? false
 
   if (debts === undefined)
-    return <div aria-hidden="true" className="h-48 animate-pulse rounded-[1.75rem] bg-surface" />
+    return <div aria-hidden="true" className="h-48 animate-pulse rounded-3xl bg-surface" />
 
   return (
     <div className="space-y-6">
       {debts.length === 0 ? (
-        <EmptyState icon={<Icon name="goals" size={26} />} title="No debts added">
+        <EmptyState
+          art="path"
+          title="No debts added"
+          action={
+            <Button onClick={() => setEditing({})}>
+              <Icon name="plus" size={18} />
+              Add a debt
+            </Button>
+          }
+        >
           <p>Add a card or loan to see when you could be debt-free and which one to focus on.</p>
-          <Button className="mt-5" onClick={() => setEditing({})}>
-            <Icon name="plus" size={18} />
-            Add a debt
-          </Button>
         </EmptyState>
       ) : (
         <>
-          <ul className="divide-y divide-line overflow-hidden rounded-[1.75rem] bg-surface shadow-card ring-1 ring-line">
+          <ul className="card divide-y divide-line overflow-hidden">
             {debts.map((d) => (
               <DebtRow key={d.id} debt={d} onEdit={() => setEditing({ debt: d })} />
             ))}
@@ -51,7 +56,7 @@ export function DebtsSection() {
           {owing ? (
             <PayoffPlan debts={debts} today={today} />
           ) : (
-            <p className="rounded-3xl bg-accent-soft/60 px-5 py-4 text-[0.9375rem]">
+            <p className="rounded-3xl bg-accent-soft/60 px-5 py-4 text-body">
               Everything here is paid off. Nice work.
             </p>
           )}

@@ -26,7 +26,7 @@ export const buttonClass = (
     'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full font-medium',
     'transition-[filter,background-color,transform] select-none active:scale-[0.98]',
     'disabled:pointer-events-none disabled:opacity-50',
-    size === 'lg' ? 'min-h-13 px-6 text-base' : 'px-5 text-[0.9375rem]',
+    size === 'lg' ? 'min-h-13 px-6 text-base' : 'px-5 text-body',
     block && 'w-full',
     VARIANTS[variant],
   )

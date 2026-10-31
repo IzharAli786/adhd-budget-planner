@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cx } from './cx'
+import { AnimatedNumber } from './Section'
 
 /**
  * A hero amount that always fits its card, at any text size (PLAN §8: 150% at 390px).
@@ -30,7 +31,7 @@ export function BigNumber({
         )}
         style={{ fontSize: `min(${maxRem}rem, ${perChar.toFixed(2)}cqi)` }}
       >
-        {text}
+        <AnimatedNumber value={text} />
         {suffix && (
           <span className="text-[0.4em] font-medium tracking-normal whitespace-normal text-muted">
             {' '}

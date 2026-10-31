@@ -10,7 +10,8 @@ import { useToday } from '../../lib/useToday'
 import { BigNumber } from '../../ui/BigNumber'
 import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { Icon, type IconName } from '../../ui/Icon'
+import { Icon } from '../../ui/Icon'
+import { EmptyState } from '../../ui/PageHeader'
 import { BackupMomentSheet } from '../backup/BackupMomentSheet'
 import { useFormat } from '../bills/format'
 import { CatchUpCard } from '../catchup/CatchUpCard'
@@ -22,6 +23,7 @@ import { useQuickAdd } from '../quickadd/QuickAddProvider'
 import { ActionCard } from './ActionCard'
 import { CanFitSheet } from './CanFitSheet'
 import { CheckInSheet } from './CheckInSheet'
+import { ComingUp } from './ComingUp'
 import { MathSheet } from './MathSheet'
 import { useTodayModel, type TodayModel } from './useTodayModel'
 
@@ -47,7 +49,7 @@ export function TodayScreen() {
         <JustTodayToggle />
       </div>
       {!model.loaded || !model.plan || !ready ? (
-        <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-3xl bg-surface" />
       ) : (
         <TodayBody model={model} today={today} now={now} />
       )}
@@ -116,7 +118,6 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
     // /setup sends a finished install straight back here, so the step is Bills > Paydays.
     return (
       <Welcome
-        icon="payday"
         title={plan.kind === 'no-income' ? 'Let’s find your number' : 'When is your next pay?'}
         body={
           plan.kind === 'no-income'
@@ -152,7 +153,6 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
     return (
       <>
         <Welcome
-          icon="payday"
           title="One number to go"
           body={`Payday is ${f.dayLong(plan.period.end)}. What’s in your account right now? Then Steady shows what you can spend each day until then.`}
           cta={
@@ -179,93 +179,107 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
 
   return (
     <>
-      <section
-        aria-label="Today’s number"
-        className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line"
-      >
-        <p className="text-sm text-muted">
-          {short ? 'Before payday' : over ? 'Today' : 'You can spend today'}
-        </p>
-        {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
-        <BigNumber text={heroAmount} suffix={heroSuffix} className="mt-1" />
-        <p className="mt-4 text-base">
-          {short ? (
-            // One calm suggestion, no red (PLAN §1.3).
-            'Bills before payday are more than your balance. Moving one past payday is often the quickest fix.'
-          ) : (
-            <>
-              <span className="font-medium tabular-nums">{f.money(safe.total)}</span> until payday ·{' '}
-              {f.day(period.end)}
-            </>
-          )}
-        </p>
-        {over && (
-          <p className="mt-1 text-[0.9375rem] text-muted">
-            That’s fine. It spreads over the days left.
-          </p>
+      <div
+        className={cx(
+          // "Just today" has no side column, so it keeps the calm reading width.
+          lite
+            ? 'lg:max-w-2xl'
+            : 'lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-x-8',
         )}
-        {!lite && (
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 text-sm text-muted">
-            <span>
-              {runway.daysLeft === 1 ? 'Payday tomorrow' : `${runway.daysLeft} days to payday`} ·
-              balance from {f.relative(model.checkIn!.date, today)}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setOfferBackup(false)
+      >
+        <div className="space-y-5">
+          <section aria-label="Today’s number" className="card-hero @container p-6 sm:p-7">
+            <p className="text-body text-muted">
+              {short ? 'Before payday' : over ? 'Today' : 'You can spend today'}
+            </p>
+            {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
+            <BigNumber text={heroAmount} suffix={heroSuffix} className="mt-2" />
+            <p className="mt-5 text-base">
+              {short ? (
+                // One calm suggestion, no red (PLAN §1.3).
+                'Bills before payday are more than your balance. Moving one past payday is often the quickest fix.'
+              ) : (
+                <>
+                  <span className="font-medium tabular-nums">{f.money(safe.total)}</span> until
+                  payday · {f.day(period.end)}
+                </>
+              )}
+            </p>
+            {over && (
+              <p className="mt-1 text-body text-muted">
+                That’s fine. It spreads over the days left.
+              </p>
+            )}
+            {!lite && (
+              <div className="mt-5 flex flex-wrap items-center gap-x-3 border-t border-line pt-3 text-caption text-muted">
+                <span>
+                  {runway.daysLeft === 1 ? 'Payday tomorrow' : `${runway.daysLeft} days to payday`}{' '}
+                  · balance from {f.relative(model.checkIn!.date, today)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOfferBackup(false)
+                    setPanel('checkin')
+                  }}
+                  className="-mx-1 min-h-11 rounded-full px-1 font-medium text-accent"
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanel('math')}
+                  className="-mx-1 ml-auto min-h-11 rounded-full px-1 font-medium text-accent"
+                >
+                  See the math
+                </button>
+              </div>
+            )}
+          </section>
+
+          {gap.mode === 'short' && !lite && <CatchUpCard gap={gap} onDismiss={session.dismiss} />}
+
+          {action && (
+            <ActionCard
+              action={action}
+              snoozes={snoozes}
+              onCheckIn={(backup) => {
+                setOfferBackup(backup)
                 setPanel('checkin')
               }}
-              className="-mx-1 min-h-11 rounded-full px-1 font-medium text-accent"
-            >
-              Update
-            </button>
-            <button
-              type="button"
-              onClick={() => setPanel('math')}
-              className="-mx-1 ml-auto min-h-11 rounded-full px-1 font-medium text-accent"
-            >
-              See the math
-            </button>
-          </div>
+              onLog={() => (fieldRef.current ? fieldRef.current.focus() : openSheet())}
+            />
+          )}
+
+          {!lite && (
+            <>
+              <QuickAddField
+                today={today}
+                transactions={model.transactions}
+                envelopes={model.envelopes}
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => setPanel('fit')}>
+                  Can this fit?
+                </Button>
+                <Link to="/more/transactions" className={buttonClass('ghost')}>
+                  All entries
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Glances: below the fold on phones, a quiet side column on wide screens. */}
+        {!lite && (
+          <aside aria-label="At a glance" className="mt-8 space-y-6 lg:sticky lg:top-10 lg:mt-0">
+            <ComingUp today={today} />
+            {/* Only where the garden lives (Goals is a Full-mode tab). */}
+            {!settings.simpleMode && <GardenGlance />}
+          </aside>
         )}
-      </section>
-
-      {gap.mode === 'short' && !lite && <CatchUpCard gap={gap} onDismiss={session.dismiss} />}
-
-      {action && (
-        <ActionCard
-          action={action}
-          snoozes={snoozes}
-          onCheckIn={(backup) => {
-            setOfferBackup(backup)
-            setPanel('checkin')
-          }}
-          onLog={() => (fieldRef.current ? fieldRef.current.focus() : openSheet())}
-        />
-      )}
-
-      {!lite && (
-        <>
-          <QuickAddField
-            today={today}
-            transactions={model.transactions}
-            envelopes={model.envelopes}
-          />
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button variant="secondary" onClick={() => setPanel('fit')}>
-              Can this fit?
-            </Button>
-            <Link to="/more/transactions" className={buttonClass('ghost')}>
-              All entries
-            </Link>
-          </div>
-
-          {/* Below the fold, and only where the garden lives (Goals is a Full-mode tab). */}
-          {!settings.simpleMode && <GardenGlance />}
-        </>
-      )}
+      </div>
 
       <MathSheet
         open={panel === 'math'}
@@ -288,25 +302,10 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
   )
 }
 
-function Welcome({
-  icon,
-  title,
-  body,
-  cta,
-}: {
-  icon: IconName
-  title: string
-  body: string
-  cta: React.ReactNode
-}) {
+function Welcome({ title, body, cta }: { title: string; body: string; cta: React.ReactNode }) {
   return (
-    <section className="animate-fade-in rounded-[1.75rem] bg-surface px-6 py-10 text-center shadow-card ring-1 ring-line">
-      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-        <Icon name={icon} size={26} />
-      </span>
-      <h2 className="mt-4 text-xl font-semibold">{title}</h2>
-      <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">{body}</p>
-      <div className="mt-5">{cta}</div>
-    </section>
+    <EmptyState art="sunrise" title={title} action={cta}>
+      {body}
+    </EmptyState>
   )
 }

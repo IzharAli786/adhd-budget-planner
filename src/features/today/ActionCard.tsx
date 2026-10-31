@@ -55,14 +55,12 @@ export function ActionCard({ action, snoozes, onCheckIn, onLog }: Props) {
       aria-labelledby="next-action"
       className="animate-fade-in rounded-[1.75rem] bg-accent-soft p-5"
     >
-      <p className="text-xs font-semibold tracking-wider text-accent uppercase">
-        {done ? 'Today' : 'One thing now'}
-      </p>
+      <p className="eyebrow text-accent">{done ? 'Today' : 'One thing now'}</p>
       <h2 id="next-action" className="mt-1 flex items-center gap-2 text-lg font-medium">
         {done && <Icon name="check" size={20} className="text-accent" />}
         {action.trigger}
       </h2>
-      <p className="text-[0.9375rem] text-muted">
+      <p className="text-body text-muted">
         {action.bill ? (
           <>
             <span className="font-medium text-text tabular-nums">

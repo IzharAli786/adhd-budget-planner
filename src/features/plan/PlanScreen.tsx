@@ -10,7 +10,6 @@ import type { ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { buttonClass } from '../../ui/Button'
-import { Icon } from '../../ui/Icon'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { ProgressBar } from '../../ui/Progress'
 import { useFormat } from '../bills/format'
@@ -33,25 +32,27 @@ export function PlanScreen() {
         <div aria-hidden="true" className="h-64 animate-pulse rounded-3xl bg-surface" />
       ) : model.plan.kind !== 'ready' ? (
         <div className="space-y-8">
-          <EmptyState icon={<Icon name="plan" size={26} />} title="One number first">
+          <EmptyState
+            art="sunrise"
+            title="One number first"
+            action={
+              <Link to="/" className={buttonClass()}>
+                Go to Today
+              </Link>
+            }
+          >
             Add your payday and today’s balance on Today, and your plan fills in here.
-            <Link to="/" className={`${buttonClass()} mt-4`}>
-              Go to Today
-            </Link>
           </EmptyState>
           <EnvelopesSection envelopes={model.envelopes} usage={[]} />
         </div>
       ) : (
         <div className="space-y-8">
           <PeriodCard model={model} today={today} />
-          <section
-            aria-labelledby="fit-title"
-            className="rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line"
-          >
-            <h2 id="fit-title" className="mb-1 text-lg font-semibold">
+          <section aria-labelledby="fit-title" className="card p-5">
+            <h2 id="fit-title" className="mb-1 text-heading">
               Can this fit?
             </h2>
-            <p className="mb-4 text-[0.9375rem] text-muted">Try a price. Nothing is saved.</p>
+            <p className="mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
             <CanFitForm
               total={model.plan.safe.total}
               runway={model.plan.runway}
@@ -85,18 +86,15 @@ function PeriodCard({ model, today }: { model: TodayModel; today: ISODate }) {
   const [balance, bills, setAside, total] = simpleLines(plan.safe)
 
   return (
-    <section
-      aria-labelledby="period-title"
-      className="rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line"
-    >
+    <section aria-labelledby="period-title" className="card p-5">
       <p className="text-sm text-muted">
         {f.day(period.start)} – {f.day(addDays(period.end, -1))} · {period.daysLeft}{' '}
         {period.daysLeft === 1 ? 'day' : 'days'} left
       </p>
-      <h2 id="period-title" className="mt-0.5 text-lg font-semibold">
+      <h2 id="period-title" className="mt-0.5 text-heading">
         This period
       </h2>
-      <dl className="mt-4 divide-y divide-line text-[0.9375rem]">
+      <dl className="mt-4 divide-y divide-line text-body">
         <Row label="Income this period" value={f.money(income)}>
           {pay.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-sm text-muted">
@@ -159,7 +157,7 @@ function SavingsSummary() {
   return (
     <section aria-labelledby="savings-title" className="space-y-3">
       <div className="flex items-center justify-between gap-3 px-1">
-        <h2 id="savings-title" className="text-lg font-semibold">
+        <h2 id="savings-title" className="text-heading">
           Savings
         </h2>
         <Link to="/goals" className={buttonClass('ghost')}>
@@ -167,16 +165,16 @@ function SavingsSummary() {
         </Link>
       </div>
       {funds.length === 0 ? (
-        <p className="rounded-3xl bg-surface p-5 text-[0.9375rem] text-muted shadow-card ring-1 ring-line">
+        <p className="card p-5 text-body text-muted">
           No savings funds yet. Start one in Goals; even a little each payday adds up.
         </p>
       ) : (
-        <ul className="divide-y divide-line rounded-3xl bg-surface shadow-card ring-1 ring-line">
+        <ul className="card divide-y divide-line">
           {funds.map((fund) => {
             const saved = fundSaved(fund, transactions)
             return (
               <li key={fund.id} className="px-5 py-3.5">
-                <div className="flex justify-between gap-4 text-[0.9375rem]">
+                <div className="flex justify-between gap-4 text-body">
                   <span className="truncate font-medium">{fund.name}</span>
                   <span className="shrink-0 tabular-nums">
                     {f.money(saved)}
