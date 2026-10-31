@@ -5,7 +5,12 @@
 import * as z from 'zod/mini'
 import { isValidISODate } from '../domain/dates'
 import { isSupportedCurrency } from '../domain/currencies'
-import { NOTE_MAX_LENGTH } from '../domain/types'
+import {
+  LIFE_GOAL_STATUSES,
+  LIFE_GOAL_TITLE_MAX,
+  LIFE_GOAL_WHY_MAX,
+  NOTE_MAX_LENGTH,
+} from '../domain/types'
 import { HEX_COLOR } from '../domain/accent'
 import { DISPLAY_NAME_MAX } from '../domain/greeting'
 import { DATE_STYLES, THEMES } from '../domain/settings'
@@ -156,6 +161,18 @@ export const rowSchemas = {
     periodStart: z.optional(isoDate),
     text: z.string().check(z.maxLength(NOTE_MAX_LENGTH)),
     updatedAt: instant,
+  }),
+  // v4. Optional like every table, so files from before life goals simply have none.
+  lifeGoals: z.object({
+    id,
+    title: z.string().check(z.minLength(1), z.maxLength(LIFE_GOAL_TITLE_MAX)),
+    why: z.optional(z.string().check(z.maxLength(LIFE_GOAL_WHY_MAX))),
+    targetDate: z.optional(isoDate),
+    status: z.enum(LIFE_GOAL_STATUSES),
+    fundId: z.optional(id),
+    debtId: z.optional(id),
+    createdAt: instant,
+    doneAt: z.optional(instant),
   }),
   meta: z.object({ key: z.string(), value: z.unknown() }),
 }

@@ -11,7 +11,8 @@ import {
 } from '../../db/repos'
 import { ENVELOPE_COLORS, nextEnvelopeColor, STARTER_CATEGORIES } from '../../domain/categories'
 import type { EnvelopeUsage } from '../../domain/safeToSpend'
-import type { Cents, Envelope } from '../../domain/types'
+import type { DateRange } from '../../domain/insights'
+import type { Cents, Envelope, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { EnvelopeDot, envelopeColor } from '../../ui/EnvelopeDot'
@@ -22,18 +23,23 @@ import { ProgressBar } from '../../ui/Progress'
 import { Sheet } from '../../ui/Sheet'
 import { Switch } from '../../ui/Switch'
 import { useFormat } from '../bills/format'
+import { EnvelopeEntriesSheet } from './EnvelopeEntriesSheet'
 
 interface Props {
   envelopes: readonly Envelope[]
   /** This period's numbers per envelope; missing before there is a balance. */
   usage: readonly EnvelopeUsage[]
+  /** The current pay period, so a tap on an envelope can list its entries. */
+  period?: DateRange
+  today?: ISODate
 }
 
 /** Envelopes (off by default, PLAN §10 M9): an optional budget per kind of spending. */
-export function EnvelopesSection({ envelopes, usage }: Props) {
+export function EnvelopesSection({ envelopes, usage, period, today }: Props) {
   const { settings, update } = useAppSettings()
   const f = useFormat()
   const [editing, setEditing] = useState<Envelope | 'new' | null>(null)
+  const [viewing, setViewing] = useState<Envelope | null>(null)
   const [skipped, setSkipped] = useState(readSkipped)
   const on = settings.envelopesEnabled
   // Offered while only Everyday exists: the moment right after turning envelopes on.
@@ -89,6 +95,7 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
                   void reorderEnvelopes(ids)
                 }}
                 onEdit={() => setEditing(env)}
+                onOpen={period && today ? () => setViewing(env) : undefined}
               />
             ))}
           </ul>
@@ -101,6 +108,16 @@ export function EnvelopesSection({ envelopes, usage }: Props) {
             tag it in quick-add with @name, like “12 lunch @food”.
           </p>
         </>
+      )}
+      {period && today && (
+        <EnvelopeEntriesSheet
+          envelope={viewing}
+          envelopes={envelopes}
+          usage={usage.find((u) => u.id === viewing?.id)}
+          period={period}
+          today={today}
+          onClose={() => setViewing(null)}
+        />
       )}
       <EnvelopeSheet
         envelope={editing === 'new' ? null : editing}
@@ -185,6 +202,7 @@ function EnvelopeRow({
   last,
   onMove,
   onEdit,
+  onOpen,
 }: {
   env: Envelope
   usage: EnvelopeUsage | undefined
@@ -192,6 +210,8 @@ function EnvelopeRow({
   last: boolean
   onMove: (dir: -1 | 1) => void
   onEdit: () => void
+  /** Opens this period's entries; the whole card is the target. */
+  onOpen?: () => void
 }) {
   const f = useFormat()
   const used = usage ? usage.spent + usage.linkedDue : 0
@@ -207,11 +227,25 @@ function EnvelopeRow({
         : `${f.money(usage.reserved)} left of ${f.money(env.budget)}`
 
   return (
-    <li className="card p-4">
+    <li className="card relative p-4 transition-colors has-[.open-entries:hover]:bg-accent-soft/30">
       <div className="flex items-center gap-1">
         <EnvelopeDot color={env.color} className="ml-1" />
         <div className="min-w-0 flex-1 pl-2">
-          <h3 className="truncate font-semibold">{env.name}</h3>
+          <h3 className="truncate font-semibold">
+            {onOpen ? (
+              // Stretched over the card (::before), under the move and edit buttons.
+              <button
+                type="button"
+                onClick={onOpen}
+                aria-haspopup="dialog"
+                className="open-entries max-w-full truncate text-left outline-none before:absolute before:inset-0 before:rounded-3xl focus-visible:before:ring-2 focus-visible:before:ring-accent"
+              >
+                {env.name}
+              </button>
+            ) : (
+              env.name
+            )}
+          </h3>
           <p className="text-sm text-muted tabular-nums">{status}</p>
         </div>
         <IconButton
@@ -252,7 +286,7 @@ function IconButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60 disabled:opacity-30"
+      className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60 disabled:opacity-30"
     >
       <Icon name={icon} size={18} />
     </button>

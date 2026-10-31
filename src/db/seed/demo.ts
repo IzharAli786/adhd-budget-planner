@@ -22,6 +22,7 @@ import type {
   IncomeSource,
   ISODate,
   NoSpendDay,
+  LifeGoal,
   Note,
   SavingsFund,
   Transaction,
@@ -45,6 +46,7 @@ export interface DemoData {
   noSpend: NoSpendDay[]
   envelopes: Envelope[]
   notes: Note[]
+  lifeGoals: LifeGoal[]
   gardenPoints: number
   /** Settings' buffer: the cushion the household keeps, left out of today's number. */
   buffer: number
@@ -64,6 +66,7 @@ export const SEEDED_TABLES = [
   'noSpend',
   'envelopes',
   'notes',
+  'lifeGoals',
 ] as const satisfies readonly (keyof DemoData)[]
 
 /** Pay periods of history before the current one: about nine months, so Look back has a
@@ -540,7 +543,36 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     },
   ]
 
+  // Three life goals in three states, two leaning on a fund or a debt, so Goals shows
+  // the why behind the numbers.
+  const lifeGoals: LifeGoal[] = [
+    {
+      id: 'demo-goal-trip',
+      title: 'Two weeks by the sea',
+      why: 'No laptop, long swims, and a proper rest for once.',
+      targetDate: addMonths(today, 5),
+      status: 'doing',
+      fundId: 'demo-fund-holiday',
+      createdAt: at(historyStart, 20),
+    },
+    {
+      id: 'demo-goal-card',
+      title: 'Credit card at zero',
+      why: 'One less thing to think about every month.',
+      status: 'doing',
+      debtId: 'demo-debt-card',
+      createdAt: at(historyStart, 20),
+    },
+    {
+      id: 'demo-goal-cushion',
+      title: 'A month of rent put by',
+      status: 'todo',
+      createdAt: at(day(-30), 21),
+    },
+  ]
+
   return {
+    lifeGoals,
     incomes,
     bills,
     billOccurrences,

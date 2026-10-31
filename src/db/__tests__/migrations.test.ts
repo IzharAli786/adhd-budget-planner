@@ -12,6 +12,7 @@ import {
 } from '../schema'
 import { openDatabase, readSnapshot, snapshotDbName, writeSnapshot } from '../snapshot'
 import { LATEST_ROWS, openFixture, V1_ROWS, V2_ROWS } from './fixtures/v1'
+import type { TableData } from '../migrations'
 
 const names: string[] = []
 const fresh = (label: string) => {
@@ -58,8 +59,8 @@ describe('migrateData', () => {
   })
 
   it('v2 fills debt.originalBalance from the balance, keeping one that exists', () => {
-    expect(SCHEMA_VERSION).toBe(3)
-    // v3 only added the notes table: no transform.
+    expect(SCHEMA_VERSION).toBe(4)
+    // v3 only added the notes table, v4 the lifeGoals table: no transforms.
     expect(Object.keys(MIGRATIONS)).toEqual(['2'])
     const out = migrateData(
       {
@@ -112,7 +113,7 @@ describe('real-fixture upgrades', () => {
     await openFixture(name, 2, V2_ROWS)
     const db = new SteadyDB(name)
     await openDatabase(db, new Date('2026-10-31T00:00:00Z'))
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(SCHEMA_VERSION)
     expect(await db.notes.count()).toBe(0)
     for (const [table, rows] of Object.entries(V2_ROWS)) {
       expect(await db.table(table).count()).toBe(rows.length)
@@ -223,6 +224,40 @@ describe('real-fixture upgrades', () => {
     ])
     // Today's validator reads v1 files directly.
     expect(validateBackup(file).ok).toBe(true)
+  })
+})
+
+describe('v3 -> v4 (life goals)', () => {
+  it('a real v3 database gains an empty lifeGoals table and keeps every row', async () => {
+    const name = fresh('v3-real')
+    const v3: TableData = {
+      ...structuredClone(LATEST_ROWS),
+      notes: [{ id: 'day|2026-11-02', date: '2026-11-02', text: 'Dentist', updatedAt: 'x' }],
+    }
+    delete v3.lifeGoals
+    await openFixture(name, 3, v3)
+    const db = new SteadyDB(name)
+    await openDatabase(db, new Date('2026-10-31T00:00:00Z'))
+    expect(db.verno).toBe(4)
+    expect(await db.lifeGoals.count()).toBe(0)
+    for (const [table, rows] of Object.entries(v3)) {
+      expect(await db.table(table).count()).toBe(rows.length)
+    }
+    // A snapshot of the v3 data was taken first, without the new table.
+    const snap = await readSnapshot(name, 'migration')
+    expect(snap).toMatchObject({ fromVersion: 3 })
+    expect(snap!.data).not.toHaveProperty('lifeGoals')
+    expect(snap!.data.notes).toHaveLength(1)
+    // The upgraded database takes goals.
+    await db.lifeGoals.put({
+      id: 'g',
+      title: 'Learn to drive',
+      status: 'todo',
+      fundId: 'fund-trip',
+      createdAt: '2026-10-31T00:00:00.000Z',
+    })
+    expect(await db.lifeGoals.get('g')).toMatchObject({ title: 'Learn to drive' })
+    db.close()
   })
 })
 

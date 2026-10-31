@@ -9,6 +9,7 @@ import type {
   Envelope,
   ImpulseItem,
   IncomeSource,
+  LifeGoal,
   Meta,
   NoSpendDay,
   Note,
@@ -49,6 +50,8 @@ export const VERSIONS: readonly SchemaVersion[] = [
   { version: 2, stores: {} },
   // v3: day and pay-period notes. A new table only, so no transform: older rows pass through.
   { version: 3, stores: { notes: 'id, date, periodStart' } },
+  // v4: free-form life goals on Goals. A new table only, so no transform.
+  { version: 4, stores: { lifeGoals: 'id' } },
 ]
 
 export const SCHEMA_VERSION = VERSIONS[VERSIONS.length - 1]!.version
@@ -67,6 +70,7 @@ export const DATA_TABLES = [
   'impulse',
   'noSpend',
   'notes',
+  'lifeGoals',
   'meta',
 ] as const
 export type DataTableName = (typeof DATA_TABLES)[number]
@@ -85,6 +89,7 @@ export interface RowTypes {
   impulse: ImpulseItem
   noSpend: NoSpendDay
   notes: Note
+  lifeGoals: LifeGoal
   meta: Meta
 }
 
@@ -102,6 +107,7 @@ export const PRIMARY_KEY: Record<DataTableName, string> = {
   impulse: 'id',
   noSpend: 'date',
   notes: 'id',
+  lifeGoals: 'id',
   meta: 'key',
 }
 
@@ -122,6 +128,7 @@ export class SteadyDB extends Dexie {
   impulse!: EntityTable<ImpulseItem, 'id'>
   noSpend!: EntityTable<NoSpendDay, 'date'>
   notes!: EntityTable<Note, 'id'>
+  lifeGoals!: EntityTable<LifeGoal, 'id'>
   undo!: EntityTable<UndoEntry, 'seq'>
   meta!: EntityTable<Meta, 'key'>
 

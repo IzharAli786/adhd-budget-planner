@@ -17,6 +17,7 @@ import type { Cents, ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { buttonClass } from '../../ui/Button'
+import { Disclosure } from '../../ui/Disclosure'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { ProgressBar } from '../../ui/Progress'
 import { StatStrip } from '../../ui/StatStrip'
@@ -107,24 +108,28 @@ function CurrentPlan({
           beside savings. Phones keep the same order in one column. */}
       <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
         {income && <PeriodCard model={model} today={today} income={income} />}
-        <section aria-labelledby="fit-title" className="card p-5">
-          <h2 id="fit-title" className="mb-1 text-heading">
-            Can this fit?
-          </h2>
-          <p className="mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
+        {/* Secondary sections fold away (remembered per section), so a phone keeps the
+            period and the envelopes within a short scroll. */}
+        <Disclosure id="plan-fit" title="Can this fit?" summary="Try a price. Nothing is saved.">
+          <p className="mt-1 mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
           <CanFitForm
             total={plan.safe.total}
             runway={plan.runway}
             envelopes={settings.envelopesEnabled ? plan.safe.envelopes : []}
           />
-        </section>
+        </Disclosure>
       </div>
-      <PaydayNote periodStart={plan.period.start} />
+      <PaydayNote periodStart={plan.period.start} foldId="plan-note" />
       <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-        <EnvelopesSection envelopes={model.envelopes} usage={plan.safe.envelopes} />
+        <EnvelopesSection
+          envelopes={model.envelopes}
+          usage={plan.safe.envelopes}
+          period={plan.period}
+          today={today}
+        />
         <SavingsSummary today={today} />
       </div>
-      {data && <InsightsSection data={data} range={plan.period} />}
+      {data && <InsightsSection data={data} range={plan.period} foldId="plan-insights" />}
     </>
   )
 }

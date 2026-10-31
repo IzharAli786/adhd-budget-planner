@@ -117,3 +117,18 @@ describe('snoozes', () => {
     expect(isSnoozed('old', next, now)).toBe(false)
   })
 })
+
+describe('setup-bills copy', () => {
+  const noBills = { ...calm, hasBills: false, loggedToday: true }
+  it('says bills come off today’s number on an ordinary day', () => {
+    const a = nextAction(noBills, {}, today, now)
+    expect(a.kind).toBe('setup-bills')
+    expect(a.detail).toMatch(/come off today’s number/)
+  })
+  it('talks about the new plan when payday is tomorrow', () => {
+    const a = nextAction({ ...noBills, nextPayday: '2026-11-05' }, {}, today, now)
+    expect(a.kind).toBe('setup-bills')
+    expect(a.detail).toMatch(/Payday is tomorrow/)
+    expect(a.detail).not.toMatch(/today’s number/)
+  })
+})

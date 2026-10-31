@@ -62,8 +62,17 @@ test('sample data fills Insights and Look back', async ({ page }) => {
 
   // Insights on Plan: the envelopes plus the debt payments, rent included (in its envelope).
   await page.getByRole('link', { name: 'Plan' }).first().click()
+  // On a phone Insights starts folded, so the period and the envelopes come first.
   const insights = page.getByRole('region', { name: 'Insights' })
+  const fold = insights.getByRole('button', { name: 'Insights', exact: true })
+  await expect(fold).toHaveAttribute('aria-expanded', 'false')
+  await fold.click()
   await expect(insights.getByText('Planned and actual')).toBeVisible()
+  // Each bar names its numbers; a tap shows them in a tip.
+  await insights.getByRole('button', { name: /^Groceries: actual/ }).click()
+  await expect(
+    insights.getByText('Still free').or(insights.getByText('Past the plan')),
+  ).toBeVisible()
   await insights.getByRole('button', { name: 'Show as a table' }).click()
   const table = insights.getByRole('table')
   for (const name of ['Rent & housing', 'Groceries', 'Eating out', 'Debt'])
@@ -81,8 +90,23 @@ test('sample data fills Insights and Look back', async ({ page }) => {
   await expect(glance.getByText('Avalanche could save')).toBeVisible()
   await expect(page.getByText(/Interest paid this year \(estimate\)/).first()).toBeVisible()
   await expect(page.getByText(/\+\s*[−-]/)).toHaveCount(0)
-  const months = page.getByRole('region', { name: 'Period table' }).getByRole('row')
+  // A phone gets one card per month instead of a table that scrolls sideways.
+  const months = page.getByRole('list', { name: 'Months' }).getByRole('listitem')
   expect(await months.count()).toBeGreaterThan(3)
+  const scrolls = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  )
+  expect(scrolls).toBe(false)
+  // The chart reads one month at a time on tap.
+  const chart = page.getByRole('group', { name: 'Money in and out, month by month' })
+  await chart.getByRole('button').last().click()
+  await expect(chart.getByText('In', { exact: true })).toBeVisible()
+  // Life goals from the sample household, one linked to the holiday fund.
+  await page.getByRole('link', { name: 'Goals' }).first().click()
+  const goals = page.getByRole('region', { name: 'Life goals' })
+  await expect(goals.getByRole('heading', { name: 'Two weeks by the sea' })).toBeVisible()
+  await expect(goals.getByRole('progressbar', { name: 'Summer holiday progress' })).toBeVisible()
+  await page.goBack()
   await page.getByRole('radio', { name: 'Per payday' }).click()
   await expect(page.getByText(/You carried .+ into this payday\./)).toBeVisible()
   expect(await seriousViolations(page)).toEqual([])

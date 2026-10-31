@@ -1,9 +1,12 @@
 // Spending by envelope (or category) as a donut, and planned vs actual as bars. Lazy-loaded
-// (PLAN §5): secondary views on Plan and Look back. The pictures are decorative for
-// assistive tech; every number is also in the legend, the bar labels and a table
-// (visually hidden until asked for), per PLAN §8. No red: going past a plan is plain text.
-import { useId, useState } from 'react'
+// (PLAN §5): secondary views on Plan and Look back. The donut is decorative for assistive
+// tech; each bar is a button that names its numbers and shows them in a small tip on tap,
+// hover or focus, and every number is also in a table (visually hidden until asked for),
+// per PLAN §8. No red: going past a plan is plain text.
+import { useCallback, useId, useRef, useState } from 'react'
+import { niceMax } from '../../domain/chartScale'
 import { topCategories } from '../../domain/insights'
+import { useDismissOnOutsideTap } from '../../ui/ChartTips'
 import { cx } from '../../ui/cx'
 import type { Formatters } from '../bills/format'
 import type { InsightRow } from './insightRows'
@@ -40,15 +43,19 @@ export default function InsightsCharts({ rows, f, caption, centerLabel = 'Money 
       : []),
   ]
   const bars = rows.filter((r) => r.actual > 0 || (r.planned ?? 0) > 0)
-  const scale = Math.max(1, ...bars.map((r) => Math.max(r.actual, r.planned ?? 0)))
+  // A round scale, so the light labels under the bars read "€0 · €150 · €300".
+  const scale = niceMax(Math.max(0, ...bars.map((r) => Math.max(r.actual, r.planned ?? 0))))
   const pct = (share: number) => f.percent(Math.round(share * 1000) / 1000)
 
   return (
     <figure>
       <figcaption className="sr-only">{caption}</figcaption>
       {!showTable && (
-        <div aria-hidden="true" className="mb-3 space-y-7">
-          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-7">
+        <div className="mb-3 space-y-7">
+          <div
+            aria-hidden="true"
+            className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-7"
+          >
             <Donut slices={slices} colorOf={colorOf} label={centerLabel} total={f.money(total)} />
             <ul className="w-full min-w-0 flex-1 space-y-2 text-body">
               {slices.map((s) => (
@@ -72,6 +79,15 @@ export default function InsightsCharts({ rows, f, caption, centerLabel = 'Money 
                   <Bar key={r.key} row={r} scale={scale} color={colorOf(r.key)} f={f} />
                 ))}
               </ul>
+              {/* The value axis: light labels under the tracks, matching their midline. */}
+              <div
+                aria-hidden="true"
+                className="mt-2 flex justify-between text-caption text-muted tabular-nums"
+              >
+                <span>{f.moneyShort(0)}</span>
+                <span>{f.moneyShort(scale / 2)}</span>
+                <span>{f.moneyShort(scale)}</span>
+              </div>
             </div>
           )}
         </div>
@@ -159,54 +175,125 @@ function Bar({
   color: string
   f: Formatters
 }) {
+  // Hover shows the tip while the pointer is over the bar; focus or a tap keep it open.
+  const [hover, setHover] = useState(false)
+  const [open, setOpen] = useState(false)
+  const rowRef = useRef<HTMLLIElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  useDismissOnOutsideTap(rowRef, open, close)
   const w = (v: number) => `${Math.min(100, (v / scale) * 100)}%`
   // A budget of 0 is "no budget yet", not a plan that was blown: no track to fill, just
   // the actual, so a full-looking bar never suggests a limit that was never set.
   const noBudget = row.planned === 0
   const planned = noBudget ? null : row.planned
   const over = planned !== null && planned > 0 && row.actual > planned
+  const tip = [
+    { label: 'Actual', value: f.money(row.actual) },
+    ...(planned !== null ? [{ label: 'Planned', value: f.money(planned) }] : []),
+    ...(planned !== null && planned > 0
+      ? over
+        ? [{ label: 'Past the plan', value: f.money(row.actual - planned) }]
+        : [{ label: 'Still free', value: f.money(planned - row.actual) }]
+      : []),
+  ]
+  const label = `${row.name}: ${tip.map((t) => `${t.label.toLowerCase()} ${t.value}`).join(', ')}${noBudget ? ', no budget yet' : ''}`
   return (
-    <li>
-      <div className="flex items-center gap-2.5 whitespace-nowrap text-body">
-        <Swatch color={color} />
-        <span className="min-w-0 flex-1 truncate">{row.name}</span>
-        <span className="shrink-0 tabular-nums">
-          {f.money(row.actual)}
-          {planned !== null && <span className="text-muted"> of {f.money(planned)}</span>}
-        </span>
-      </div>
-      <div className="relative mt-1.5 h-2.5 overflow-hidden rounded-full bg-bg ring-1 ring-line">
-        {planned !== null && (
-          // The plan as a soft track of the same colour; the actual sits on top of it.
+    <li
+      ref={rowRef}
+      className="relative"
+      onPointerEnter={(e) => {
+        if (e.pointerType === 'mouse') setHover(true)
+      }}
+      onPointerLeave={() => setHover(false)}
+    >
+      <div aria-hidden="true">
+        <div className="flex items-center gap-2.5 text-body whitespace-nowrap">
+          <Swatch color={color} />
+          <span className="min-w-0 flex-1 truncate">{row.name}</span>
+          <span className="shrink-0 tabular-nums">
+            {f.money(row.actual)}
+            {planned !== null && <span className="text-muted"> of {f.money(planned)}</span>}
+          </span>
+        </div>
+        <div
+          className="relative mt-1.5 h-2.5 overflow-hidden rounded-full bg-bg ring-1 ring-line"
+          // A faint midline matches the "half" label under the bars.
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
+          }}
+        >
+          {planned !== null && (
+            // The plan as a soft track of the same colour; the actual sits on top of it.
+            <div
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{
+                width: w(planned),
+                background: `color-mix(in oklab, ${color} 22%, var(--surface))`,
+              }}
+            />
+          )}
           <div
             className="absolute inset-y-0 left-0 rounded-full"
-            style={{
-              width: w(planned),
-              background: `color-mix(in oklab, ${color} 22%, var(--surface))`,
-            }}
+            style={{ width: w(row.actual), background: color }}
           />
+          {over && (
+            <div
+              className="absolute inset-y-0 w-0.5 bg-text/60"
+              style={{ left: `calc(${w(planned!)} - 1px)` }}
+            />
+          )}
+        </div>
+        {/* Under the bar, so a long envelope name keeps its room on a phone. */}
+        {noBudget && (
+          <p className="mt-1 text-caption text-muted tabular-nums">
+            {f.money(row.actual)} spent · no budget yet
+          </p>
         )}
-        <div
-          className="absolute inset-y-0 left-0 rounded-full"
-          style={{ width: w(row.actual), background: color }}
-        />
         {over && (
-          <div
-            className="absolute inset-y-0 w-0.5 bg-text/60"
-            style={{ left: `calc(${w(planned!)} - 1px)` }}
-          />
+          <p className="mt-1 text-caption text-muted tabular-nums">
+            {f.money(row.actual - planned!)} past the plan. It came from what was free.
+          </p>
         )}
       </div>
-      {/* Under the bar, so a long envelope name keeps its room on a phone. */}
-      {noBudget && (
-        <p className="mt-1 text-caption text-muted tabular-nums">
-          {f.money(row.actual)} spent · no budget yet
-        </p>
-      )}
-      {over && (
-        <p className="mt-1 text-caption text-muted tabular-nums">
-          {f.money(row.actual - planned!)} past the plan. It came from what was free.
-        </p>
+      {/* The whole row is the target (at least 44px tall), named with every number. */}
+      <button
+        type="button"
+        aria-label={label}
+        // Keyboard focus shows the tip too; a mouse click focuses without :focus-visible,
+        // so it only toggles.
+        onFocus={(e) => {
+          if (e.currentTarget.matches(':focus-visible')) setOpen(true)
+        }}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && open) {
+            e.stopPropagation()
+            setOpen(false)
+          }
+        }}
+        className="absolute -inset-x-1.5 -inset-y-1.5 min-h-11 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      />
+      {(hover || open) && (
+        <div
+          // The button already carries these words for screen readers.
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 min-w-40 rounded-xl bg-surface px-3 py-2 text-caption shadow-card ring-1 ring-line"
+        >
+          <p className="flex items-center gap-2 font-semibold whitespace-nowrap">
+            <Swatch color={color} />
+            {row.name}
+          </p>
+          <dl className="mt-1 space-y-0.5">
+            {tip.map((t) => (
+              <div key={t.label} className="flex justify-between gap-3 whitespace-nowrap">
+                <dt className="text-muted">{t.label}</dt>
+                <dd className="font-medium tabular-nums">{t.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       )}
     </li>
   )

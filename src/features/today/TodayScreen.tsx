@@ -242,14 +242,15 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
                     setOfferBackup(false)
                     setPanel('checkin')
                   }}
-                  className="-mx-1 min-h-11 rounded-full px-1 font-medium text-accent"
+                  className="-mx-1 min-h-11 shrink-0 rounded-full px-1 font-medium whitespace-nowrap text-accent"
                 >
                   Update
                 </button>
                 <button
                   type="button"
                   onClick={() => setPanel('math')}
-                  className="-mx-1 ml-auto min-h-11 rounded-full px-1 font-medium text-accent"
+                  // Never "See the / math" across two lines: it moves down whole instead.
+                  className="-mx-1 ml-auto min-h-11 shrink-0 rounded-full px-1 font-medium whitespace-nowrap text-accent"
                 >
                   See the math
                 </button>

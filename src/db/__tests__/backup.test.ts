@@ -445,7 +445,7 @@ describe('notes (schema v3)', () => {
   it('are exported, validated and restored with everything else', async () => {
     await loadRows({ ...clone(LATEST_ROWS), notes: [dayNote, periodNote] })
     const file = JSON.parse(JSON.stringify(await exportBackup(NOW, 'full'))) as BackupFile
-    expect(file.schemaVersion).toBe(3)
+    expect(file.schemaVersion).toBe(SCHEMA_VERSION)
     expect(file.data.notes).toHaveLength(2)
     await resetDb()
     const valid = mustValidate(file)
@@ -503,5 +503,119 @@ describe('notes (schema v3)', () => {
     file.source = 'demo'
     file.data.notes = [dayNote]
     expect(mustValidate(file).file.data.notes).toEqual([])
+  })
+})
+
+describe('life goals (schema v4)', () => {
+  const goal = {
+    id: 'goal-1',
+    title: 'A week in Lisbon',
+    why: 'Sun, and no screens',
+    targetDate: '2027-06-01',
+    status: 'doing',
+    fundId: 'fund-trip',
+    createdAt: '2026-10-31T09:00:00.000Z',
+  }
+  const doneGoal = {
+    id: 'goal-2',
+    title: 'Card paid off',
+    status: 'done',
+    debtId: 'debt-card',
+    createdAt: '2026-01-31T09:00:00.000Z',
+    doneAt: '2026-10-01T09:00:00.000Z',
+  }
+
+  it('are exported, validated and restored with everything else', async () => {
+    expect(SCHEMA_VERSION).toBe(4)
+    await loadRows({ ...clone(LATEST_ROWS), lifeGoals: [goal, doneGoal] })
+    const file = JSON.parse(JSON.stringify(await exportBackup(NOW, 'full'))) as BackupFile
+    expect(file.schemaVersion).toBe(4)
+    expect(file.data.lifeGoals).toHaveLength(2)
+    await resetDb()
+    const valid = mustValidate(file)
+    expect(valid.preview.counts.lifeGoals).toBe(2)
+    await importBackup(valid, NOW)
+    expect(await db.lifeGoals.get('goal-1')).toEqual(goal)
+    expect(await db.lifeGoals.get('goal-2')).toEqual(doneGoal)
+  })
+
+  it('an older v3 file without life goals still restores, with none', async () => {
+    const file: Loose = await fixtureFile()
+    file.schemaVersion = 3
+    delete file.data.lifeGoals
+    await db.lifeGoals.put(goal as never)
+    const valid = mustValidate(file)
+    expect(valid.file.schemaVersion).toBe(4)
+    expect(valid.file.data.lifeGoals).toEqual([])
+    await importBackup(valid, NOW)
+    expect(await db.lifeGoals.count()).toBe(0)
+    expect(await db.transactions.count()).toBe(LATEST_ROWS.transactions!.length)
+  })
+
+  it('an app still on v3 refuses a v4 file instead of dropping its goals', async () => {
+    const file: Loose = await fixtureFile()
+    file.data.lifeGoals = [goal]
+    const result = validateBackup(file, 3, {})
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('newer-schema')
+  })
+
+  it.each<[string, Record<string, unknown>, string, RestoreErrorCode]>([
+    ['an empty title', { ...goal, title: '' }, 'data.lifeGoals[0].title', 'invalid-shape'],
+    [
+      'an unknown status',
+      { ...goal, status: 'someday' },
+      'data.lifeGoals[0].status',
+      'invalid-shape',
+    ],
+    [
+      'a date that does not exist',
+      { ...goal, targetDate: '2027-02-30' },
+      'data.lifeGoals[0].targetDate',
+      'invalid-date',
+    ],
+    [
+      'a fund that is missing',
+      { ...goal, fundId: 'nope' },
+      'data.lifeGoals[0].fundId',
+      'dangling-ref',
+    ],
+    [
+      'a debt that is missing',
+      { ...doneGoal, debtId: 'nope' },
+      'data.lifeGoals[0].debtId',
+      'dangling-ref',
+    ],
+  ])('rejects a goal with %s', async (_, row, path, code) => {
+    const file: Loose = await fixtureFile()
+    file.data.lifeGoals = [row]
+    const result = validateBackup(file)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toMatchObject({ code, path })
+  })
+
+  it('a demo file brings its goals, minus links to anything left behind', async () => {
+    const file: Loose = await fixtureFile()
+    file.source = 'demo'
+    file.data.funds[0].deletedAt = '2026-10-30T09:00:00.000Z'
+    file.data.lifeGoals = [goal, doneGoal]
+    const goals = mustValidate(file).file.data.lifeGoals
+    expect(goals).toHaveLength(2)
+    expect(goals[0]).not.toHaveProperty('fundId')
+    expect(goals[1]).toMatchObject({ debtId: 'debt-card' })
+  })
+
+  it('purging a deleted fund unlinks the goals that pointed at it', async () => {
+    await loadRows({
+      ...clone(LATEST_ROWS),
+      funds: [{ ...clone(LATEST_ROWS).funds![0]!, deletedAt: '2026-09-01T00:00:00.000Z' }],
+      lifeGoals: [goal],
+    } as never)
+    await purgeDeleted(NOW)
+    expect(await db.lifeGoals.get('goal-1')).not.toHaveProperty('fundId')
+    // And the app's own next backup is still valid.
+    expect(validateBackup(JSON.parse(JSON.stringify(await exportBackup(NOW, 'full')))).ok).toBe(
+      true,
+    )
   })
 })

@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import { csvFile, csvFileName, csvNames, transactionsToCsv } from '../../db/csv'
@@ -83,7 +83,11 @@ export function TransactionsScreen() {
   const checkIns = useCheckIns()
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
-  const [envelopeId, setEnvelopeId] = useState<string | undefined>(undefined)
+  // Plan's envelope sheet links here with ?envelope=<id> ("See all in log").
+  const [searchParams] = useSearchParams()
+  const [envelopeId, setEnvelopeId] = useState<string | undefined>(
+    () => searchParams.get('envelope') || undefined,
+  )
   const [query, setQuery] = useState('')
 
   const [pickedYear, setPickedYear] = useState<string | null>(null)
@@ -339,7 +343,7 @@ function TransactionRow({
 // `relative`: the chips' sr-only spans are absolutely positioned, and without a positioned
 // ancestor they escape the scroller and widen the page.
 const rowClass =
-  'relative -mx-4 flex gap-2 overflow-x-auto p-1.5 px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0'
+  'relative -mx-4 flex scroll-px-4 gap-2 overflow-x-auto p-1.5 px-4 [scrollbar-width:none] min-[400px]:-mx-5 min-[400px]:scroll-px-5 min-[400px]:px-5 md:-mx-1.5 md:scroll-px-1.5 md:px-1.5 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0'
 
 function ChipRow({
   label,
@@ -368,7 +372,10 @@ function ChipRow({
     if (!chip) return
     // The row is `relative`, so offsetLeft is already measured from its edge.
     const left = chip.offsetLeft
-    if (left < row.scrollLeft || left + chip.offsetWidth > row.scrollLeft + row.clientWidth)
+    // 16px of breathing room on whichever side it was hidden, so a chip (and its focus
+    // ring) never sits clipped against the row's edge.
+    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 16)
+    else if (left + chip.offsetWidth > row.scrollLeft + row.clientWidth)
       row.scrollLeft = left + chip.offsetWidth - row.clientWidth + 16
   }, [keys, months, value])
 

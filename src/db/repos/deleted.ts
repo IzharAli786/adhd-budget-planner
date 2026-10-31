@@ -69,12 +69,18 @@ export const restoreDeleted = (item: Pick<DeletedItem, 'table' | 'id'>) =>
 
 // Rows that may point at a purgeable row. Purging must unlink them: a dangling
 // envelopeId/fundId/debtId would make the app's OWN next backup fail restore validation.
-const REFERENCES: [table: 'transactions' | 'bills', field: string, target: SoftDeleteTable][] = [
+const REFERENCES: [
+  table: 'transactions' | 'bills' | 'lifeGoals',
+  field: string,
+  target: SoftDeleteTable,
+][] = [
   ['transactions', 'envelopeId', 'envelopes'],
   ['transactions', 'fundId', 'funds'],
   ['transactions', 'debtId', 'debts'],
   ['bills', 'envelopeId', 'envelopes'],
   ['bills', 'debtId', 'debts'],
+  ['lifeGoals', 'fundId', 'funds'],
+  ['lifeGoals', 'debtId', 'debts'],
 ]
 
 /**
@@ -85,7 +91,7 @@ const REFERENCES: [table: 'transactions' | 'bills', field: string, target: SoftD
 export function purgeDeleted(now: Date = new Date(), retentionDays = RETENTION_DAYS) {
   // retentionDays 0 is "Empty now": everything deleted before this instant.
   const cutoff = new Date(now.getTime() - retentionDays * 86_400_000).toISOString()
-  return mutate(null, [...SOFT_DELETE_TABLES, 'billOccurrences'], async (w) => {
+  return mutate(null, [...SOFT_DELETE_TABLES, 'billOccurrences', 'lifeGoals'], async (w) => {
     const purged = new Map<SoftDeleteTable, Set<string>>()
     for (const table of SOFT_DELETE_TABLES) {
       const rows = (await db.table(table).toArray()) as { id: string; deletedAt?: Instant }[]

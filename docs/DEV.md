@@ -71,6 +71,13 @@ longer after today is asked again. Setup counts as done when
   transform: older databases and backups simply have no notes. A step's upgrade only reads
   stores that already exist, since a later version's tables are created after it runs.
 
+- v4: a `lifeGoals` table (`id`) for free-form goals on Goals (`db/repos/lifeGoals.ts`):
+  title, why, target date, status (`todo` / `doing` / `done`) and an optional `fundId` or
+  `debtId`. No transform. The table is optional in `backupSchema.ts`, so v1-v3 files
+  restore with no goals; a v3 app refuses a v4 file (`newer-schema`) instead of dropping
+  them. Purging a deleted fund or debt unlinks the goals that pointed at it. Deleting a goal
+  is a hard delete with undo (it holds no money history).
+
   Settings later gained optional `displayName` and `accent` fields; both are optional in
   `backupSchema.ts`, so no version bump: older files simply lack them.
 
@@ -93,6 +100,19 @@ date. The payday backup moment saves what was carried in to `meta.periodClose` (
 in backups); otherwise it is worked out from check-ins. Chart colours are the
 `--chart-1..6` tokens, checked for contrast in `contrast.test.ts`. "Print this period /
 year" renders a `.print-report` that only the `@media print` rules in `app.css` show.
+
+## Charts, folding and phone layouts
+
+Chart values are readable without the table: `ui/ChartTips.tsx` lays one button per column
+over Look back's money chart and the payoff chart (named with every number, one Tab stop,
+arrows move, a tip on tap/hover/focus), and each Insights bar is a button with its own tip.
+Axis tops are rounded by `domain/chartScale.ts` (`niceMax`) and labelled with
+`f.moneyShort` ("€2.5K"). `ui/Disclosure.tsx` folds Plan's Insights, payday note and
+"Can this fit?"; they start folded below 640px and the choice is kept per section in
+`localStorage` (`steady:open-sections`, cleared by Erase). Below 640px Look back's table
+becomes stacked cards. Tapping an envelope on Plan opens its entries this pay period
+(`features/plan/EnvelopeEntriesSheet.tsx`, the same rule as the envelope's "left" number)
+with "See all in log" (`/more/transactions?envelope=<id>`).
 
 ## End-to-end tests (Playwright)
 
