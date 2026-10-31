@@ -17,8 +17,13 @@ const REGION_CURRENCY: Record<string, string> = {
   ...Object.fromEntries(OTHERS.split(' ').map((pair) => pair.split(':'))),
 }
 
-// Where the week starts on Sunday (CLDR). Everyone else gets Monday, the EU default.
+// Fallback for engines without Intl week data (Firefox, Safari < 17): where the week
+// starts on Sunday or Saturday (CLDR). Everyone else gets Monday, the EU default.
 const SUNDAY_FIRST = new Set('US CA MX BR JP KR TW HK PH IL IN ZA AU'.split(' '))
+const SATURDAY_FIRST = new Set('AF BH DJ DZ EG IQ IR JO KW LY OM QA SD SY'.split(' '))
+
+type WeekInfo = { firstDay?: number }
+type LocaleWithWeek = Intl.Locale & { getWeekInfo?: () => WeekInfo; weekInfo?: WeekInfo }
 
 /** "en-gb" or "en_GB" -> "en-GB"; null when it isn't a usable BCP 47 tag. */
 export function canonicalLocale(tag: string | undefined): string | null {
@@ -37,8 +42,29 @@ export function currencyForLocale(locale: string): string {
   return code && isSupportedCurrency(code) ? code : DEFAULT_SETTINGS.currency
 }
 
+/**
+ * The week start Intl knows for this locale, or null. Detects both shapes: the
+ * getWeekInfo() method (current spec, Chrome 130+) and the older weekInfo getter
+ * (Safari 17, Chrome 99-129). Intl numbers days 1 = Monday ... 7 = Sunday.
+ */
+export function intlWeekStart(locale: string): WeekStart | null {
+  try {
+    const loc = new Intl.Locale(locale) as LocaleWithWeek
+    const info = typeof loc.getWeekInfo === 'function' ? loc.getWeekInfo() : loc.weekInfo
+    const day = info?.firstDay
+    return typeof day === 'number' && day >= 1 && day <= 7 ? ((day % 7) as WeekStart) : null
+  } catch {
+    return null
+  }
+}
+
+export function fallbackWeekStart(locale: string): WeekStart {
+  const region = regionOf(locale) ?? ''
+  return SUNDAY_FIRST.has(region) ? 0 : SATURDAY_FIRST.has(region) ? 6 : 1
+}
+
 export function weekStartForLocale(locale: string): WeekStart {
-  return SUNDAY_FIRST.has(regionOf(locale) ?? '') ? 0 : 1
+  return intlWeekStart(locale) ?? fallbackWeekStart(locale)
 }
 
 /** Settings a fresh install starts with on a device set to `tag`. */

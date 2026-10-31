@@ -51,7 +51,8 @@ export const SETUP_TABLES = [
 
 export const defaultSource = (): BackupSource => (import.meta.env.MODE === 'demo' ? 'demo' : 'full')
 
-export const backupFileName = (today: ISODate) => `steady-backup-${today}.json`
+export const backupFileName = (today: ISODate, source: BackupSource = defaultSource()) =>
+  source === 'demo' ? `steady-demo-setup-${today}.json` : `steady-backup-${today}.json`
 
 /**
  * The backup as a ready File. Built BEFORE the user taps Save: iOS only lets

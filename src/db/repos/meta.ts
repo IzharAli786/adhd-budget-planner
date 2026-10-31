@@ -13,9 +13,11 @@ export type MetaKey =
   | 'gardenPoints'
   | 'unlocked'
   | 'changesSinceBackup'
+  | 'demo'
   | `snoozes${string}`
 
-const INTERNAL_PREFIXES = ['unlocked', 'changesSinceBackup', 'snoozes'] as const
+// 'demo' (db/demo.ts) is the demo's clock and entry count: it belongs to that install.
+const INTERNAL_PREFIXES = ['unlocked', 'changesSinceBackup', 'snoozes', 'demo'] as const
 
 export const isInternalMetaKey = (key: string) => INTERNAL_PREFIXES.some((p) => key.startsWith(p))
 

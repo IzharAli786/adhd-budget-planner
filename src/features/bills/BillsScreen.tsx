@@ -16,6 +16,7 @@ import { expandOccurrences, ruleDates } from '../../domain/recurrence'
 import type { ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
 import { useToday } from '../../lib/useToday'
+import { BigNumber } from '../../ui/BigNumber'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { ListGroup, ListRow } from '../../ui/List'
@@ -159,12 +160,7 @@ function BillsView({
           <p className="text-sm text-muted">
             {period.fromPayday ? 'Left to pay before payday' : 'Left to pay this month'}
           </p>
-          <p
-            aria-live="polite"
-            className="mt-1 text-[2.75rem] leading-none font-semibold tracking-tight tabular-nums"
-          >
-            {f.money(dueSoon.due)}
-          </p>
+          <BigNumber text={f.money(dueSoon.due)} maxRem={2.75} className="mt-1" />
           <p className="mt-3 text-[0.9375rem] text-muted">
             {summaryLine(dueSoon.dueCount, dueSoon.paidCount, period, f)}
           </p>
@@ -285,7 +281,7 @@ function BillGroup({
   const t = totalsOf(entries)
   return (
     <section className="space-y-2">
-      <div className="flex items-baseline justify-between px-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
         <h2 className="text-xs font-semibold tracking-wider text-muted uppercase">{title}</h2>
         {entries.length > 0 && (
           <p className="text-sm text-muted tabular-nums">

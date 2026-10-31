@@ -1,9 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
+import { useAppSettings } from '../../app/SettingsProvider'
 import { importBackup, readBackupFile, type RestoreError, type ValidBackup } from '../../db/backup'
 import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import type { DataTableName } from '../../db/schema'
 import type { Instant } from '../../domain/types'
+import { dateTimeFormat } from '../../domain/intl'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
 import { Icon } from '../../ui/Icon'
@@ -24,10 +26,12 @@ const TABLE_LABELS: Partial<Record<DataTableName, string>> = {
   noSpend: 'No-spend days',
 }
 
-const dateFormat = new Intl.DateTimeFormat('en-IE', { dateStyle: 'medium' })
-const formatDay = (iso: string) => dateFormat.format(new Date(`${iso.slice(0, 10)}T12:00:00`))
+// Midday local time, so no time zone can move the calendar day either way.
+const formatDay = (iso: string, locale: string) =>
+  dateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(`${iso.slice(0, 10)}T12:00:00`))
 
 export function BackupScreen() {
+  const { locale } = useAppSettings().settings
   const toast = useToast()
   const lastBackupAt = useLiveQuery(() => getMeta<Instant>('lastBackupAt'))
   const changes = useLiveQuery(getChangesSinceBackup)
@@ -146,7 +150,8 @@ export function BackupScreen() {
         onClose={() => !busy && setPending(null)}
         title="Restore this backup?"
         description={
-          pending && `Saved ${formatDay(pending.preview.exportedAt)} · ${pending.preview.currency}`
+          pending &&
+          `Saved ${formatDay(pending.preview.exportedAt, locale)} · ${pending.preview.currency}`
         }
         actions={
           <>
@@ -185,6 +190,7 @@ const changesNote = (n: number | undefined) =>
 
 /** What a backup holds, shown before anything is replaced. Reused by setup's import. */
 export function BackupPreview({ backup }: { backup: ValidBackup }) {
+  const { locale } = useAppSettings().settings
   const { preview } = backup
   const rows = Object.entries(TABLE_LABELS)
     .map(([table, label]) => ({ label, count: preview.counts[table as DataTableName] }))
@@ -212,7 +218,7 @@ export function BackupPreview({ backup }: { backup: ValidBackup }) {
       )}
       {preview.from && preview.to && (
         <p className="text-sm text-muted">
-          Activity from {formatDay(preview.from)} to {formatDay(preview.to)}.
+          Activity from {formatDay(preview.from, locale)} to {formatDay(preview.to, locale)}.
         </p>
       )}
       <p className="text-sm text-muted">

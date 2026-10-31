@@ -8,12 +8,16 @@ export type ColorMode = 'auto' | 'light' | 'dark'
 export type MotionPreference = 'auto' | 'on' | 'off'
 /** 0 = Sunday ... 6 = Saturday, same convention as dayOfWeek(). */
 export type WeekStart = 0 | 1 | 2 | 3 | 4 | 5 | 6
+/** Short dates as words ("Fri 7 Nov") or numbers in the locale's order ("Fri 07/11"). */
+export const DATE_STYLES = ['words', 'numbers'] as const
+export type DateStyle = (typeof DATE_STYLES)[number]
 
 export interface Settings {
   locale: string
   currency: string
   decimals: number
   weekStart: WeekStart
+  dateStyle: DateStyle
   theme: Theme
   mode: ColorMode
   simpleMode: boolean
@@ -34,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   currency: 'EUR',
   decimals: 2,
   weekStart: 1,
+  dateStyle: 'words',
   theme: 'clay',
   mode: 'auto',
   // New users start simple (PLAN §1.6); Full tools are one toggle away.

@@ -7,7 +7,6 @@ import { Button } from '../../ui/Button'
 import { EmptyState } from '../../ui/PageHeader'
 import { Icon } from '../../ui/Icon'
 import { useFormat } from '../bills/format'
-import { aprText } from './DebtForm'
 import { DebtEditor, type DebtEditorTarget } from './DebtEditor'
 import { PayoffPlan } from './PayoffPlan'
 
@@ -73,15 +72,19 @@ function DebtRow({ debt, onEdit }: { debt: Debt; onEdit: () => void }) {
         onClick={onEdit}
         className="block w-full px-5 py-4 text-left transition-colors hover:bg-accent-soft/40 active:bg-accent-soft/70"
       >
-        <span className="flex items-baseline gap-3">
-          <span className="min-w-0 flex-1 truncate font-medium">{debt.name}</span>
-          <span className="font-semibold tabular-nums">{f.money(debt.balance)}</span>
+        {/* Wraps instead of truncating: at 150% text the APR line is the useful part. */}
+        <span className="flex flex-wrap items-baseline gap-x-3">
+          <span className="min-w-0 flex-1 font-medium break-words">{debt.name}</span>
+          <span className="ml-auto font-semibold tabular-nums">{f.money(debt.balance)}</span>
         </span>
-        <span className="mt-0.5 flex items-baseline gap-3 text-sm text-muted">
-          <span className="min-w-0 flex-1 truncate">
-            {aprText(debt.aprBps)}% APR · {f.money(debt.minPayment)} on the {f.ordinal(debt.dueDay)}
+        <span className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-sm text-muted">
+          <span className="min-w-0 flex-1">
+            {f.percent(debt.aprBps / 10_000)} APR · {f.money(debt.minPayment)} on the{' '}
+            {f.ordinal(debt.dueDay)}
           </span>
-          <span className="tabular-nums">{debt.balance === 0 ? 'Paid off' : `${pct}% paid`}</span>
+          <span className="ml-auto tabular-nums">
+            {debt.balance === 0 ? 'Paid off' : `${f.percent(pct / 100)} paid`}
+          </span>
         </span>
         <span aria-hidden="true" className="mt-3 block h-1.5 overflow-hidden rounded-full bg-bg">
           <span

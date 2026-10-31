@@ -5,7 +5,7 @@
 import * as z from 'zod/mini'
 import { isValidISODate } from '../domain/dates'
 import { isSupportedCurrency } from '../domain/currencies'
-import { THEMES } from '../domain/settings'
+import { DATE_STYLES, THEMES } from '../domain/settings'
 import type { EXPORTED_META_KEYS } from './repos/meta'
 
 export const UNSAFE_AMOUNT = 'unsafe-amount'
@@ -154,6 +154,7 @@ export const settingsSchema = z.object({
   currency: z.optional(z.string().check(z.refine(isSupportedCurrency))),
   decimals: z.optional(ranged(0, 4)),
   weekStart: z.optional(z.literal([0, 1, 2, 3, 4, 5, 6])),
+  dateStyle: z.optional(z.enum(DATE_STYLES)),
   theme: z.optional(z.enum(THEMES)),
   mode: z.optional(z.enum(['auto', 'light', 'dark'])),
   simpleMode: z.optional(z.boolean()),

@@ -7,8 +7,8 @@ interface MoneyInputProps {
   label: ReactNode
   value: Cents | null
   onChange: (cents: Cents | null) => void
-  /** Symbol shown inside the field, e.g. '€'. */
-  symbol?: string
+  /** Symbol shown inside the field, from the settings' currency (useFormat().symbol). */
+  symbol: string
   decimals?: number
   hint?: ReactNode
   /** An error from the form (e.g. "required"); a parse error takes precedence. */
@@ -28,7 +28,7 @@ export function MoneyInput({
   label,
   value,
   onChange,
-  symbol = '€',
+  symbol,
   decimals = 2,
   hint,
   error,
@@ -71,7 +71,12 @@ export function MoneyInput({
             if (next !== null || e.target.value.trim() === '') onChange(next)
           }}
           onBlur={() => setTouched(true)}
-          className={cx(inputClass, 'pl-9 text-lg font-medium tabular-nums')}
+          className={cx(
+            inputClass,
+            'text-lg font-medium tabular-nums',
+            // "€" is one glyph, "CHF" or "kr." three: the text must start after the symbol.
+            symbol.length <= 1 ? 'pl-9' : symbol.length === 2 ? 'pl-12' : 'pl-15',
+          )}
         />
       </div>
     </Field>

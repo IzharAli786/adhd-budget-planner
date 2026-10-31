@@ -7,6 +7,7 @@ import { nextAction } from '../../domain/nextAction'
 import type { Instant, ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
+import { BigNumber } from '../../ui/BigNumber'
 import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon, type IconName } from '../../ui/Icon'
@@ -185,25 +186,8 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         <p className="text-sm text-muted">
           {short ? 'Before payday' : over ? 'Today' : 'You can spend today'}
         </p>
-        <p
-          aria-live="polite"
-          className={cx(
-            'mt-1 leading-none font-semibold tracking-tight tabular-nums',
-            // Long amounts ("€12,345.67") step down so they never overflow a 390px card.
-            heroAmount.length > 8
-              ? 'text-[clamp(2.25rem,11vw,3.75rem)]'
-              : 'text-[clamp(3rem,15vw,4.5rem)]',
-          )}
-        >
-          {heroAmount}
-          {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
-          {heroSuffix && (
-            <span className="text-[0.4em] font-medium tracking-normal text-muted">
-              {' '}
-              {heroSuffix}
-            </span>
-          )}
-        </p>
+        {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
+        <BigNumber text={heroAmount} suffix={heroSuffix} className="mt-1" />
         <p className="mt-4 text-base">
           {short ? (
             // One calm suggestion, no red (PLAN §1.3).

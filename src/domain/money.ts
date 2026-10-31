@@ -1,3 +1,5 @@
+import { numberFormat } from './intl'
+
 // Money is always an integer number of minor units (cents), never a float.
 // 0.1 + 0.2 === 0.30000000000000004 in JS, so floats drift; integers don't.
 export type Cents = number
@@ -19,7 +21,7 @@ export function formatMoney(
   locale = 'en-IE',
   decimals = 2,
 ): string {
-  return new Intl.NumberFormat(locale, {
+  return numberFormat(locale, {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals,
