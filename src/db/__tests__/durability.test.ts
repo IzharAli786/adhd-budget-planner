@@ -122,6 +122,12 @@ describe('Recently deleted', () => {
     expect(await r.listBills()).toHaveLength(1)
   })
 
+  it('does not list the minimum bill a paid-off debt ended', async () => {
+    const { debt } = await r.addDebt(card) // first due 20 Nov, so the bill has no dates left
+    await r.updateDebt(debt.id, { balance: 0 }, '2026-11-05')
+    expect(await r.listRecentlyDeleted()).toEqual([])
+  })
+
   it('purgeAt is 30 days after deletion', () => {
     expect(r.purgeAt('2026-10-01T10:00:00.000Z')).toBe('2026-10-31T10:00:00.000Z')
   })

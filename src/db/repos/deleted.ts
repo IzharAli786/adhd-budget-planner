@@ -31,9 +31,11 @@ export async function listRecentlyDeleted(): Promise<DeletedItem[]> {
   const items: DeletedItem[] = []
   // A debt's minimum bill is deleted with it (same stamp) and comes back with it, so it
   // is not a separate thing to restore.
-  const debtStamps = new Map(
-    (await db.debts.toArray()).filter((d) => d.deletedAt).map((d) => [d.id, d.deletedAt]),
-  )
+  const allDebts = await db.debts.toArray()
+  const debtStamps = new Map(allDebts.filter((d) => d.deletedAt).map((d) => [d.id, d.deletedAt]))
+  // Paying a debt off ends its minimum bill (soft-deleting it if no dates were left). That
+  // bill is managed by the debt; restoring it would put a minimum back on a paid-off debt.
+  const paidOff = new Set(allDebts.filter((d) => !d.deletedAt && d.balance <= 0).map((d) => d.id))
   for (const table of SOFT_DELETE_TABLES) {
     const rows = (await db.table(table).toArray()) as {
       id: string
@@ -44,7 +46,9 @@ export async function listRecentlyDeleted(): Promise<DeletedItem[]> {
     }[]
     for (const row of rows) {
       if (!row.deletedAt) continue
-      if (table === 'bills' && row.debtId && debtStamps.get(row.debtId) === row.deletedAt) continue
+      if (table === 'bills' && row.debtId) {
+        if (debtStamps.get(row.debtId) === row.deletedAt || paidOff.has(row.debtId)) continue
+      }
       items.push({ table, id: row.id, name: labelOf(row), deletedAt: row.deletedAt })
     }
   }

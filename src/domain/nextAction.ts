@@ -153,7 +153,7 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       id: 'log-today',
       kind: 'log-today',
       trigger: 'Log today’s spending',
-      detail: 'Type it below, like “12 coffee”. Nothing to log? That counts too.',
+      detail: 'A quick note, like “12 coffee”. Nothing to log? That counts too.',
       cta: 'Log something',
       doneState: 'Logged.',
     })
