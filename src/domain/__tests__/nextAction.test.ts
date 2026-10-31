@@ -56,6 +56,18 @@ describe('nextAction priority (PLAN §4.5)', () => {
     ['expired 48h item', { expiredImpulse: 1, hasBills: false }, 'impulse'],
     ['deferred setup', { hasBills: false, loggedToday: false }, 'setup-bills'],
     ['log today', { loggedToday: false }, 'log-today'],
+    // The sample household opens on something to try, not on a backup nag.
+    [
+      'demo sample, nothing added yet',
+      { demo: 'sample', daysSinceBackup: 300, expiredImpulse: 1 },
+      'demo-try',
+    ],
+    ['the demo never asks for a backup', { demo: 'other', daysSinceBackup: 300 }, 'all-done'],
+    [
+      'a demo check-in still comes first',
+      { demo: 'sample', paydaySinceCheckIn: true },
+      'payday-checkin',
+    ],
   ])('%s', (_, patch, kind) => {
     expect(nextAction({ ...calm, ...patch }, {}, today, now).kind).toBe(kind)
   })

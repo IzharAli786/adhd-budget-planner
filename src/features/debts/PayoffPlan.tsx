@@ -278,7 +278,8 @@ function StrategyCard({
           <dd className="tabular-nums">{sim.paidOff ? sim.months : 'Over 600'}</dd>
         </div>
         <div>
-          <dt className="text-xs text-muted">Total interest</dt>
+          {/* Not Look back's "Interest paid this year": this is what is still to come. */}
+          <dt className="text-xs text-muted">Interest until debt-free (estimate)</dt>
           {/* Unfinished, the total is just wherever the 50-year window stopped: not a real figure. */}
           <dd className="tabular-nums">
             {sim.paidOff ? f.money(sim.totalInterest) : 'Still adding up'}

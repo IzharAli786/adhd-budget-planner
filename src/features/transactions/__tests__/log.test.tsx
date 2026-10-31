@@ -65,7 +65,9 @@ describe('Transaction log', () => {
     await waitFor(() => expect(listed()).toEqual(['refund', 'coffee', 'Bus']))
     expect(within(totals).getByText(/3 of 4 entries/)).toBeTruthy()
     expect(within(totals).getByText('€20.00')).toBeTruthy() // out
-    expect(within(totals).getByText('€50.00')).toBeTruthy() // in
+    // In: the refund plus the salary of Fri 30 Oct, as Plan counts this period's income.
+    expect(within(totals).getByText('€2,150.00')).toBeTruthy()
+    expect(within(totals).getByText('Pay included: €2,100.00')).toBeTruthy()
     // Envelope chip per row.
     const coffee = screen.getByRole('button', { name: /coffee/ })
     expect(await within(coffee).findByText('Eating out')).toBeTruthy()

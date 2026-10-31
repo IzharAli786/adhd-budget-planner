@@ -117,8 +117,11 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
     }
   }, [data, year, today])
 
-  const rowLabel = (r: PeriodSummary) =>
+  const periodName = (r: PeriodSummary) =>
     mode === 'month' ? f.month(r.start) : `${f.day(r.start)} – ${f.day(addDays(r.end, -1))}`
+  // The row still in progress says so, so a month with only one payday in it yet doesn't
+  // read as a month that went wrong.
+  const rowLabel = (r: PeriodSummary) => periodName(r) + (r.end > today ? ' (so far)' : '')
 
   // Print once the report is in the DOM; afterprint puts the screen back.
   useEffect(() => {
@@ -129,11 +132,15 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
     return () => window.removeEventListener('afterprint', done)
   }, [printing])
 
-  // Monthly keeps all twelve months on the axis, so the year reads as a year even when
-  // the history starts in October; months without history are empty, not zero-height lies.
+  // Monthly keeps the rest of the year on the axis, so it reads as a year, but starts at
+  // the month the history starts in: no empty slots for months Steady never saw.
   const points = useMemo(() => {
     const byStart = new Map(rows.map((r) => [r.start, r]))
-    const ranges = mode === 'month' ? monthRanges(year) : rows
+    const since = data.input.since
+    const ranges =
+      mode === 'month'
+        ? monthRanges(year).filter((m) => since === undefined || m.end > since)
+        : rows
     return ranges.map((range) => {
       const r = byStart.get(range.start)
       return {
@@ -143,7 +150,7 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
         moneyOut: r?.moneyOut ?? 0,
       }
     })
-  }, [rows, mode, year, settings.locale])
+  }, [rows, mode, year, settings.locale, data.input.since])
 
   const thisYear = year === Number(today.slice(0, 4))
   const active = rows.some((r) => r.incomeIn || r.moneyOut || r.saved)
@@ -190,21 +197,15 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                 value={f.money(totals.debtPaid)}
                 hint="Minimums and extra payments"
               />
-              {interest &&
-                // Never "saves €0.00": when neither order is cheaper, say so plainly.
-                (interest.interestSaved === 0 ? (
-                  <Tile
-                    label="Snowball or avalanche"
-                    value="Same cost"
-                    hint="Both plans cost the same here"
-                  />
-                ) : (
-                  <Tile
-                    label={`Interest ${interest.interestSaved > 0 ? 'avalanche' : 'snowball'} saves`}
-                    value={f.money(Math.abs(interest.interestSaved))}
-                    hint={`Compared with ${interest.interestSaved > 0 ? 'snowball' : 'avalanche'}, an estimate`}
-                  />
-                ))}
+              {/* Only when the order matters: a tile saying "saves €0.00" tells nobody anything.
+                  It looks ahead (interest until debt-free), unlike the debt card's figure. */}
+              {interest && interest.interestSaved !== 0 && (
+                <Tile
+                  label={`${interest.interestSaved > 0 ? 'Avalanche' : 'Snowball'} could save`}
+                  value={f.money(Math.abs(interest.interestSaved))}
+                  hint={`Interest until debt-free, against ${interest.interestSaved > 0 ? 'snowball' : 'avalanche'} (estimate)`}
+                />
+              )}
             </section>
 
             {(yearSummary.funds.length > 0 || yearSummary.debts) && (
@@ -275,7 +276,7 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                     setPrinting({
                       kind: 'period',
                       range: { start: latest.start, end: latest.end },
-                      title: rowLabel(latest),
+                      title: periodName(latest),
                       payday: mode === 'payday',
                     })
                   }

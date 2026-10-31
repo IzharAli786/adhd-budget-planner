@@ -70,13 +70,25 @@ export function nextEnvelopeColor(
 
 /** The starter category new bills land in, so a bill shows up under it in Insights. */
 export const BILLS_CATEGORY = 'Bills & utilities'
+/** Where rent, a mortgage and the like go instead, when that category exists. */
+export const HOUSING_CATEGORY = 'Rent & housing'
+
+// Whole words, so "Parental" or "Currently" never count as rent.
+const HOUSING_BILL = /\b(rent|mortgage|housing|landlord|lease)\b/i
 
 /**
- * Where a new bill goes by default: the live "Bills & utilities" envelope when there is one
- * (common categories added), else none. Only a default: the bill form lets you change it.
+ * Where a new bill goes by default: a bill named like rent or a mortgage goes to the live
+ * "Rent & housing" envelope when there is one; any other bill (or a housing one without
+ * that envelope) to "Bills & utilities"; with neither, none. Only a default: the bill
+ * form lets you change it.
  */
 export function defaultBillEnvelope(
   envelopes: readonly Pick<Envelope, 'id' | 'name' | 'deletedAt'>[],
+  billName = '',
 ): Envelope['id'] | undefined {
-  return envelopes.find((e) => e.deletedAt === undefined && key(e.name) === key(BILLS_CATEGORY))?.id
+  const named = (name: string) =>
+    envelopes.find((e) => e.deletedAt === undefined && key(e.name) === key(name))?.id
+  return (
+    (HOUSING_BILL.test(billName) ? named(HOUSING_CATEGORY) : undefined) ?? named(BILLS_CATEGORY)
+  )
 }

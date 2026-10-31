@@ -46,6 +46,8 @@ export interface DemoData {
   envelopes: Envelope[]
   notes: Note[]
   gardenPoints: number
+  /** Settings' buffer: the cushion the household keeps, left out of today's number. */
+  buffer: number
 }
 
 const HOUR = 3_600_000
@@ -67,6 +69,17 @@ export const SEEDED_TABLES = [
 /** Pay periods of history before the current one: about nine months, so Look back has a
  *  year that reads like one and Insights has past periods to step back through. */
 export const DEMO_PAST_PERIODS = 19
+
+/** Take-home pay every other week, in whole currency units. Enough to cover the month's
+ *  bills, debt minimums, savings and everyday spending with something left over, so the
+ *  sample year in Look back tells a steady, believable story. */
+export const DEMO_PAY = 1275
+const DEBT_CARD = 3850
+const DEBT_LOAN = 2400
+const THIRD_PAYDAY_SAVED = 1100
+const PERIOD_SPEND_CAP = 320
+// About what the buffer leaves in the account above it (see buildDemoData).
+const SPENDABLE = 1100
 
 // A small seeded generator (mulberry32), so the household is the same on every visit and
 // in tests while its spending still looks real and uneven.
@@ -135,14 +148,19 @@ const SPENDS: readonly { category?: string; weight: number; kinds: readonly Spen
 ]
 const SPEND_WEIGHT = SPENDS.reduce((a, s) => a + s.weight, 0)
 
-// Per-pay-period budgets on the categories everyday spending goes into. The bill
-// categories stay at 0 ("no budget yet"): their bills are planned on the calendar.
+// Per-pay-period budgets on every common category, so the donut and the planned-against-
+// actual bars read well. The bill categories hold what their bills take in this pay
+// period: rent goes out the day after payday (see bill() below), so it always lands here.
 const BUDGETS: Record<string, number> = {
+  Everyday: 30,
+  'Rent & housing': 1100,
   Groceries: 200,
   'Eating out': 90,
   Transport: 90,
-  Fun: 40,
+  'Bills & utilities': 85,
+  Subscriptions: 45,
   'Personal care': 30,
+  Fun: 40,
   Gifts: 30,
   Other: 25,
 }
@@ -176,7 +194,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
   )
   const historyStart = paydays[0]!
   const setUpOn = at(addDays(historyStart, -1), 19)
-  const pay = money(1125)
+  const pay = money(DEMO_PAY)
   const incomes: IncomeSource[] = [
     {
       id: 'demo-pay',
@@ -195,7 +213,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     {
       id: 'demo-env-everyday',
       name: 'Everyday',
-      budget: 0,
+      budget: money(BUDGETS.Everyday!),
       isDefault: true,
       color: 'accent',
       sort: 0,
@@ -242,17 +260,25 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     id: string,
     name: string,
     amount: number,
-    offset: number,
+    offset: number | 'after-payday',
     autopay: boolean,
     category: string,
   ) {
-    const dom = parseISODate(dueNear(offset)).day
+    // Rent goes out the day after the last payday (the 1st after a payday at the very end
+    // of a month), so it always sits in this pay period with the pay that covers it.
+    const afterPayday = parseISODate(lastPayday).day + 1
+    const dom =
+      offset === 'after-payday'
+        ? afterPayday <= 28
+          ? afterPayday
+          : 1
+        : parseISODate(dueNear(offset)).day
     monthly(
       { id: `demo-bill-${id}`, name, amount: money(amount), autopay, envelopeId: env(category) },
       dom,
     )
   }
-  bill('rent', 'Rent', 1100, -4, false, 'Rent & housing')
+  bill('rent', 'Rent', 1100, 'after-payday', false, 'Rent & housing')
   bill('streaming', 'Streaming', 12.99, -8, true, 'Subscriptions')
   bill('gym', 'Gym', 29, -2, true, 'Subscriptions')
   bill('phone', 'Phone', 25, 3, true, 'Bills & utilities')
@@ -278,25 +304,28 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
       dueDay,
     )
   }
+  // The bigger balance carries the higher rate, so the two payoff orders really differ:
+  // snowball clears the smaller student loan first, avalanche the costly card, and Goals and
+  // Look back can show the interest that choice saves.
   debt(
     'card',
     {
       name: 'Credit card',
-      balance: money(1240),
-      originalBalance: money(1850),
-      aprBps: 2190,
-      minPayment: money(35),
+      balance: money(DEBT_CARD),
+      originalBalance: money(4800),
+      aprBps: 2490,
+      minPayment: money(95),
     },
     8,
   )
   debt(
-    'car',
+    'loan',
     {
-      name: 'Car loan',
-      balance: money(6420),
-      originalBalance: money(9000),
-      aprBps: 590,
-      minPayment: money(168),
+      name: 'Student loan',
+      balance: money(DEBT_LOAN),
+      originalBalance: money(6000),
+      aprBps: 450,
+      minPayment: money(60),
     },
     -3,
   )
@@ -306,7 +335,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     {
       id: 'demo-fund-holiday',
       name: 'Summer holiday',
-      target: money(1200),
+      target: money(3500),
       targetDate: addMonths(today, 5),
       perPeriod: money(40),
       openingSaved: 0,
@@ -334,6 +363,17 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
       fundId: 'demo-fund-holiday',
       createdAt: at(date, 17),
     })
+    // Twice a year a month has a third payday; most of that pay goes to the holiday, so
+    // the account grows gently instead of jumping (and the sample year reads as steady).
+    if (addDays(date, -28).slice(0, 7) === date.slice(0, 7))
+      transactions.push({
+        id: `demo-tx-third-${j + 1}`,
+        date,
+        amount: -money(THIRD_PAYDAY_SAVED),
+        note: 'Third payday this month',
+        fundId: 'demo-fund-holiday',
+        createdAt: at(date, 17, 2),
+      })
     if (j > 0)
       transactions.push({
         id: `demo-tx-52-${j}`,
@@ -356,13 +396,16 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     }
   }
 
-  // Everyday spending before the last two weeks: 9 to 14 entries a pay period across its
-  // days, tagged into the common categories (a few left untagged, as people do).
+  // Everyday spending before the last two weeks: 11 to 14 entries a pay period across its
+  // days, tagged into the common categories (a few left untagged, as people do). A pay
+  // period stops short of PERIOD_SPEND_CAP, as a household on a plan does, so no month
+  // swings into the red on the luck of the draw.
   const random = rng(20261031)
   const handFrom = day(-13)
   let n = 0
   for (const start of paydays.slice(0, -1)) {
-    const count = 9 + Math.floor(random() * 6)
+    const count = 11 + Math.floor(random() * 4)
+    let spent = 0
     for (let k = 0; k < count; k++) {
       const date = addDays(start, Math.floor(random() * 14))
       let pick = random() * SPEND_WEIGHT
@@ -370,7 +413,8 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
       const [note, min, max] = group.kinds[Math.floor(random() * group.kinds.length)]!
       // To the nearest 5 cents, so amounts look like prices rather than noise.
       const amount = Math.round((min + random() * (max - min)) * 20) / 20
-      if (date >= handFrom) continue
+      if (date >= handFrom || spent + amount > PERIOD_SPEND_CAP) continue
+      spent += amount
       transactions.push({
         id: `demo-tx-past-${++n}`,
         date,
@@ -410,9 +454,10 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     [-5, 'Groceries', 52.4, groceries],
     [-5, 'Dinner out', 27, eatingOut],
     [-4, 'Coffee', 3.2, eatingOut],
-    [-4, 'Petrol', 45, transport],
+    [-4, 'Train', 12.5, transport],
     [-2, 'Lunch', 8.7, eatingOut],
     [-2, 'Haircut', 22, care],
+    [-2, 'Bakery', 4.2],
     [-1, 'Groceries', 31.6, groceries],
     [-1, 'Coffee', 3.4, eatingOut],
     [-1, 'Cinema', 11.5, fun],
@@ -447,7 +492,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
   for (const o of billOccurrences) move(o.originalDate, -(o.paidAmount ?? 0))
   for (const p of paydays) move(p, pay)
   const checkIns: BalanceCheckIn[] = []
-  let balance = money(200)
+  let balance = money(1000)
   for (let date = historyStart; date < today; date = addDays(date, 1)) {
     balance += moved.get(date) ?? 0
     if (checkInDays.has(date))
@@ -458,6 +503,10 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
         balance,
       })
   }
+  // The year's left-over is a cushion in the account by now. Most of it is the buffer
+  // (Settings), which today's number never counts, so the hero stays an everyday amount.
+  const step = money(100)
+  const buffer = Math.max(0, Math.floor((balance - money(SPENDABLE)) / step) * step)
 
   const impulse: ImpulseItem[] = [
     {
@@ -504,6 +553,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     envelopes,
     notes,
     // What the garden counts for all this history; it only grows from here.
+    buffer,
     gardenPoints: gardenPoints({
       checkIns,
       occurrences: billOccurrences,
@@ -532,7 +582,12 @@ export async function seedDemo(now: Date = new Date()): Promise<void> {
   const meta: RowTypes['meta'][] = [
     {
       key: 'settings',
-      value: { ...previous, simpleMode: false, envelopesEnabled: true } satisfies Settings,
+      value: {
+        ...previous,
+        simpleMode: false,
+        envelopesEnabled: true,
+        buffer: data.buffer,
+      } satisfies Settings,
     },
     { key: 'setupProgress', value: { step: 'done', ackAt: stamp, doneAt: stamp } },
     { key: 'lastOpened', value: today },

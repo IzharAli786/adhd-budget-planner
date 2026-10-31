@@ -10,6 +10,15 @@ import type { Formatters } from '../bills/format'
 const pct = (f: Formatters, share: number) => f.percent(Math.round(share * 100) / 100)
 const apr = (f: Formatters, bps: number) => f.percent(Math.round(bps) / 10000)
 
+/** A fund's net move: "+€40.00" in, or "€50.00 taken out" (never "+−€50.00"). */
+export const fundMove = (f: Formatters, cents: number) =>
+  cents < 0 ? `${f.money(-cents)} taken out` : `+${f.money(cents)}`
+
+function savingsSubtitle(f: Formatters, total: number, when: string) {
+  if (total < 0) return `${f.money(-total)} more taken out of your funds than put in ${when}.`
+  return `${f.money(total)} moved into your funds ${when}.`
+}
+
 export function SavingsYearCard({
   funds,
   f,
@@ -26,7 +35,7 @@ export function SavingsYearCard({
     <YearCard
       id="savings-year"
       title={title}
-      subtitle={`${f.money(total)} moved into your funds ${when}.`}
+      subtitle={savingsSubtitle(f, total, when)}
       table={<SavingsTable funds={funds} f={f} caption={title} when={when} />}
     >
       <ul className="space-y-4">
@@ -34,7 +43,7 @@ export function SavingsYearCard({
           <li key={r.id}>
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate text-body font-medium">{r.name}</span>
-              <span className="shrink-0 text-body tabular-nums">+{f.money(r.savedInRange)}</span>
+              <span className="shrink-0 text-body tabular-nums">{fundMove(f, r.savedInRange)}</span>
             </div>
             {r.ofTarget !== null && (
               <ProgressBar
@@ -83,9 +92,9 @@ export function DebtYearCard({
         )}
         {debts.owed > 0 && (
           <Fig
-            label="Interest, roughly"
+            label={`Interest paid ${when} (estimate)`}
             value={`≈ ${f.money(debts.interestEstimate)}`}
-            hint="An estimate at today’s balances"
+            hint="At today’s balances"
           />
         )}
       </dl>
@@ -200,7 +209,7 @@ export function SavingsTable({
             <th scope="row" className="py-2 pr-2 text-left font-normal">
               {r.name}
             </th>
-            <td className={td}>{f.money(r.savedInRange)}</td>
+            <td className={td}>{fundMove(f, r.savedInRange)}</td>
             <td className={td}>
               {f.money(r.savedTotal)}
               {r.target !== undefined && ` of ${f.money(r.target)}`}
@@ -269,7 +278,7 @@ export function DebtTable({
         {debts.owed > 0 && (
           <tr className="text-muted">
             <th scope="row" colSpan={3} className="py-2 text-left font-normal">
-              Interest {when}, an estimate at today’s balances
+              Interest paid {when} (estimate at today’s balances)
             </th>
             <td className={td}>≈ {f.money(debts.interestEstimate)}</td>
           </tr>

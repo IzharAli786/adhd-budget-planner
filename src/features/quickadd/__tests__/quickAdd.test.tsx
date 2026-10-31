@@ -90,6 +90,20 @@ describe('Quick add sheet', () => {
     expect((await r.listTransactions()).at(-1)).toMatchObject({ date: '2026-11-04', amount: -320 })
   })
 
+  it('names the budget the spending came out of, which is why "until payday" holds', async () => {
+    await r.updateSettings({ envelopesEnabled: true, simpleMode: false })
+    const everyday = await r.ensureDefaultEnvelope()
+    await r.updateEnvelope(everyday.id, { budget: 5000 })
+    window.history.replaceState(null, '', '/bills')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Quick add' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: /What for/ }), 'coffee')
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
+    expect(await screen.findByText('Logged €12.00 · coffee · from Everyday budget')).toBeTruthy()
+  })
+
   it('a sheet opened before midnight and saved after it logs on the new day', async () => {
     vi.setSystemTime(new Date(2026, 10, 4, 23, 59))
     window.history.replaceState(null, '', '/bills')

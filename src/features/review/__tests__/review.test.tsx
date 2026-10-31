@@ -158,7 +158,7 @@ describe('Look back', () => {
     expect(within(savings).getByText(/€150\.00 moved into your funds this year/)).toBeTruthy()
     await userEvent.click(within(savings).getByRole('button', { name: 'Show as a table' }))
     const fundRow = within(within(savings).getByRole('table')).getByRole('row', { name: /Holiday/ })
-    expect(within(fundRow).getByText('€150.00')).toBeTruthy()
+    expect(within(fundRow).getByText('+€150.00')).toBeTruthy()
     expect(within(fundRow).getByText(/25\s?%/)).toBeTruthy() // 250 of 1,000
 
     const debt = screen.getByRole('region', { name: 'Debt this year' })
@@ -168,7 +168,7 @@ describe('Look back', () => {
     expect(within(cardRow).getByText('€35.00')).toBeTruthy()
     expect(within(cardRow).getByText('€1,200.00')).toBeTruthy()
     // The interest figure says what it is: a rough estimate.
-    expect(within(debtTable).getByText(/an estimate at today’s balances/)).toBeTruthy()
+    expect(within(debtTable).getByText(/estimate at today’s balances/)).toBeTruthy()
 
     await userEvent.click(screen.getByRole('button', { name: 'Print this year' }))
     await waitFor(() => expect(print).toHaveBeenCalledTimes(1))

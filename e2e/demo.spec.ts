@@ -47,6 +47,10 @@ test('sample data opens a filled-in Today', async ({ page }) => {
   await expect(hero(page)).toHaveText(/\d/)
   // Months of history behind it, and still a calm, positive number for today.
   expect(await heroCents(page)).toBeGreaterThan(0)
+  // The first thing to do is something to try, not a backup chore.
+  const card = page.getByRole('region', { name: 'Try logging “12 coffee”' })
+  await expect(card).toBeVisible()
+  await expect(page.getByText('Save a backup')).toHaveCount(0)
   expect(await seriousViolations(page)).toEqual([])
 })
 
@@ -71,6 +75,12 @@ test('sample data fills Insights and Look back', async ({ page }) => {
   await page.getByRole('link', { name: /Look back/ }).click()
   await expect(page.getByRole('region', { name: 'Savings this year' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Debt this year' })).toBeVisible()
+  // A good year: money left over, and the two payoff orders really differ in cost.
+  const glance = page.getByRole('region', { name: /at a glance$/ })
+  await expect(glance.getByText('Left over', { exact: true })).toBeVisible()
+  await expect(glance.getByText('Avalanche could save')).toBeVisible()
+  await expect(page.getByText(/Interest paid this year \(estimate\)/).first()).toBeVisible()
+  await expect(page.getByText(/\+\s*[−-]/)).toHaveCount(0)
   const months = page.getByRole('region', { name: 'Period table' }).getByRole('row')
   expect(await months.count()).toBeGreaterThan(3)
   await page.getByRole('radio', { name: 'Per payday' }).click()

@@ -43,6 +43,7 @@ export function ActionCard({ action, snoozes, onCheckIn, onLog }: Props) {
       case 'setup-bills':
         return navigate('/bills?new=1')
       case 'log-today':
+      case 'demo-try':
         return onLog()
       case 'all-done':
         return

@@ -11,7 +11,8 @@ import {
 } from 'react'
 import { useLocation } from 'react-router'
 import { useUndoToast } from '../../app/useUndoToast'
-import { useCheckIns } from '../../db/hooks'
+import { useCheckIns, useEnvelopes } from '../../db/hooks'
+import { useAppSettings } from '../../app/SettingsProvider'
 import { addTransaction } from '../../db/repos'
 import { askIfInBalance } from '../../domain/reconcile'
 import type { Cents, Id, ISODate } from '../../domain/types'
@@ -55,6 +56,22 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   const undoToast = useUndoToast()
   const checkIns = useCheckIns()
   const checkIn = checkIns?.at(-1)
+  const envelopes = useEnvelopes()
+  const { settings } = useAppSettings()
+  const showEnvelopes = settings.envelopesEnabled && !settings.simpleMode
+  // Spending inside an envelope's budget uses room already held back, so "until payday"
+  // doesn't move. Naming the budget in the toast says why. Untagged spending uses the
+  // default envelope (Everyday), as safe-to-spend counts it.
+  const budgetOf = useCallback(
+    (entry: NewEntry) => {
+      if (!showEnvelopes || entry.amount >= 0 || !envelopes) return null
+      const live = envelopes.filter((e) => e.deletedAt === undefined)
+      const env =
+        live.find((e) => e.id === entry.envelopeId) ?? live.find((e) => e.isDefault) ?? null
+      return env && env.budget > 0 ? env.name : null
+    },
+    [showEnvelopes, envelopes],
+  )
   const { pathname } = useLocation()
   const onToday = pathname === '/'
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -81,12 +98,13 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
         ...(inBalance ? { inBalance: true } : {}),
       })
       const what = entry.note.trim() ? ` · ${entry.note.trim()}` : ''
+      const from = budgetOf(entry)
       undoToast(
-        `${entry.amount < 0 ? 'Logged' : 'Added'} ${f.money(Math.abs(entry.amount))}${what}`,
+        `${entry.amount < 0 ? 'Logged' : 'Added'} ${f.money(Math.abs(entry.amount))}${what}${from ? ` · from ${from} budget` : ''}`,
       )
       return true
     },
-    [checkIn, f, undoToast],
+    [checkIn, f, undoToast, budgetOf],
   )
 
   const openSheet = useCallback(() => setSheetOpen(true), [])

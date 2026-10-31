@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { STARTER_CATEGORIES } from '../../domain/categories'
 import { addDays, daysBetween, isValidISODate } from '../../domain/dates'
 import { gardenPoints, spendDates } from '../../domain/garden'
+import { compare, defaultBudget, negativeAmortization } from '../../domain/debt'
 import { isImpulseExpired } from '../../domain/impulse'
 import { isSpend } from '../../domain/reconcile'
 import { addedOnMap, billEntriesBetween } from '../../domain/bills'
 import { isDebtPayment, isEverydaySpend } from '../../domain/insights'
-import { payPeriodRanges, periodSummaries } from '../../domain/review'
+import { historyStart, payPeriodRanges, periodSummaries, totalFlows } from '../../domain/review'
 import { planToday } from '../../domain/today'
 import { todayISO } from '../../lib/clock'
 import { exportBackup, importBackup, validateBackup } from '../backup'
@@ -24,7 +25,7 @@ import {
 } from '../demo'
 import * as r from '../repos'
 import { db } from '../schema'
-import { buildDemoData, DEMO_PAST_PERIODS, seedDemo } from '../seed/demo'
+import { buildDemoData, DEMO_PAST_PERIODS, DEMO_PAY, seedDemo } from '../seed/demo'
 import { setCreateGuard, undoLast } from '../undo'
 import { resetDb } from './helpers'
 
@@ -185,9 +186,12 @@ describe('sample data', () => {
     expect(data.envelopes.map((e) => e.name)).toEqual(
       expect.arrayContaining(STARTER_CATEGORIES.map((c) => c.name)),
     )
-    // Budgets on the everyday categories; the bill ones read "no budget yet".
-    expect(data.envelopes.find((e) => e.name === 'Groceries')!.budget).toBeGreaterThan(0)
-    expect(data.envelopes.find((e) => e.name === 'Rent & housing')!.budget).toBe(0)
+    // A budget on every category, Everyday and the bill ones included, so no row reads
+    // "no budget yet" and the planned-against-actual bars all have a plan to compare.
+    for (const e of data.envelopes) expect(e.budget, e.name).toBeGreaterThan(0)
+    // Rent sits in its own category, as the bill form now suggests for it.
+    const rent = data.bills.find((b) => b.name === 'Rent')!
+    expect(data.envelopes.find((e) => e.id === rent.envelopeId)!.name).toBe('Rent & housing')
     const ids = new Set(data.envelopes.map((e) => e.id))
     const tagged = data.transactions.filter((t) => t.envelopeId !== undefined)
     expect(tagged.length).toBeGreaterThan(10)
@@ -213,10 +217,13 @@ describe('sample data', () => {
           funds: data.funds,
           envelopes: data.envelopes,
           envelopesEnabled: true,
+          buffer: data.buffer,
           addedOn: addedOnMap(data.bills, (at) => todayISO(new Date(at))),
         })
         expect(plan.kind).toBe('ready')
         if (plan.kind !== 'ready') return
+        // An everyday amount, not the whole cushion: the buffer keeps most of it out.
+        expect(plan.safe.total).toBeLessThan(10 ** decimals * 1500)
         // Nothing overdue, nothing short, and a balance never below zero at a check-in.
         expect(plan.safe.dueEntries.every((e) => e.date >= today)).toBe(true)
         expect(plan.safe.total).toBeGreaterThan(0)
@@ -235,16 +242,49 @@ describe('sample data', () => {
         const year = Number(today.slice(0, 4))
         for (const row of periodSummaries(year, 'payday', input))
           if (row.carried) expect(row.carried.amount).toBeGreaterThanOrEqual(0)
+
+        // The sample year is a steady one: every finished month has money left over, but
+        // for at most one that dips a little, and the year as a whole is positive.
+        const since = historyStart(input)
+        const months = [year - 1, year].flatMap((y) =>
+          periodSummaries(y, 'month', { ...input, since }).filter((r) => r.end <= today),
+        )
+        const dips = months.filter((r) => r.net < 0)
+        expect(dips.length).toBeLessThanOrEqual(1)
+        for (const r of dips) expect(r.net).toBeGreaterThan(-(10 ** decimals) * 100)
+        expect(totalFlows(months).net).toBeGreaterThan(0)
+        // Look back starts where the sample starts: on its first payday, with a check-in.
+        expect(since).toBe(data.checkIns[0]!.date)
       }),
       { numRuns: 40 },
     )
   })
 
+  it('tells snowball and avalanche apart: different orders, real interest saved', () => {
+    const data = buildDemoData(TODAY, NOW)
+    const owing = data.debts.filter((d) => d.balance > 0)
+    const result = compare(owing, defaultBudget(owing, 5000))
+    if ('error' in result) throw new Error(result.error)
+    // Avalanche saves at least €50 of interest over snowball.
+    expect(result.interestSaved).toBeGreaterThan(5000)
+    const firstCleared = (schedule: number[][]) =>
+      schedule.findIndex((row) => row.some((b) => b === 0))
+    const clearedFirst = (sim: { schedule: number[][] }) => {
+      const month = firstCleared(sim.schedule)
+      return sim.schedule[month]!.findIndex((b) => b === 0)
+    }
+    expect(clearedFirst(result.snowball)).not.toBe(clearedFirst(result.avalanche))
+    // Nothing that only grows on its minimum.
+    expect(negativeAmortization(owing)).toEqual([])
+  })
+
   it('keeps amounts in whole currency units for any decimals', () => {
     const yen = buildDemoData(TODAY, NOW, 0)
     const euro = buildDemoData(TODAY, NOW, 2)
-    expect(yen.incomes[0]!.amount).toBe(1125)
-    expect(euro.incomes[0]!.amount).toBe(112500)
+    expect(yen.incomes[0]!.amount).toBe(DEMO_PAY)
+    expect(euro.incomes[0]!.amount).toBe(DEMO_PAY * 100)
+    expect(yen.buffer % 100).toBe(0)
+    expect(euro.buffer % 10000).toBe(0)
   })
 })
 
@@ -289,7 +329,7 @@ describe('seedDemo', () => {
   it('uses the decimals of the currency already chosen', async () => {
     await r.updateSettings({ currency: 'JPY', decimals: 0 })
     await seedDemo(NOW)
-    expect((await db.incomes.toArray())[0]!.amount).toBe(1125)
+    expect((await db.incomes.toArray())[0]!.amount).toBe(DEMO_PAY)
     expect((await r.getSettings()).currency).toBe('JPY')
   })
 })
@@ -373,7 +413,7 @@ describe('entry cap', () => {
     // "Change from this date on" ends the old series and starts a new bill row.
     await r.editBillFrom(rent.id, addDays(TODAY, 20), { amount: 99000 })
     // A due-day change on a debt with a paid month splits its minimum bill too.
-    await r.updateDebt('demo-debt-car', { dueDay: 20 }, TODAY)
+    await r.updateDebt('demo-debt-loan', { dueDay: 20 }, TODAY)
     expect(await db.bills.count()).toBeGreaterThan(bills)
     expect((await getDemoState())!.entries).toBe(DEMO_CAP)
   })
