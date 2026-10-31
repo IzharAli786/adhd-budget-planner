@@ -104,10 +104,10 @@ export interface CategorySpend {
 }
 
 export const CATEGORY_NAMES: Record<CategoryId, string> = {
-  everyday: 'Everyday',
+  everyday: 'Everyday spending',
   bills: 'Bills',
   savings: 'Savings',
-  debt: 'Debt payments',
+  debt: 'Debt',
 }
 
 /**
@@ -146,6 +146,51 @@ export function spendByCategory(
       planned: sum(live(funds).map((f) => f.perPeriod)) * periods,
       actual: Math.max(0, saved),
     },
+    {
+      id: 'debt',
+      name: CATEGORY_NAMES.debt,
+      planned: of(true, false),
+      actual: of(true, true) + debtTx,
+    },
+  ]
+}
+
+/**
+ * With envelopes on, the money out that no envelope holds: bills not linked to one, and
+ * debt payments (paid minimums plus payments logged against a debt). Shown beside the
+ * envelopes, so rent and the car loan still appear in where the money goes. Nothing counts
+ * twice: a bill linked to an envelope is already in it, and a payment logged for a bill
+ * occurrence is that bill (isDebtPayment leaves it out).
+ */
+export function spendOutsideEnvelopes(
+  transactions: readonly Transaction[],
+  occurrences: readonly BillOccurrence[],
+  bills: readonly Bill[],
+  envelopes: readonly Envelope[],
+  period: DateRange,
+): CategorySpend[] {
+  const known = new Set(live(envelopes).map((e) => e.id))
+  const linked = new Set(
+    bills.filter((b) => b.envelopeId !== undefined && known.has(b.envelopeId)).map((b) => b.id),
+  )
+  const entries = billEntriesBetween(bills, occurrences, period.start, period.end).filter(
+    (e) => e.status !== 'skipped' && !linked.has(e.billId),
+  )
+  const of = (debt: boolean, paidOnly: boolean) =>
+    sum(
+      entries
+        .filter((e) => (e.debtId !== undefined) === debt && (!paidOnly || e.status === 'paid'))
+        .map((e) => e.amount),
+    )
+  const debtTx =
+    0 -
+    sum(
+      live(transactions)
+        .filter((t) => isDebtPayment(t) && within(t.date, period))
+        .map((t) => t.amount),
+    )
+  return [
+    { id: 'bills', name: CATEGORY_NAMES.bills, planned: of(false, false), actual: of(false, true) },
     {
       id: 'debt',
       name: CATEGORY_NAMES.debt,

@@ -100,6 +100,50 @@ describe('BillForm', () => {
     expect('envelopeId' in again.mock.calls[0]![0]).toBe(false)
   })
 
+  it('puts a new bill in Bills & utilities when that envelope exists, and lets you pick none', async () => {
+    const envs: Envelope[] = [
+      { id: 'every', name: 'Everyday', budget: 0, isDefault: true, color: 'accent', sort: 0 },
+      {
+        id: 'utils',
+        name: 'Bills & utilities',
+        budget: 0,
+        isDefault: false,
+        color: 'slate',
+        sort: 1,
+      },
+    ]
+    const onSubmit = renderForm(undefined, envs)
+    expect(
+      screen.getByRole('button', { name: 'Bills & utilities' }).getAttribute('aria-pressed'),
+    ).toBe('true')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Water')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Amount' }), '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSubmit.mock.calls[0]![0]).toMatchObject({ envelopeId: 'utils' })
+    cleanup()
+
+    // An existing bill keeps its own (here: none), and "No" really clears the default.
+    const bill: Bill = {
+      id: 'b',
+      name: 'Rent',
+      amount: 90000,
+      rule: { freq: 'monthly', interval: 1, day: 5, anchor: '2026-11-05' },
+      autopay: false,
+      createdAt: '2026-10-01T00:00:00.000Z',
+    }
+    const edit = renderForm(bill, envs)
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(edit.mock.calls[0]![0]).toMatchObject({ envelopeId: undefined })
+    cleanup()
+
+    const none = renderForm(undefined, envs)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Gift')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Amount' }), '30')
+    await userEvent.click(screen.getByRole('button', { name: 'No' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(none.mock.calls[0]![0]).toMatchObject({ envelopeId: undefined })
+  })
+
   it('every 2 weeks with autopay', async () => {
     const onSubmit = renderForm()
     await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Gym')

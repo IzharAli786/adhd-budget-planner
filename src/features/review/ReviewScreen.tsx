@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { addDays } from '../../domain/dates'
+import { addDays, maxDate } from '../../domain/dates'
 import { compare, defaultBudget } from '../../domain/debt'
 import { dateTimeFormat } from '../../domain/intl'
 import {
@@ -14,6 +14,7 @@ import {
   type ReviewMode,
 } from '../../domain/review'
 import type { ISODate } from '../../domain/types'
+import { debtsInRange, fundsInRange } from '../../domain/yearSummary'
 import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
@@ -25,6 +26,7 @@ import { useFormat, type Formatters } from '../bills/format'
 import { carryLine } from './carry'
 import { PrintReport, type PrintTarget } from './PrintReport'
 import { useReviewData, type ReviewData } from './useReviewData'
+import { DebtYearCard, SavingsYearCard } from './YearCards'
 
 const IncomeOutChart = lazy(() => import('./IncomeOutChart'))
 
@@ -91,6 +93,30 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
     return 'error' in result ? null : result
   }, [data.debts, f.decimals])
 
+  // The year as Look back counts it (from the start of the history), so the cards agree
+  // with the tiles and the table.
+  const yearSummary = useMemo(() => {
+    const whole = yearRange(year)
+    const counted = { start: maxDate(whole.start, data.input.since ?? whole.start), end: whole.end }
+    const live = <T extends { deletedAt?: string }>(rows: T[]) =>
+      rows.filter((r) => r.deletedAt === undefined)
+    return {
+      funds:
+        live(data.funds).length > 0 ? fundsInRange(data.funds, data.transactions, counted) : [],
+      debts:
+        live(data.debts).length > 0
+          ? debtsInRange(
+              data.debts,
+              data.bills,
+              data.occurrences,
+              data.transactions,
+              counted,
+              today,
+            )
+          : null,
+    }
+  }, [data, year, today])
+
   const rowLabel = (r: PeriodSummary) =>
     mode === 'month' ? f.month(r.start) : `${f.day(r.start)} – ${f.day(addDays(r.end, -1))}`
 
@@ -123,6 +149,7 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
   const active = rows.some((r) => r.incomeIn || r.moneyOut || r.saved)
   const latest = rows.at(-1)
   const unit = mode === 'month' ? 'month' : 'pay period'
+  const when = thisYear ? 'this year' : `in ${year}`
 
   return (
     <>
@@ -171,6 +198,27 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                 />
               )}
             </section>
+
+            {(yearSummary.funds.length > 0 || yearSummary.debts) && (
+              <div className="grid gap-5 lg:grid-cols-2">
+                {yearSummary.funds.length > 0 && (
+                  <SavingsYearCard
+                    funds={yearSummary.funds}
+                    f={f}
+                    title={thisYear ? 'Savings this year' : `Savings in ${year}`}
+                    when={when}
+                  />
+                )}
+                {yearSummary.debts && (
+                  <DebtYearCard
+                    debts={yearSummary.debts}
+                    f={f}
+                    title={thisYear ? 'Debt this year' : `Debt in ${year}`}
+                    when={when}
+                  />
+                )}
+              </div>
+            )}
 
             <section aria-labelledby="flow-title" className="card p-5 sm:p-6">
               <h2 id="flow-title" className="text-heading">
@@ -238,6 +286,9 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                     rows,
                     rowLabel,
                     periods: periodsInYear,
+                    funds: yearSummary.funds,
+                    debts: yearSummary.debts,
+                    when,
                   })
                 }
               >
