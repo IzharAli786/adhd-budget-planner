@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { CatchUpProvider } from '../features/catchup/CatchUpProvider'
 import { InstallBanner } from '../features/install/InstallGate'
@@ -7,6 +7,7 @@ import { purgeDeleted } from '../db/repos'
 import { requestPersist } from '../lib/storage'
 import { AppBadge } from './AppBadge'
 import { cx } from '../ui/cx'
+import { Icon } from '../ui/Icon'
 import { TabBar } from './TabBar'
 import { UpdateToast } from './UpdateToast'
 
@@ -34,6 +35,9 @@ export function AppShell() {
   // nested settings-style screens keep a calm reading measure.
   const { pathname } = useLocation()
   const wide = WIDE.has(pathname)
+  // The path the "works offline" note appeared on; it goes once the person moves on.
+  const [offlineAt, setOfflineAt] = useState<string | null>(null)
+  const onOfflineReady = useCallback(() => setOfflineAt(window.location.pathname), [setOfflineAt])
 
   return (
     // Quick-add lives here, not per screen: the floating + and the `n` key work on every tab.
@@ -51,18 +55,40 @@ export function AppShell() {
           <main
             id="main"
             className={cx(
-              'mx-auto w-full max-w-md px-4 pt-[max(env(safe-area-inset-top),1.25rem)] pb-[calc(6.5rem+env(safe-area-inset-bottom))] min-[400px]:px-5',
+              // Phones: room under the last card for the tab bar AND the floating +, so
+              // scrolled to the end, nothing sits beneath the button.
+              'mx-auto w-full max-w-md px-4 pt-[max(env(safe-area-inset-top),1.25rem)] pb-[calc(10rem+env(safe-area-inset-bottom))] min-[400px]:px-5',
               'md:max-w-2xl md:px-10 md:pt-12 md:pb-16',
               wide && 'lg:max-w-6xl lg:px-12',
             )}
           >
+            {offlineAt === pathname && <OfflineNote onDismiss={() => setOfflineAt(null)} />}
             <Outlet />
           </main>
           <TabBar />
-          <UpdateToast />
+          <UpdateToast onOfflineReady={onOfflineReady} />
           <AppBadge />
         </div>
       </CatchUpProvider>
     </QuickAddProvider>
+  )
+}
+
+/** A slim, in-flow note: it pushes the page down a line instead of covering anything. */
+function OfflineNote({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    // No live region: it isn't news about anything the person did, just a quiet fact.
+    <div className="print-hide mb-4 flex items-center gap-2 rounded-2xl bg-accent-soft py-1 pr-1 pl-3 text-sm">
+      <Icon name="check" size={16} className="shrink-0 text-accent" />
+      <p className="min-w-0 flex-1">Steady now works offline, even with no connection.</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-muted hover:text-text"
+      >
+        <Icon name="close" size={16} />
+      </button>
+    </div>
   )
 }

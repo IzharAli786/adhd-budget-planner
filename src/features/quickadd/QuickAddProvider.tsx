@@ -117,12 +117,18 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
           aria-keyshortcuts="n"
           title="Quick add (n)"
           className={cx(
-            'print-hide fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full',
+            'print-hide fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center gap-2 rounded-full',
             'bg-accent text-accent-contrast shadow-card transition-[filter,transform] hover:brightness-105 active:scale-95',
-            'md:right-8 md:bottom-8',
+            // From md up it lives in the side rail, outside the content column, so it can
+            // never sit on a card. Above the rail (z-40), below toasts and dialogs.
+            'md:right-auto md:bottom-6 md:left-5 md:z-[45]',
+            'lg:left-6 lg:w-44 lg:justify-start lg:rounded-2xl lg:px-4',
           )}
         >
           <Icon name="plus" size={26} strokeWidth={2.2} />
+          <span aria-hidden="true" className="hidden font-medium lg:inline">
+            Quick add
+          </span>
         </button>
       )}
       <QuickAddSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />

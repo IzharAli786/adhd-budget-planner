@@ -47,13 +47,19 @@ export function monthRange(date: ISODate): LogRange {
   return { kind: 'month', start, end: addMonths(start, 1) }
 }
 
-/** Months that have entries, plus the current one, newest first (the month pills). */
-export function logMonths(transactions: readonly Pick<Transaction, 'date'>[], today: ISODate) {
-  const months = new Set([today.slice(0, 7), ...transactions.map((t) => t.date.slice(0, 7))])
-  return [...months]
-    .sort()
-    .reverse()
-    .map((m) => monthRange(`${m}-01`))
+/** Years that have entries, plus the current one, newest first (the year pills). */
+export function logYears(transactions: readonly Pick<Transaction, 'date'>[], today: ISODate) {
+  const years = new Set([today.slice(0, 4), ...transactions.map((t) => t.date.slice(0, 4))])
+  return [...years].sort().reverse()
+}
+
+/**
+ * Every month of `year`, January first: a fixed row of 12 is easier to scan than only
+ * the months with entries. The current year stops at this month; nothing is ahead.
+ */
+export function yearMonths(year: string, today: ISODate): LogRange[] {
+  const last = year === today.slice(0, 4) ? parseISODate(today).month : 12
+  return Array.from({ length: last }, (_, i) => monthRange(makeDate(Number(year), i + 1, 1)))
 }
 
 export interface LogFilter {
@@ -93,16 +99,37 @@ export interface LogTotals {
   in: Cents
   /** Money that went out, as a positive number. */
   out: Cents
+  /** Entries on each side, for the averages. */
+  inCount: number
+  outCount: number
+  /** Average money out per spending entry, whole cents; 0 with none. */
+  averageOut: Cents
+  /** Average money in per incoming entry, whole cents; 0 with none. */
+  averageIn: Cents
 }
 
 export function logTotals(rows: readonly Pick<Transaction, 'amount'>[]): LogTotals {
   let inSum = 0
   let outSum = 0
+  let inCount = 0
   for (const t of rows) {
-    if (t.amount > 0) inSum += t.amount
-    else outSum -= t.amount
+    if (t.amount > 0) {
+      inSum += t.amount
+      inCount++
+    } else outSum -= t.amount
   }
-  return { count: rows.length, in: inSum, out: outSum }
+  const outCount = rows.length - inCount
+  // Averaged per side: one salary among twenty coffees would make a mixed average meaningless.
+  const avg = (sum: Cents, n: number) => (n === 0 ? 0 : Math.round(sum / n))
+  return {
+    count: rows.length,
+    in: inSum,
+    out: outSum,
+    inCount,
+    outCount,
+    averageOut: avg(outSum, outCount),
+    averageIn: avg(inSum, inCount),
+  }
 }
 
 /** Newest day first, and within a day the latest entry first. */

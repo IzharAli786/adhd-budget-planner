@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import { catchUp, type CatchUp } from '../../domain/catchUp'
+import { greeting } from '../../domain/greeting'
 import { nextAction } from '../../domain/nextAction'
 import { recordCarryOver } from '../../db/repos'
 import type { Cents, Instant, ISODate } from '../../domain/types'
@@ -45,9 +46,7 @@ export function TodayScreen() {
       {/* Every screen needs an h1 for heading navigation; Today's is the hero itself. */}
       <h1 className="sr-only">Today</h1>
       <div className="-my-2 flex items-center justify-between gap-3">
-        <p aria-hidden="true" className="text-sm font-medium tracking-wide text-muted md:invisible">
-          Steady
-        </p>
+        <Greeting now={now} />
         <JustTodayToggle />
       </div>
       {!model.loaded || !model.plan || !ready ? (
@@ -56,6 +55,16 @@ export function TodayScreen() {
         <TodayBody model={model} today={today} now={now} />
       )}
     </div>
+  )
+}
+
+/** "Good morning, Sam": a quiet hello, following the clock as the app stays open. */
+function Greeting({ now }: { now: Instant }) {
+  const { displayName } = useAppSettings().settings
+  return (
+    <p className="min-w-0 truncate text-sm font-medium text-muted">
+      {greeting(new Date(now).getHours(), displayName)}
+    </p>
   )
 }
 

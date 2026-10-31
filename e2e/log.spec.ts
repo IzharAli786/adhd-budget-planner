@@ -34,6 +34,9 @@ test('common categories, an @tag chip, the log filter and a CSV export', async (
   await page.goto('/more/transactions')
   const totals = page.getByRole('region', { name: 'Totals' })
   await expect(totals).toContainText('2 of 2 entries')
+  // The months row starts at January; on a phone the latest month must still be in view.
+  const months = page.getByRole('group', { name: /^Months in/ })
+  await expect(months.getByRole('button').last()).toBeInViewport({ ratio: 1 })
   await page
     .getByRole('group', { name: 'Envelope' })
     .getByRole('button', { name: 'Eating out' })

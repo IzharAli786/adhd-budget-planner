@@ -6,6 +6,8 @@ import * as z from 'zod/mini'
 import { isValidISODate } from '../domain/dates'
 import { isSupportedCurrency } from '../domain/currencies'
 import { NOTE_MAX_LENGTH } from '../domain/types'
+import { HEX_COLOR } from '../domain/accent'
+import { DISPLAY_NAME_MAX } from '../domain/greeting'
 import { DATE_STYLES, THEMES } from '../domain/settings'
 import type { EXPORTED_META_KEYS } from './repos/meta'
 
@@ -174,6 +176,9 @@ export const settingsSchema = z.object({
   envelopesEnabled: z.optional(z.boolean()),
   appBadge: z.optional(z.nullable(z.boolean())),
   justToday: z.optional(z.boolean()),
+  // Added after v3 as optional fields, so no schema bump: older files simply lack them.
+  displayName: z.optional(z.string().check(z.maxLength(DISPLAY_NAME_MAX))),
+  accent: z.optional(z.nullable(z.string().check(z.regex(HEX_COLOR)))),
 })
 
 // domain/setup.ts SetupProgress. A bad row would send a restored device back into setup

@@ -2,7 +2,7 @@
 // The picture is an image with a short label; the screen's table right below holds every
 // number, so nothing here is only in the chart. Out is drawn in the neutral muted tone,
 // never red: spending is not a mistake.
-import { useSyncExternalStore } from 'react'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import type { Cents } from '../../domain/money'
 
 export interface IncomeOutPoint {
@@ -16,19 +16,7 @@ export interface IncomeOutPoint {
 const H = 168
 // A wider drawing on wide screens: the same height, so the chart doesn't grow into a wall
 // and its labels stay at text size instead of scaling up with the card.
-const WIDE = '(min-width: 48rem)'
-const wideQuery = () => (typeof window.matchMedia === 'function' ? window.matchMedia(WIDE) : null)
-function subscribe(cb: () => void) {
-  const mq = wideQuery()
-  mq?.addEventListener('change', cb)
-  return () => mq?.removeEventListener('change', cb)
-}
-const useWide = () =>
-  useSyncExternalStore(
-    subscribe,
-    () => wideQuery()?.matches ?? false,
-    () => false,
-  )
+const useWide = () => useMediaQuery('(min-width: 48rem)')
 const PAD = { top: 8, right: 4, bottom: 20, left: 4 }
 
 export default function IncomeOutChart({

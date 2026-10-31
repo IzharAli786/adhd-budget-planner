@@ -152,7 +152,8 @@ export function compare(
   return {
     snowball,
     avalanche,
-    interestSaved: snowball.totalInterest - avalanche.totalInterest,
+    // Whole cents: a fraction would print as "saves €0.00".
+    interestSaved: Math.round(snowball.totalInterest - avalanche.totalInterest),
     monthsDiff: snowball.months - avalanche.months,
   }
 }

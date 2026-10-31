@@ -1,12 +1,23 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { importBackup, readBackupFile, type RestoreError, type ValidBackup } from '../../db/backup'
+import {
+  archiveFileName,
+  importBackup,
+  prepareBackupFile,
+  readBackupFile,
+  type RestoreError,
+  type ValidBackup,
+} from '../../db/backup'
 import { prepareCsvFile } from '../../db/csv'
+import { eraseEverything } from '../../db/erase'
 import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import type { DataTableName } from '../../db/schema'
 import type { Instant } from '../../domain/types'
 import { dateTimeFormat } from '../../domain/intl'
+import { IS_DEMO } from '../../lib/demo'
+import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
 import { Icon } from '../../ui/Icon'
@@ -39,6 +50,8 @@ export function BackupScreen() {
   const changes = useLiveQuery(getChangesSinceBackup)
   // Prepared as the screen opens, so Save runs inside the tap (see SaveBackup).
   const file = useBackupFile()
+  const year = useToday().slice(0, 4)
+  const archive = useLiveQuery(() => prepareBackupFile(new Date(), archiveFileName(year)), [year])
   // Same reason: ready before the tap. Rebuilt when the data changes.
   const transactionsCsv = useLiveQuery(() => prepareCsvFile('transactions'))
   const billsCsv = useLiveQuery(() => prepareCsvFile('bills'))
@@ -114,6 +127,21 @@ export function BackupScreen() {
               {file.name} · {Math.max(1, Math.round(file.size / 1024))} KB
             </p>
           )}
+          {/* A year-end keepsake: the same restorable file, named so it's easy to find later. */}
+          <div className="mt-5 border-t border-line pt-5">
+            <p className="text-body text-muted">
+              Closing the year, or about to start fresh? Keep everything up to today in one file
+              named for {year}.
+            </p>
+            <SaveBackupButton
+              file={archive}
+              label="Save this year as a file"
+              variant="secondary"
+              size="md"
+              className="mt-3"
+              onSaved={() => toast.show({ message: `Saved ${archiveFileName(year)}.` })}
+            />
+          </div>
         </section>
 
         <section className="card p-6">
@@ -179,6 +207,8 @@ export function BackupScreen() {
             Choose a backup file
           </Button>
         </section>
+
+        <EraseSection backupFile={file} />
       </div>
 
       <Dialog
@@ -218,6 +248,90 @@ export function BackupScreen() {
         )}
       </Dialog>
     </>
+  )
+}
+
+/**
+ * Erase everything on this device: for a shared or sold device, or a true fresh start.
+ * The dialog names every consequence and offers the backup first, right where it's needed.
+ */
+function EraseSection({ backupFile }: { backupFile: File | undefined }) {
+  const toast = useToast()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  async function erase() {
+    setBusy(true)
+    setFailed(false)
+    try {
+      await eraseEverything()
+      setOpen(false)
+      navigate('/', { replace: true })
+      toast.show({ message: 'Everything was erased from this device.', duration: 8000 })
+    } catch {
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section aria-labelledby="erase-title" className="card-quiet p-6">
+      <h2 id="erase-title" className="text-heading">
+        Erase everything on this device
+      </h2>
+      <p className="mt-1 text-body text-muted">
+        Removes all of Steady’s data from this browser. Handy before passing a device on, or to
+        start completely fresh.
+      </p>
+      <Button variant="danger" className="mt-4" onClick={() => setOpen(true)}>
+        <Icon name="trash" size={18} />
+        Erase everything…
+      </Button>
+
+      <Dialog
+        open={open}
+        onClose={() => !busy && setOpen(false)}
+        title="Erase everything on this device?"
+        description="This can’t be undone."
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={() => void erase()} disabled={busy}>
+              {busy ? 'Erasing…' : 'Erase everything'}
+            </Button>
+          </>
+        }
+      >
+        <ul className="list-disc space-y-1.5 pl-5 text-body">
+          <li>Every entry, bill, payday, envelope, fund, debt and note goes.</li>
+          <li>Your settings and the safety copies kept after a restore go too.</li>
+          <li>
+            {IS_DEMO
+              ? 'The demo starts again from the beginning.'
+              : 'You’ll enter your unlock code again, then set up from the start.'}
+          </li>
+          <li>Backup files you saved elsewhere aren’t touched, and can be restored later.</li>
+        </ul>
+        <SaveBackupButton
+          file={backupFile}
+          label="Save a backup first"
+          variant="secondary"
+          size="md"
+          className="mt-5"
+          onSaved={() => toast.show({ message: 'Backup saved. Erasing is still up to you.' })}
+        />
+        {failed && (
+          <p role="alert" className="mt-3 text-sm">
+            Erasing didn’t finish, so nothing was removed. Please try again.
+          </p>
+        )}
+      </Dialog>
+    </section>
   )
 }
 

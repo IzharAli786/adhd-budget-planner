@@ -1,5 +1,15 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
+import { accentTokens, checkAccent, HEX_COLOR, type Mode } from '../../domain/accent'
+import { DISPLAY_NAME_MAX } from '../../domain/greeting'
 import {
   THEMES,
   type ColorMode,
@@ -11,6 +21,7 @@ import {
 import { todayISO } from '../../lib/clock'
 import { askBadgePermission, badgeEnabled, badgePlatform } from '../../lib/badge'
 import { formatBytes, requestPersist, storageStatus, type StorageStatus } from '../../lib/storage'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Field, inputClass } from '../../ui/Field'
@@ -69,6 +80,8 @@ export function SettingsScreen() {
     <>
       <PageHeader title="Appearance & settings" back={{ to: '/more', label: 'More' }} />
       <div className="space-y-8">
+        <NameSection />
+
         <Section title="Theme" id="theme-label">
           <div
             ref={themeGroup}
@@ -86,6 +99,7 @@ export function SettingsScreen() {
               />
             ))}
           </div>
+          <AccentPicker />
         </Section>
 
         <Section title="Light or dark">
@@ -140,6 +154,149 @@ export function SettingsScreen() {
       </div>
     </>
   )
+}
+
+/** Optional first name for Today's greeting. Settings only: setup stays four questions. */
+function NameSection() {
+  const { settings, update } = useAppSettings()
+  const id = useId()
+  // Local while typing: the saved row comes back through IndexedDB a moment later, and
+  // feeding that into the field would move the caret.
+  const [name, setName] = useState(settings.displayName)
+  return (
+    <Section title="You">
+      <div className="card p-5">
+        <Field
+          id={id}
+          label="Your name (optional)"
+          hint="Only used to say hello on Today. It stays on this device."
+        >
+          <input
+            id={id}
+            type="text"
+            value={name}
+            maxLength={DISPLAY_NAME_MAX}
+            autoComplete="given-name"
+            placeholder="e.g. Sam"
+            aria-describedby={`${id}-hint`}
+            onChange={(e) => {
+              setName(e.target.value)
+              void update({ displayName: e.target.value.trim() })
+            }}
+            className={inputClass}
+          />
+        </Field>
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * A custom accent on top of the theme. A colour that would make accent text or buttons
+ * hard to read is refused, and the nearest readable shade of it is offered instead.
+ */
+function AccentPicker() {
+  const { settings, update } = useAppSettings()
+  const id = useId()
+  const custom = settings.accent
+  // Judged and shown in the mode on screen, so a dark-mode pick isn't held to light mode.
+  const osDark = useMediaQuery('(prefers-color-scheme: dark)')
+  const mode: Mode =
+    settings.theme === 'midnight' ||
+    settings.mode === 'dark' ||
+    (settings.mode === 'auto' && osDark)
+      ? 'dark'
+      : 'light'
+  const other: Mode = mode === 'light' ? 'dark' : 'light'
+  const tokens = custom ? accentTokens(custom, settings.theme) : null
+  const fallback = useMemo(() => themeAccent(settings.theme, mode), [settings.theme, mode])
+  const shown = tokens?.[mode].accent ?? fallback
+  const [draft, setDraft] = useState('')
+  const [suggestion, setSuggestion] = useState<string | null>(null)
+  const otherShade =
+    tokens !== null && settings.theme !== 'midnight' && tokens[other].accent !== tokens[mode].accent
+
+  function pick(color: string) {
+    setDraft(color)
+    if (!HEX_COLOR.test(color)) return
+    const check = checkAccent(color, settings.theme, mode)
+    if (check.ok) {
+      setSuggestion(null)
+      void update({ accent: color.toLowerCase() })
+    } else setSuggestion(check.suggestion)
+  }
+
+  return (
+    <div className="card mt-3 p-5">
+      <div className="flex flex-wrap items-center gap-4">
+        <input
+          id={id}
+          type="color"
+          // A refused colour stays in the well so the person sees what was refused.
+          value={suggestion && HEX_COLOR.test(draft) ? draft : shown}
+          onChange={(e) => pick(e.target.value)}
+          className="h-11 w-16 shrink-0 cursor-pointer rounded-xl border border-line bg-surface p-1"
+        />
+        <div className="min-w-0 flex-1">
+          <label htmlFor={id} className="block font-medium">
+            Accent colour
+          </label>
+          <p className="text-sm text-muted">
+            {custom
+              ? `Your own colour${otherShade ? `, with a ${other === 'dark' ? 'lighter' : 'deeper'} shade of it in ${other} mode` : ''}.`
+              : 'Using the theme’s colour. Pick any colour that stays easy to read.'}
+          </p>
+        </div>
+        {custom && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSuggestion(null)
+              void update({ accent: null })
+            }}
+          >
+            Use the theme’s colour
+          </Button>
+        )}
+      </div>
+      <div aria-live="polite">
+        {suggestion && (
+          <div className="mt-4 rounded-2xl bg-bg p-4">
+            <p className="text-body">
+              That colour would be hard to read as text and on buttons here, so it wasn’t used. The
+              nearest shade that reads well:
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="h-9 w-9 shrink-0 rounded-xl ring-1 ring-line"
+                style={{ background: suggestion }}
+              />
+              <span className="font-mono text-sm">{suggestion}</span>
+              <Button variant="secondary" size="md" onClick={() => pick(suggestion)}>
+                Use this shade
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// The theme's own accent as the picker's starting point. Read from the stylesheet, so it
+// is whatever app.css says, for the mode on screen.
+function themeAccent(theme: Theme, mode: Mode): string {
+  const probe = document.createElement('span')
+  probe.dataset.theme = theme
+  probe.hidden = true
+  document.body.append(probe)
+  const value = getComputedStyle(probe)
+    .getPropertyValue(mode === 'dark' ? '--d-accent' : '--l-accent')
+    .trim()
+    .toLowerCase()
+  probe.remove()
+  return HEX_COLOR.test(value) ? value : '#a9502b'
 }
 
 const DATE_STYLE_OPTIONS = [
