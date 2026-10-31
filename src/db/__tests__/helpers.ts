@@ -16,5 +16,13 @@ export async function loadRows(rows: TableData) {
   })
 }
 
+/** An install past the unlock screen and first-run setup, for tests of the app itself. */
+export async function seedReadyInstall() {
+  await db.meta.bulkPut([
+    { key: 'unlocked', value: { at: '2026-01-01T09:00:00.000Z', hashPrefix: 'test' } },
+    { key: 'setupProgress', value: { step: 'done', doneAt: '2026-01-01T09:00:00.000Z' } },
+  ])
+}
+
 /** structuredClone keeps the fixture constant immune to the code under test. */
 export const clone = <T>(value: T): T => structuredClone(value)

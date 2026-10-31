@@ -26,3 +26,11 @@ export function formatMoney(
     maximumFractionDigits: decimals,
   }).format(cents / 10 ** decimals)
 }
+
+/**
+ * The same typed number in a currency with other decimals: "2500" stays 2500 when EUR
+ * (2) becomes JPY (0), so 250000 cents become 2500 yen, not 250000.
+ */
+export function rescaleCents(cents: Cents, fromDecimals: number, toDecimals: number): Cents {
+  return Math.round(cents * 10 ** (toDecimals - fromDecimals))
+}

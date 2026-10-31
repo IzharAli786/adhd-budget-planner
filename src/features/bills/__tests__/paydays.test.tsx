@@ -3,13 +3,14 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../../app/App'
-import { resetDb } from '../../../db/__tests__/helpers'
+import { resetDb, seedReadyInstall } from '../../../db/__tests__/helpers'
 import * as r from '../../../db/repos'
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 31, 12, 0)) // Sat 31 Oct 2026
   await resetDb()
+  await seedReadyInstall()
   localStorage.clear()
 })
 afterEach(() => {

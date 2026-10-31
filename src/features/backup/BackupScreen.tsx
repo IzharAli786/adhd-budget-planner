@@ -184,7 +184,7 @@ export function BackupScreen() {
           </>
         }
       >
-        {pending && <Preview backup={pending} />}
+        {pending && <BackupPreview backup={pending} />}
       </Dialog>
 
       <Dialog
@@ -205,7 +205,8 @@ export function BackupScreen() {
   )
 }
 
-function Preview({ backup }: { backup: ValidBackup }) {
+/** What a backup holds, shown before anything is replaced. Reused by setup's import. */
+export function BackupPreview({ backup }: { backup: ValidBackup }) {
   const { preview } = backup
   const rows = Object.entries(TABLE_LABELS)
     .map(([table, label]) => ({ label, count: preview.counts[table as DataTableName] }))
