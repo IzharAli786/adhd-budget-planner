@@ -101,7 +101,8 @@ Notes:
 - The a11y spec emulates `prefers-reduced-motion: reduce`, or axe can measure colours
   halfway through a fade-in. It logs an expense and adds a bill first, so rows, chips
   and calendar dots are scanned, not just empty states.
-- The demo spec finishes setup before checking for a service worker: the full app only
+- The demo spec starts on the entry screen ("Try Steady"), takes "Try with my own
+  numbers" and finishes setup before checking for a service worker: the full app only
   registers one from the shell, so checking on the setup screen would prove nothing.
 - `midnight.spec.ts` uses `page.clock.install()` with an explicit `+01:00` offset, then
   `runFor` past midnight, to check `useToday` rolls over while the app stays open.
