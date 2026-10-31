@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import {
+  addedOnMap,
   billEntriesBetween,
   groupByDate,
   groupUpcoming,
@@ -95,7 +96,7 @@ function BillsView({
 
   const groups = useMemo(() => {
     const entries = billEntriesBetween(bills, occurrences, addDays(today, -OVERDUE_DAYS), laterEnd)
-    const addedOn = new Map(bills.map((b) => [b.id, todayISO(new Date(b.createdAt))]))
+    const addedOn = addedOnMap(bills, (at) => todayISO(new Date(at)))
     return groupUpcoming(entries, today, period, laterEnd, addedOn)
   }, [bills, occurrences, today, period, laterEnd])
 

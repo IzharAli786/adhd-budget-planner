@@ -98,16 +98,7 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       doneState: `${bill.name} marked paid.`,
       bill,
     })
-  if (state.balanceAgeDays > STALE_BALANCE_DAYS)
-    add({
-      id: 'stale-balance',
-      kind: 'stale-balance',
-      trigger: 'Update your balance',
-      detail: 'Takes 20 seconds. Keeps today’s number honest.',
-      cta: 'Update',
-      doneState: 'Balance updated.',
-    })
-  if (state.paydaySinceCheckIn)
+  const payday = () =>
     add({
       id: 'payday-checkin',
       kind: 'payday-checkin',
@@ -117,6 +108,19 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       // PLAN §4.5: payday is the backup moment, so the done state offers one.
       doneState: 'Balance updated. A good moment for a backup.',
     })
+  // A stale balance after a payday is the same task (one check-in), so it takes the
+  // payday wording at the stale slot. Otherwise the plainer card wins, the check-in
+  // clears the payday one, and the payday backup offer is lost.
+  if (state.balanceAgeDays > STALE_BALANCE_DAYS && !state.paydaySinceCheckIn)
+    add({
+      id: 'stale-balance',
+      kind: 'stale-balance',
+      trigger: 'Update your balance',
+      detail: 'Takes 20 seconds. Keeps today’s number honest.',
+      cta: 'Update',
+      doneState: 'Balance updated.',
+    })
+  if (state.paydaySinceCheckIn) payday()
   if (state.daysSinceBackup > BACKUP_DAYS)
     add({
       id: 'backup',

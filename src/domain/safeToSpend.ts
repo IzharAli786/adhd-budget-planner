@@ -90,7 +90,7 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
   // Balance
   const counted = countedTransactions(live, checkIn)
   const since = sum(counted.map((t) => t.amount))
-  const paid = paidSinceCheckIn(occurrences, bills, counted, checkIn)
+  const paid = paidSinceCheckIn(occurrences, bills, counted, checkIn, input.addedOn)
   const paidTotal = sum(paid.map((p) => p.amount))
   const currentBalance = checkIn.balance + since - paidTotal
 

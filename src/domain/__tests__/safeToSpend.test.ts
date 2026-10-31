@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { paidFields } from '../bills'
+import { addedOnMap, billEntriesBetween, paidFields } from '../bills'
 import { addDays, fromDayNumber, makeDate, parseISODate, toDayNumber } from '../dates'
 import { checkInPlan } from '../reconcile'
 import { ESTIMATE_NOTE, safeToSpend, simpleLines, type SafeToSpendInput } from '../safeToSpend'
@@ -466,6 +466,57 @@ describe('safe-to-spend properties (PLAN §4.1)', () => {
         expect(
           totalOf({ ...base, today, transactions: [...base.transactions, contribution] }),
         ).toBeLessThanOrEqual(totalOf({ ...base, today }))
+      }),
+    )
+  })
+})
+
+describe('ticking a bill paid (review)', () => {
+  it('never moves the total when nothing new left the bank, history included', () => {
+    fc.assert(
+      fc.property(arbWorld, fc.nat(), fc.nat(), ({ base, today }, addedPick, pick) => {
+        // Bills entered the app on random days, so some dates are history (PLAN M4).
+        const bills = base.bills.map((b, i) => ({
+          ...b,
+          createdAt: `${addDays(today, -((addedPick >> i) % 60))}T09:00:00.000Z`,
+        }))
+        const world = {
+          ...base,
+          today,
+          bills,
+          envelopesEnabled: false,
+          addedOn: addedOnMap(bills, (at) => at.slice(0, 10)),
+        }
+        const plan = ready(world)
+        const unpaid = billEntriesBetween(
+          bills,
+          base.occurrences,
+          addDays(today, -90),
+          plan.period.end,
+        ).filter((e) => e.status === 'due')
+        fc.pre(unpaid.length > 0)
+        const e = unpaid[pick % unpaid.length]!
+        const counted = plan.safe.dueEntries.some(
+          (d) => d.billId === e.billId && d.originalDate === e.originalDate,
+        )
+        const history = e.date < world.addedOn.get(e.billId)!
+        fc.pre(counted || history)
+        const id = occurrenceId(e.billId, e.originalDate)
+        const after = totalOf({
+          ...world,
+          occurrences: [
+            ...base.occurrences.filter((o) => o.id !== id),
+            {
+              id,
+              billId: e.billId,
+              originalDate: e.originalDate,
+              ...paidFields(e.override, e.amount, `${today}T23:30:00.000Z`),
+            },
+          ],
+        })
+        // A counted bill moves from "bills due" to "paid since"; a history one was never
+        // owed, so ticking it for the record changes nothing either.
+        expect(after).toBe(plan.safe.total)
       }),
     )
   })

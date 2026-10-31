@@ -51,12 +51,16 @@ export interface PaidSince {
  * amount the moment you tick it. Bills paid at or before the check-in (including the
  * autopay ones the check-in itself marks) are already in the typed balance. A bill paid
  * through a logged transaction is counted by that transaction instead.
+ *
+ * Occurrences dated before the bill entered the app (`addedOn`) are history: they never
+ * counted as due, so ticking one paid for the record must not take it off the balance.
  */
 export function paidSinceCheckIn(
   occurrences: readonly BillOccurrence[],
   bills: readonly Bill[],
   counted: readonly Transaction[],
   checkIn: Pick<CheckInLike, 'at'>,
+  addedOn?: ReadonlyMap<Id, ISODate>,
 ): PaidSince[] {
   const byId = new Map(bills.map((b) => [b.id, b]))
   const viaTx = new Set(counted.map((t) => t.billOccurrenceId).filter(Boolean))
@@ -64,6 +68,8 @@ export function paidSinceCheckIn(
   for (const o of occurrences) {
     if (o.status !== 'paid' || o.paidAt === undefined || o.paidAt <= checkIn.at) continue
     if (viaTx.has(o.id)) continue
+    const added = addedOn?.get(o.billId)
+    if (added !== undefined && (o.movedTo ?? o.originalDate) < added) continue
     const bill = byId.get(o.billId)
     out.push({
       billId: o.billId,

@@ -93,6 +93,14 @@ describe('paidSinceCheckIn', () => {
     const linked = tx({ billOccurrenceId: 'rent|2026-11-01', amount: -90000 })
     expect(paidSinceCheckIn([occ({})], bills, [linked], checkIn)).toEqual([])
   })
+  it('ignores history: a date from before the bill was added, ticked for the record', () => {
+    const addedOn = new Map([['rent', '2026-11-02']])
+    expect(paidSinceCheckIn([occ({})], bills, [], checkIn, addedOn)).toEqual([])
+    // Moved onto a date it existed for: a real payment again.
+    expect(
+      paidSinceCheckIn([occ({ movedTo: '2026-11-02' })], bills, [], checkIn, addedOn),
+    ).toHaveLength(1)
+  })
 })
 
 describe('lookbackStart / paydaySinceCheckIn', () => {

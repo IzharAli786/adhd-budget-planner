@@ -6,6 +6,7 @@ import { nextAction } from '../../domain/nextAction'
 import type { ISODate } from '../../domain/types'
 import { useToday } from '../../lib/useToday'
 import { Button, buttonClass } from '../../ui/Button'
+import { cx } from '../../ui/cx'
 import { Icon, type IconName } from '../../ui/Icon'
 import { useFormat } from '../bills/format'
 import { QuickAddField } from '../quickadd/QuickAddField'
@@ -118,6 +119,8 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
   const { safe, runway, period } = plan
   const short = safe.status === 'short'
   const over = !short && runway.leftToday < 0
+  const heroAmount = f.money(short ? -safe.total : over ? -runway.leftToday : runway.leftToday)
+  const heroSuffix = short ? 'short' : over ? 'over' : null
 
   return (
     <>
@@ -130,13 +133,22 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
         </p>
         <p
           aria-live="polite"
-          className="mt-1 text-[clamp(3rem,15vw,4.5rem)] leading-none font-semibold tracking-tight tabular-nums"
+          className={cx(
+            'mt-1 leading-none font-semibold tracking-tight tabular-nums',
+            // Long amounts ("€12,345.67") step down so they never overflow a 390px card.
+            heroAmount.length > 8
+              ? 'text-[clamp(2.25rem,11vw,3.75rem)]'
+              : 'text-[clamp(3rem,15vw,4.5rem)]',
+          )}
         >
-          {short
-            ? `${f.money(-safe.total)} short`
-            : over
-              ? `${f.money(-runway.leftToday)} over`
-              : f.money(runway.leftToday)}
+          {heroAmount}
+          {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
+          {heroSuffix && (
+            <span className="text-[0.4em] font-medium tracking-normal text-muted">
+              {' '}
+              {heroSuffix}
+            </span>
+          )}
         </p>
         <p className="mt-4 text-base">
           {short ? (

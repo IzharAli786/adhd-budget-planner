@@ -69,6 +69,24 @@ describe('parseQuickAdd (PLAN §4.4 table)', () => {
     ],
     ['1,234.50 tv', { ok: false, reason: 'no_amount' }],
     ['yday 3', { ok: true, amount: 300, kind: 'spend', note: 'yday', date: today }],
+    // A space after the sign or symbol must not turn income into spending.
+    ['+ 1500 salary', { ok: true, amount: 150000, kind: 'income', note: 'salary', date: today }],
+    ['salary + 1500', { ok: true, amount: 150000, kind: 'income', note: 'salary', date: today }],
+    ['- 7 bus', { ok: true, amount: 700, kind: 'spend', note: 'bus', date: today }],
+    [
+      '€ 12 coffee',
+      { ok: true, amount: 1200, kind: 'spend', note: 'coffee', date: today, currency: '€' },
+    ],
+    [
+      '+ € 20 refund',
+      { ok: true, amount: 2000, kind: 'income', note: 'refund', date: today, currency: '€' },
+    ],
+    // "when" words count wherever they are, still as exact words only.
+    [
+      'yesterday 4.99 netflix',
+      { ok: true, amount: 499, kind: 'spend', note: 'netflix', date: '2026-10-30' },
+    ],
+    ['99999999999999999 tv', { ok: false, reason: 'too_large' }],
   ]
   it.each(cases)('%j', (text, expected) => {
     expect(parseQuickAdd(text, ctx)).toEqual(expected)

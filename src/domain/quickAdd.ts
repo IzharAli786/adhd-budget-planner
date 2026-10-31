@@ -30,7 +30,7 @@ export interface QuickAddEntry {
   currency?: string
 }
 
-export type QuickAddError = 'empty' | 'no_amount' | 'too_many_decimals' | 'zero'
+export type QuickAddError = 'empty' | 'no_amount' | 'too_many_decimals' | 'too_large' | 'zero'
 
 export type QuickAddResult = QuickAddEntry | { ok: false; reason: QuickAddError }
 
@@ -49,6 +49,11 @@ const AMOUNT_RE = /^([+-])?([€$£])?(\d+(?:[.,]\d+)?)([€$£])?$/
 const isCurrency = (token: string) =>
   SYMBOLS.has(token) || (/^[a-z]{3}$/i.test(token) && isSupportedCurrency(token.toUpperCase()))
 
+function whenOf(token: string, today: ISODate): ISODate | null {
+  const lower = token.toLowerCase()
+  return lower === 'today' ? today : lower === 'yesterday' ? addDays(today, -1) : null
+}
+
 export function parseQuickAdd(text: string, ctx: QuickAddContext): QuickAddResult {
   const tokens = text.trim().split(/\s+/).filter(Boolean)
   if (tokens.length === 0) return { ok: false, reason: 'empty' }
@@ -58,12 +63,26 @@ export function parseQuickAdd(text: string, ctx: QuickAddContext): QuickAddResul
   const at = tokens.findIndex((t) => AMOUNT_RE.test(t))
   if (at === -1) return { ok: false, reason: 'no_amount' }
   const match = AMOUNT_RE.exec(tokens[at]!)!
-  const [, sign, pre, digits = '', post] = match
+  const [, ownSign, pre, digits = '', post] = match
   const amount = parseAmount(digits, ctx.decimals ?? 2)
-  if (amount === null) return { ok: false, reason: 'too_many_decimals' }
+  if (amount === null) {
+    const frac = /[.,](\d+)$/.exec(digits)?.[1] ?? ''
+    return {
+      ok: false,
+      reason: frac.length > (ctx.decimals ?? 2) ? 'too_many_decimals' : 'too_large',
+    }
+  }
   if (amount === 0) return { ok: false, reason: 'zero' }
 
+  // People put a space after the sign or symbol ("+ 1500 salary", "€ 12 coffee"). Read
+  // those as part of the amount; left in the note, "+ 1500" would log as SPENDING.
+  const words: string[] = tokens.slice(0, at)
   let currency = pre ?? post
+  if (currency === undefined && words.length > 0 && SYMBOLS.has(words.at(-1)!)) {
+    currency = words.pop()!
+  }
+  let sign = ownSign
+  if (sign === undefined && (words.at(-1) === '+' || words.at(-1) === '-')) sign = words.pop()
   const rest = tokens.slice(at + 1)
   if (currency === undefined && rest[0] !== undefined && isCurrency(rest[0])) {
     currency = rest.shift()!
@@ -71,21 +90,26 @@ export function parseQuickAdd(text: string, ctx: QuickAddContext): QuickAddResul
 
   let date = ctx.today
   let tag: string | undefined
-  const words: string[] = tokens.slice(0, at)
+  const note: string[] = []
+  // "today"/"yesterday" count wherever they are ("yesterday 4.99 netflix" too), but as
+  // exact words only: "y" or "yday" stay part of the note.
+  for (const token of words) {
+    const when = whenOf(token, ctx.today)
+    if (when !== null) date = when
+    else note.push(token)
+  }
   for (const token of rest) {
-    const lower = token.toLowerCase()
-    // Exact words only: "y" or "yday" stay part of the note.
-    if (lower === 'today') date = ctx.today
-    else if (lower === 'yesterday') date = addDays(ctx.today, -1)
+    const when = whenOf(token, ctx.today)
+    if (when !== null) date = when
     else if (token.length > 1 && token.startsWith('@') && tag === undefined) tag = token.slice(1)
-    else words.push(token)
+    else note.push(token)
   }
 
   const entry: QuickAddEntry = {
     ok: true,
     amount,
     kind: sign === '+' ? 'income' : 'spend',
-    note: words.join(' '),
+    note: note.join(' '),
     date,
   }
   if (currency !== undefined)

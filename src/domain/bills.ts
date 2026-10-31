@@ -10,6 +10,7 @@ import type {
   BillOccurrence,
   Id,
   IncomeSource,
+  Instant,
   ISODate,
   PaydayOverride,
   Recurrence,
@@ -61,6 +62,20 @@ export interface UpcomingGroups {
   thisPeriod: BillEntry[]
   /** [periodEnd, laterEnd). */
   later: BillEntry[]
+}
+
+/**
+ * The day each bill entered the app, for telling history from overdue (see groupUpcoming
+ * and safeToSpend). One-off bills are left out on purpose: a one-off typed in with a past
+ * date is the user saying "this is still owed", so it must count as overdue, not vanish.
+ */
+export function addedOnMap(
+  bills: readonly Pick<Bill, 'id' | 'createdAt' | 'rule'>[],
+  localDate: (at: Instant) => ISODate,
+): Map<Id, ISODate> {
+  return new Map(
+    bills.filter((b) => b.rule.freq !== 'once').map((b) => [b.id, localDate(b.createdAt)]),
+  )
 }
 
 /**

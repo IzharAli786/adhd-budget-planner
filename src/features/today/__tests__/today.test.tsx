@@ -199,4 +199,20 @@ describe('Today', () => {
     render(<App />)
     expect((await hero()).textContent).toBe('€450.00 short')
   })
+
+  it('a one-off bill typed in with a past date counts as overdue, not history', async () => {
+    await salary()
+    await r.addCheckIn(84250, '2026-11-04', EARLIER)
+    // Added today (NOW), dated two days ago: still owed.
+    await r.addBill({
+      name: 'Parking fine',
+      amount: 4000,
+      rule: { freq: 'once', date: '2026-11-02' },
+      autopay: false,
+    })
+    render(<App />)
+    expect(await screen.findByText('Did Parking fine go out?')).toBeTruthy()
+    // (84250 − 4000) / 26 = 3086.5 -> floor 3086
+    expect((await hero()).textContent).toBe('€30.86')
+  })
 })

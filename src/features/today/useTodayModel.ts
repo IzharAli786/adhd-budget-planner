@@ -12,6 +12,7 @@ import {
   useTransactions,
 } from '../../db/hooks'
 import { getMeta } from '../../db/repos'
+import { addedOnMap } from '../../domain/bills'
 import { daysBetween } from '../../domain/dates'
 import { type ActionState, type Snoozes } from '../../domain/nextAction'
 import { overdueManual, planToday } from '../../domain/today'
@@ -66,7 +67,7 @@ export function useTodayModel(today: ISODate) {
       envelopes,
       envelopesEnabled: settings.envelopesEnabled,
       buffer: settings.buffer,
-      addedOn: new Map(bills.map((b) => [b.id, localDate(b.createdAt)])),
+      addedOn: addedOnMap(bills, localDate),
     })
   }, [
     loaded,

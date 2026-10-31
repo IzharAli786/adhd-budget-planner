@@ -43,7 +43,13 @@ describe('nextAction priority (PLAN §4.5)', () => {
       'payday-unknown',
     ],
     ['overdue bill', { overdue: [rent], balanceAgeDays: 9 }, 'overdue-bill'],
-    ['balance older than 3 days', { balanceAgeDays: 4, paydaySinceCheckIn: true }, 'stale-balance'],
+    ['balance older than 3 days', { balanceAgeDays: 4, daysSinceBackup: 30 }, 'stale-balance'],
+    // Same single check-in, but with the payday wording and its backup offer.
+    [
+      'stale AND payday passed reads as payday',
+      { balanceAgeDays: 9, paydaySinceCheckIn: true, daysSinceBackup: 30 },
+      'payday-checkin',
+    ],
     ['3 days is not stale yet', { balanceAgeDays: 3 }, 'all-done'],
     ['payday passed', { paydaySinceCheckIn: true, daysSinceBackup: 30 }, 'payday-checkin'],
     ['backup older than 14 days', { daysSinceBackup: 15, expiredImpulse: 2 }, 'backup'],

@@ -16,6 +16,7 @@ import { useQuickAdd } from './QuickAddProvider'
 const ERRORS: Record<Exclude<QuickAddError, 'empty'>, string> = {
   no_amount: 'Add an amount, like “12 coffee”.',
   too_many_decimals: 'That has too many decimals. Did you mean 1250 or 1.25?',
+  too_large: 'That amount is too big to be right. Check the digits?',
   zero: 'The amount can’t be zero.',
 }
 
@@ -81,7 +82,12 @@ export function QuickAddField({ today, transactions, envelopes }: Props) {
     )
   }
 
-  const error = !parsed.ok && parsed.reason !== 'empty' ? ERRORS[parsed.reason] : null
+  const error =
+    parsed.ok || parsed.reason === 'empty'
+      ? null
+      : parsed.reason === 'too_many_decimals' && f.decimals === 0
+        ? 'Whole amounts only for this currency, like 500.'
+        : ERRORS[parsed.reason]
   const showError = error !== null && tried
 
   return (
