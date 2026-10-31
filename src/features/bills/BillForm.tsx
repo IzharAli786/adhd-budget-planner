@@ -71,11 +71,13 @@ export function BillForm({
   const [name, setName] = useState(bill?.name ?? '')
   const [amount, setAmount] = useState<number | null>(bill?.amount ?? null)
   const [autopay, setAutopay] = useState(bill?.autopay ?? false)
-  // A new bill starts in "Bills & utilities" when that envelope exists, so it shows up in
-  // Insights under it; an existing bill keeps whatever it had.
-  const [envelopeId, setEnvelopeId] = useState<Id | undefined>(
-    bill ? bill.envelopeId : defaultBillEnvelope(envelopes),
+  // A new bill follows its name ("Rent" goes to Rent & housing, anything else to Bills &
+  // utilities) until a chip is tapped; an existing bill keeps whatever it had.
+  const [picked, setPicked] = useState<{ id: Id | undefined } | null>(
+    bill ? { id: bill.envelopeId } : null,
   )
+  const envelopeId = picked ? picked.id : defaultBillEnvelope(envelopes, name)
+  const setEnvelopeId = (id: Id | undefined) => setPicked({ id })
   const [choice, setChoice] = useState<RepeatChoice>(initial)
   // Rules the form can't show exactly (from a split or a backup) stay as stored unless
   // the user actually changes the repeat fields.

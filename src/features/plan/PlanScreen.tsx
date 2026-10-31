@@ -11,16 +11,16 @@ import {
 import { addDays } from '../../domain/dates'
 import { paydayEntriesBetween } from '../../domain/bills'
 import { periodIncome, type PeriodIncome } from '../../domain/plan'
-import { simpleLines } from '../../domain/safeToSpend'
+import { simpleLines, type SafeToSpend } from '../../domain/safeToSpend'
 import { fundPace, fundProgress, fundSaved } from '../../domain/savings'
-import type { ISODate } from '../../domain/types'
+import type { Cents, ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { buttonClass } from '../../ui/Button'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { ProgressBar } from '../../ui/Progress'
 import { StatStrip } from '../../ui/StatStrip'
-import { useFormat } from '../bills/format'
+import { useFormat, type Formatters } from '../bills/format'
 import { PaydayNote } from '../notes/PaydayNote'
 import { paceText, SavingsTiles, usePaydays } from '../goals/FundsSection'
 import { CanFitForm } from '../today/CanFitSheet'
@@ -149,6 +149,17 @@ function usePeriodIncome(model: TodayModel): PeriodIncome | null {
   }, [incomes, overrides, checkIns, period])
 }
 
+// simpleLines gives each deduction as a negative line (it adds up to the total). Shown on
+// its own, "Set aside −€300" reads like money lost, so the summary shows what is held
+// back as a plain amount: never below zero, never with a minus sign.
+const held = (line: Cents) => Math.max(0, -line)
+
+/** How far the envelopes went past their budgets this period, in total. */
+const overBudget = (safe: SafeToSpend) => safe.envelopes.reduce((a, e) => a + e.over, 0)
+
+const overNote = (f: Formatters, over: Cents) =>
+  `Over budget by ${f.money(over)} in envelopes this period`
+
 const incomeLabel = (income: PeriodIncome) =>
   income.kind === 'expected' ? 'Expected pay' : 'Income this period'
 
@@ -158,6 +169,7 @@ function PlanStrip({ model, income }: { model: TodayModel; income: PeriodIncome 
   if (model.plan?.kind !== 'ready') return null
   const { safe, period } = model.plan
   const [, , setAside, total] = simpleLines(safe)
+  const over = overBudget(safe)
   return (
     <StatStrip
       label="This period at a glance"
@@ -172,8 +184,8 @@ function PlanStrip({ model, income }: { model: TodayModel; income: PeriodIncome 
         },
         {
           label: 'Set aside',
-          value: f.money(setAside!.amount),
-          hint: 'Savings, envelopes, buffer',
+          value: f.money(held(setAside!.amount)),
+          hint: over > 0 ? overNote(f, over) : 'Savings, envelopes, buffer',
         },
         {
           label: safe.status === 'short' ? 'Short until payday' : 'Safe to spend',
@@ -200,6 +212,7 @@ function PeriodCard({
   const { period } = plan
   const pay = income.entries
   const [balance, bills, setAside, total] = simpleLines(plan.safe)
+  const over = overBudget(plan.safe)
 
   return (
     <section aria-labelledby="period-title" className="card p-5">
@@ -233,8 +246,10 @@ function PeriodCard({
           )}
         </Row>
         <Row label="Balance now" value={f.money(balance!.amount)} />
-        <Row label="Bills before payday" value={f.money(bills!.amount)} />
-        <Row label="Set aside" value={f.money(setAside!.amount)} />
+        <Row label="Bills before payday" value={f.money(held(bills!.amount))} />
+        <Row label="Set aside" value={f.money(held(setAside!.amount))}>
+          {over > 0 && <p className="mt-1 text-sm text-muted">{overNote(f, over)}</p>}
+        </Row>
         <Row
           label={plan.safe.status === 'short' ? 'Short until payday' : 'Safe to spend'}
           value={f.money(total!.amount)}

@@ -1,6 +1,7 @@
 // The transaction log's selection: which pay period or month, which envelope, which words.
 // Pure, so the screen only renders and the filters are table- and property-tested.
-import { addDays, addMonths, makeDate, parseISODate } from './dates'
+import { paydayEntriesBetween } from './bills'
+import { addDays, addMonths, makeDate, maxDate, minDate, parseISODate } from './dates'
 import type { Cents } from './money'
 import { nextPayday, previousPayday } from './paySchedule'
 import type { Id, IncomeSource, ISODate, PaydayOverride, Transaction } from './types'
@@ -137,4 +138,22 @@ export function newestFirst<T extends Pick<Transaction, 'date' | 'createdAt'>>(r
   return [...rows].sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.createdAt < b.createdAt ? 1 : -1,
   )
+}
+
+/**
+ * Pay that came in over a log range: paydays on the schedule from the start of the history
+ * up to today, as Plan's "Income this period" and Look back count them. Pay is not an
+ * entry in the log, so without this a pay period's "Money in" would show only refunds.
+ */
+export function payInRange(
+  incomes: readonly IncomeSource[],
+  overrides: readonly PaydayOverride[],
+  range: Pick<LogRange, 'start' | 'end'>,
+  today: ISODate,
+  since: ISODate,
+): Cents {
+  const from = maxDate(range.start, since)
+  const to = minDate(range.end, addDays(today, 1))
+  if (from >= to) return 0
+  return paydayEntriesBetween(incomes, overrides, from, to).reduce((a, p) => a + p.amount, 0)
 }

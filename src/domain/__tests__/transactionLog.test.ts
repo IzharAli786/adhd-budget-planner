@@ -8,6 +8,7 @@ import {
   logTotals,
   monthRange,
   newestFirst,
+  payInRange,
   payPeriods,
   yearMonths,
   type LogRange,
@@ -257,5 +258,22 @@ describe('savingsOnPaydays', () => {
   it('is empty with no period income or no fund asking', () => {
     expect(savingsOnPaydays(paydays, [fund({})], undefined).size).toBe(0)
     expect(savingsOnPaydays(paydays, [], 'pay').size).toBe(0)
+  })
+})
+
+describe('payInRange', () => {
+  // Paid 23 Oct, 6 Nov, 20 Nov (biweekly). Today is Wed 11 Nov.
+  const today = '2026-11-11'
+  it('counts paydays in the range up to today, as Plan does', () => {
+    const period = { start: '2026-11-06', end: '2026-11-20' }
+    expect(payInRange([income], [], period, today, '2026-01-01')).toBe(200000)
+    // November so far: the 20th has not come yet.
+    expect(payInRange([income], [], monthRange(today), today, '2026-01-01')).toBe(200000)
+  })
+  it('leaves out pay from before the history starts, and pay still to come', () => {
+    expect(payInRange([income], [], ALL_TIME, today, '2026-10-30')).toBe(200000)
+    expect(payInRange([income], [], ALL_TIME, today, '2026-10-01')).toBe(600000) // 9 Oct too
+    const later = { start: '2026-11-12', end: '2026-12-01' }
+    expect(payInRange([income], [], later, today, '2026-01-01')).toBe(0)
   })
 })

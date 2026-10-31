@@ -14,8 +14,8 @@ interface Props {
   f: Formatters
   /** Names the figure for screen readers, e.g. "Spending by envelope, this period". */
   caption: string
-  /** The word in the donut's middle: "Spent" for envelopes; "Out" when the groups include
-   *  savings and debt, which are not spending. */
+  /** The words in the donut's middle and on the table's total: "Money out" when the rows
+   *  include bills, savings or debt (not only spending), else "Spent". */
   centerLabel?: string
 }
 
@@ -25,7 +25,7 @@ const R = 52
 const STROKE = 18
 const C = 2 * Math.PI * R
 
-export default function InsightsCharts({ rows, f, caption, centerLabel = 'Spent' }: Props) {
+export default function InsightsCharts({ rows, f, caption, centerLabel = 'Money out' }: Props) {
   const [showTable, setShowTable] = useState(false)
   const tableId = useId()
   const { top, rest, total } = topCategories(rows)
@@ -78,7 +78,7 @@ export default function InsightsCharts({ rows, f, caption, centerLabel = 'Spent'
       )}
 
       <div id={tableId} className={cx(showTable ? 'mb-2' : 'sr-only')}>
-        <InsightsTable rows={rows} total={total} f={f} caption={caption} />
+        <InsightsTable rows={rows} total={total} f={f} caption={caption} totalLabel={centerLabel} />
       </div>
       <div className="flex justify-end print-hide">
         <button

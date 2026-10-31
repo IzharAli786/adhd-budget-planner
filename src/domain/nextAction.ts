@@ -9,6 +9,7 @@ export type ActionKind =
   | 'overdue-bill'
   | 'stale-balance'
   | 'payday-checkin'
+  | 'demo-try'
   | 'backup'
   | 'impulse'
   | 'setup-bills'
@@ -36,6 +37,12 @@ export interface ActionState {
   expiredImpulse?: number
   hasBills: boolean
   loggedToday: boolean
+  /**
+   * The demo. 'sample' is the sample household before the visitor has added anything:
+   * its first card invites them to try logging. In any demo there is no backup card (the
+   * demo resets itself; More offers bringing the setup over instead).
+   */
+  demo?: 'sample' | 'other'
 }
 
 export interface NextAction {
@@ -121,7 +128,16 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       doneState: 'Balance updated.',
     })
   if (state.paydaySinceCheckIn) payday()
-  if (state.daysSinceBackup > BACKUP_DAYS)
+  if (state.demo === 'sample')
+    add({
+      id: 'demo-try',
+      kind: 'demo-try',
+      trigger: 'Try logging “12 coffee”',
+      detail: 'Type it the way you’d say it. Steady files it and updates the plan.',
+      cta: 'Try it',
+      doneState: 'Logged.',
+    })
+  if (state.daysSinceBackup > BACKUP_DAYS && state.demo === undefined)
     add({
       id: 'backup',
       kind: 'backup',

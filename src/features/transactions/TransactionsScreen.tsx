@@ -4,19 +4,27 @@ import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import { csvFile, csvFileName, csvNames, transactionsToCsv } from '../../db/csv'
-import { useEnvelopes, useIncomes, usePaydayOverrides, useTransactions } from '../../db/hooks'
+import {
+  useCheckIns,
+  useEnvelopes,
+  useIncomes,
+  usePaydayOverrides,
+  useTransactions,
+} from '../../db/hooks'
 import { deleteTransaction, updateTransaction } from '../../db/repos'
 import { groupByDate } from '../../domain/bills'
 import { addDays, isValidISODate } from '../../domain/dates'
 import { dateTimeFormat } from '../../domain/intl'
 import type { Cents } from '../../domain/money'
 import { primaryIncome } from '../../domain/paySchedule'
+import { historyStart } from '../../domain/review'
 import {
   ALL_TIME,
   filterLog,
   logTotals,
   logYears,
   newestFirst,
+  payInRange,
   payPeriods,
   yearMonths,
   type LogRange,
@@ -72,6 +80,7 @@ export function TransactionsScreen() {
   )
   const incomes = useIncomes()
   const overrides = usePaydayOverrides()
+  const checkIns = useCheckIns()
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
   const [envelopeId, setEnvelopeId] = useState<string | undefined>(undefined)
@@ -130,6 +139,13 @@ export function TransactionsScreen() {
     () => newestFirst(filterLog(inRange, { range: ALL_TIME, envelopeId, query })),
     [inRange, envelopeId, query],
   )
+  // Paydays in the selection count as money in, as on Plan and in Look back. Not with an
+  // envelope or a search picked: pay belongs to neither.
+  const pay = useMemo(() => {
+    if (!incomes || !overrides || !checkIns || !transactions) return 0
+    const since = historyStart({ today, transactions, checkIns })
+    return payInRange(incomes, overrides, selected.range, today, since)
+  }, [incomes, overrides, checkIns, transactions, selected.range, today])
   const days = useMemo(() => [...groupByDate(rows)], [rows])
   const byId = new Map((envelopes ?? []).map((e) => [e.id, e]))
   // Only envelopes that appear in this selection, so a filter chip never shows nothing.
@@ -179,7 +195,13 @@ export function TransactionsScreen() {
                 onChange={pick}
               />
             </div>
-            <Summary rows={rows} range={selected} transactions={transactions} names={names} />
+            <Summary
+              rows={rows}
+              range={selected}
+              transactions={transactions}
+              names={names}
+              pay={envelopeId || query.trim() ? 0 : pay}
+            />
             <div className="space-y-3">
               <label className="block">
                 <span className="sr-only">Search notes</span>
@@ -446,11 +468,14 @@ function Summary({
   range,
   transactions,
   names,
+  pay,
 }: {
   rows: readonly Transaction[]
   range: RangeOption
   transactions: readonly Transaction[]
   names: Awaited<ReturnType<typeof csvNames>> | undefined
+  /** Paydays in the range (not entries in the log), counted into Money in. */
+  pay: Cents
 }) {
   const f = useFormat()
   const today = useToday()
@@ -476,7 +501,12 @@ function Summary({
       </p>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
         <Stat label="Money out" value={f.money(totals.out)} size="sm" />
-        <Stat label="Money in" value={f.money(totals.in)} size="sm" />
+        <Stat
+          label="Money in"
+          value={f.money(totals.in + pay)}
+          hint={pay > 0 ? `Pay included: ${f.money(pay)}` : undefined}
+          size="sm"
+        />
         <Stat label="Entries" value={totals.count} size="sm" />
         {/* Per side: a salary would swamp a mixed average. Spending is the usual question. */}
         {totals.outCount > 0 || totals.inCount === 0 ? (

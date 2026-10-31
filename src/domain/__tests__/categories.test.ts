@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  defaultBillEnvelope,
   ENVELOPE_COLORS,
   isPaletteColor,
   missingStarters,
@@ -71,6 +72,28 @@ describe('starter categories', () => {
     }
     expect(envelopeTag(all[1]!, all)).toBe('rent')
     expect(envelopeTag(all[3]!, all)).toBe('eating')
+  })
+})
+
+describe('defaultBillEnvelope', () => {
+  const home = env('home', 'Rent & housing', 1)
+  const utils = env('utils', 'Bills & utilities', 2)
+  it.each<[string, Envelope[], string, string | undefined]>([
+    ['rent goes to Rent & housing', [home, utils], 'Rent', 'home'],
+    ['so does a mortgage, any case', [home, utils], 'MORTGAGE payment', 'home'],
+    ['housing words only as whole words', [home, utils], 'Parental care', 'utils'],
+    ['other bills go to Bills & utilities', [home, utils], 'Phone', 'utils'],
+    ['rent without Rent & housing', [utils], 'Rent', 'utils'],
+    [
+      'a deleted Rent & housing does not count',
+      [{ ...home, deletedAt: 'x' }, utils],
+      'Rent',
+      'utils',
+    ],
+    ['no categories, no default', [], 'Rent', undefined],
+    ['only Rent & housing: other bills get none', [home], 'Phone', undefined],
+  ])('%s', (_, envelopes, name, expected) => {
+    expect(defaultBillEnvelope(envelopes, name)).toBe(expected)
   })
 })
 

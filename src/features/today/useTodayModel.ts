@@ -20,6 +20,8 @@ import { expiredImpulse } from '../../domain/impulse'
 import { overdueManual, planToday } from '../../domain/today'
 import type { Instant, ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
+import { IS_DEMO } from '../../lib/demo'
+import type { DemoState } from '../../db/demo'
 
 const localDate = (at: Instant) => todayISO(new Date(at))
 
@@ -41,6 +43,10 @@ export function useTodayModel(today: ISODate, now: Instant) {
   // `?? {}` inside the query: useLiveQuery's own undefined means "still loading".
   const snoozes = useLiveQuery(async () => (await getMeta<Snoozes>('snoozes')) ?? {})
   const lastBackupAt = useLiveQuery(async () => (await getMeta<Instant>('lastBackupAt')) ?? null)
+  // Only the demo build has a demo state; the full app never reads it.
+  const demo = useLiveQuery(async () =>
+    IS_DEMO ? ((await getMeta<DemoState>('demo')) ?? null) : null,
+  )
 
   const loaded =
     incomes !== undefined &&
@@ -53,7 +59,8 @@ export function useTodayModel(today: ISODate, now: Instant) {
     funds !== undefined &&
     impulse !== undefined &&
     snoozes !== undefined &&
-    lastBackupAt !== undefined
+    lastBackupAt !== undefined &&
+    demo !== undefined
 
   const checkIn = checkIns?.at(-1)
 
@@ -102,8 +109,11 @@ export function useTodayModel(today: ISODate, now: Instant) {
       expiredImpulse: expiredImpulse(impulse ?? [], now).length,
       hasBills: (bills?.length ?? 0) > 0,
       loggedToday: (transactions ?? []).some((t) => t.date === today),
+      ...(IS_DEMO
+        ? { demo: demo?.kind === 'sample' && demo.entries === 0 ? 'sample' : 'other' }
+        : {}),
     }
-  }, [plan, checkIns, lastBackupAt, today, now, impulse, bills, transactions])
+  }, [plan, checkIns, lastBackupAt, today, now, impulse, bills, transactions, demo])
 
   return {
     loaded,

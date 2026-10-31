@@ -144,6 +144,41 @@ describe('BillForm', () => {
     expect(none.mock.calls[0]![0]).toMatchObject({ envelopeId: undefined })
   })
 
+  it('puts rent in Rent & housing as it is typed, until a chip is picked', async () => {
+    const envs: Envelope[] = [
+      { id: 'every', name: 'Everyday', budget: 0, isDefault: true, color: 'accent', sort: 0 },
+      { id: 'home', name: 'Rent & housing', budget: 0, isDefault: false, color: 'clay', sort: 1 },
+      {
+        id: 'utils',
+        name: 'Bills & utilities',
+        budget: 0,
+        isDefault: false,
+        color: 'slate',
+        sort: 2,
+      },
+    ]
+    const pressed = (name: string) =>
+      screen.getByRole('button', { name }).getAttribute('aria-pressed')
+    const onSubmit = renderForm(undefined, envs)
+    const nameBox = screen.getByRole('textbox', { name: 'Name' })
+    expect(pressed('Bills & utilities')).toBe('true')
+    await userEvent.type(nameBox, 'Rent')
+    expect(pressed('Rent & housing')).toBe('true')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Amount' }), '900')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSubmit.mock.calls[0]![0]).toMatchObject({ envelopeId: 'home' })
+    cleanup()
+
+    // A chip tapped by hand stays, whatever the name says next.
+    const picked = renderForm(undefined, envs)
+    await userEvent.click(screen.getByRole('button', { name: 'Bills & utilities' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Mortgage')
+    expect(pressed('Bills & utilities')).toBe('true')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Amount' }), '900')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(picked.mock.calls[0]![0]).toMatchObject({ envelopeId: 'utils' })
+  })
+
   it('every 2 weeks with autopay', async () => {
     const onSubmit = renderForm()
     await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Gym')

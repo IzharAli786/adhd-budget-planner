@@ -7,6 +7,9 @@ import type { ReviewData } from './useReviewData'
 
 const InsightsCharts = lazy(() => import('./InsightsCharts'))
 
+/** Row keys that are not envelopes: what the money went to beside them. */
+const KINDS = new Set(['bills', 'debt', 'savings'])
+
 /** Plan's "Insights": where this period's money went, as a donut and plan-vs-actual bars. */
 export function InsightsSection({
   data,
@@ -22,6 +25,10 @@ export function InsightsSection({
   const rows = useMemo(() => insightRows(data, range), [data, range])
   const spent = rows.some((r) => r.actual > 0)
   const by = data.envelopesEnabled && data.envelopes.length > 0 ? 'envelope' : 'kind'
+  // The total counts bills and debt payments too (beside the envelopes, or as groups), so
+  // it is "Money out", not "Spent", whenever they are in it.
+  const outside = by === 'kind' || rows.some((r) => KINDS.has(r.key) && r.actual > 0)
+  const totalLabel = outside ? 'Money out' : 'Spent'
 
   return (
     <section aria-labelledby="insights-title" className="card p-5 sm:p-6">
@@ -29,7 +36,8 @@ export function InsightsSection({
         Insights
       </h2>
       <p className="mt-0.5 mb-5 text-body text-muted">
-        {past ? 'Where that period’s money went' : 'Where this period’s money is going'}, by {by}.
+        {past ? 'Where that period’s money went' : 'Where this period’s money is going'}, by {by}
+        {outside && by === 'envelope' ? ', with bills and debt payments' : ''}.
       </p>
       {spent ? (
         <Suspense
@@ -38,8 +46,8 @@ export function InsightsSection({
           <InsightsCharts
             rows={rows}
             f={f}
-            caption={`${by === 'envelope' ? 'Spending' : 'Money out'} by ${by}, ${f.day(range.start)} to ${f.day(addDays(range.end, -1))}`}
-            centerLabel={by === 'envelope' ? 'Spent' : 'Out'}
+            caption={`${outside ? 'Money out' : 'Spending'} by ${by}, ${f.day(range.start)} to ${f.day(addDays(range.end, -1))}`}
+            centerLabel={totalLabel}
           />
         </Suspense>
       ) : (

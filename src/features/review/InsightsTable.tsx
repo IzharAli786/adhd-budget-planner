@@ -7,11 +7,14 @@ export function InsightsTable({
   total,
   f,
   caption,
+  totalLabel = 'Total',
 }: {
   rows: InsightRow[]
   total: number
   f: Formatters
   caption: string
+  /** The footer row's name, e.g. "Money out" when bills and debt are in the rows. */
+  totalLabel?: string
 }) {
   const anyPlan = rows.some((r) => r.planned !== null)
   return (
@@ -56,7 +59,7 @@ export function InsightsTable({
       <tfoot>
         <tr className="border-t border-line font-medium">
           <th scope="row" className="py-2 text-left">
-            Total
+            {totalLabel}
           </th>
           {anyPlan && <td />}
           <td className="py-2 text-right">{f.money(total)}</td>
