@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
     console.warn('\n[steady] VITE_UNLOCK_HASHES is empty: no code will unlock this build.\n')
   }
   return {
+    // Its own folder, so a demo build can never be deployed as (or over) the full app.
+    build: { outDir: mode === 'demo' ? 'dist-demo' : 'dist' },
     resolve: {
       alias: [
         // No service worker in the demo or in unit tests, so the register hook is a no-op.

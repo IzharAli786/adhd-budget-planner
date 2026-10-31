@@ -4,12 +4,14 @@ import { useRecentlyDeleted, useUndoLabel } from '../../db/hooks'
 import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import { undoLast } from '../../db/undo'
 import type { Instant } from '../../domain/types'
+import { IS_DEMO } from '../../lib/demo'
 import { INSTALL_FLOW, isStandalone } from '../../lib/install'
 import { ListGroup, ListRow } from '../../ui/List'
 import { PageHeader } from '../../ui/PageHeader'
 import { Switch } from '../../ui/Switch'
 import { useToast } from '../../ui/Toast'
 import { relativeDays } from '../backup/relative'
+import { DemoMoreGroup } from '../demo/DemoMore'
 
 export function MoreScreen() {
   const { settings, update } = useAppSettings()
@@ -24,6 +26,7 @@ export function MoreScreen() {
     <>
       <PageHeader title="More" />
       <div className="space-y-7">
+        {IS_DEMO && <DemoMoreGroup />}
         <ListGroup>
           <ListRow
             icon="sparkle"
@@ -116,7 +119,7 @@ export function MoreScreen() {
           <ListRow
             icon="palette"
             label="Appearance & settings"
-            detail="Theme, dark mode, text size, motion"
+            detail="Theme, text size, currency, dates"
             to="/more/settings"
           />
         </ListGroup>

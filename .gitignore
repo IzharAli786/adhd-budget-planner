@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-demo
 .vitest
 *.tsbuildinfo
 .DS_Store

@@ -86,24 +86,30 @@ export function BillRow({ entry, today, onOpen, showDate = true }: BillRowProps)
             <span className="font-semibold tabular-nums">{Number(entry.date.slice(8))}</span>
           </span>
         )}
-        <span className="min-w-0 flex-1">
-          <span className={cx('block truncate font-medium', (paid || skipped) && 'text-muted')}>
-            {entry.name}
-          </span>
-          {meta.length > 0 && (
-            <span className={cx('block truncate text-sm', overdue ? 'text-accent' : 'text-muted')}>
-              {capitalize(meta.join(' · '))}
+        {/* Name and amount share a wrapping row: with large text (or a long name) the
+            amount drops under the name instead of squeezing the name to "Ele…". */}
+        <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3">
+          <span className="min-w-[min(100%,7rem)] flex-1">
+            <span
+              className={cx('block font-medium break-words', (paid || skipped) && 'text-muted')}
+            >
+              {entry.name}
             </span>
-          )}
-        </span>
-        <span
-          className={cx(
-            'shrink-0 font-medium tabular-nums',
-            (paid || skipped) && 'text-muted',
-            skipped && 'line-through',
-          )}
-        >
-          {f.money(entry.amount)}
+            {meta.length > 0 && (
+              <span className={cx('block text-sm', overdue ? 'text-accent' : 'text-muted')}>
+                {capitalize(meta.join(' · '))}
+              </span>
+            )}
+          </span>
+          <span
+            className={cx(
+              'ml-auto shrink-0 font-medium tabular-nums',
+              (paid || skipped) && 'text-muted',
+              skipped && 'line-through',
+            )}
+          >
+            {f.money(entry.amount)}
+          </span>
         </span>
       </button>
     </li>

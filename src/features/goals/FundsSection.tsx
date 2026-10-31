@@ -142,10 +142,14 @@ function FundCard({
     <li className="rounded-3xl bg-surface p-5 shadow-card ring-1 ring-line">
       <div className="flex items-center gap-4">
         <ProgressRing value={progress} label={`${fund.name} progress`}>
-          {fund.target ? `${Math.floor(progress * 100)}%` : <Icon name="leaf" size={20} />}
+          {fund.target ? (
+            f.percent(Math.floor(progress * 100) / 100)
+          ) : (
+            <Icon name="leaf" size={20} />
+          )}
         </ProgressRing>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-semibold">{fund.name}</h3>
+          <h3 className="font-semibold break-words">{fund.name}</h3>
           <p className="text-[0.9375rem] tabular-nums">
             {f.money(saved)}
             {fund.target !== undefined && (

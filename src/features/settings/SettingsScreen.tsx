@@ -1,14 +1,25 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { THEMES, type ColorMode, type MotionPreference, type Theme } from '../../domain/settings'
+import {
+  THEMES,
+  type ColorMode,
+  type DateStyle,
+  type MotionPreference,
+  type Theme,
+  type WeekStart,
+} from '../../domain/settings'
+import { todayISO } from '../../lib/clock'
 import { askBadgePermission, badgeEnabled, badgePlatform } from '../../lib/badge'
 import { formatBytes, requestPersist, storageStatus, type StorageStatus } from '../../lib/storage'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
+import { Field, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
 import { PageHeader } from '../../ui/PageHeader'
 import { Segmented } from '../../ui/Segmented'
 import { Switch } from '../../ui/Switch'
+import { makeFormatters, useFormat } from '../bills/format'
+import { LocalePickers } from '../setup/LocaleLine'
 
 const THEME_LABELS: Record<Theme, string> = {
   clay: 'Clay',
@@ -105,6 +116,8 @@ export function SettingsScreen() {
           />
         </Section>
 
+        <RegionSection />
+
         <Section title="Tools">
           <div className="flex items-center gap-3 rounded-[1.5rem] bg-surface px-4 py-2 shadow-card ring-1 ring-line">
             <div className="min-w-0 flex-1 py-1.5">
@@ -126,6 +139,72 @@ export function SettingsScreen() {
         <StorageCard />
       </div>
     </>
+  )
+}
+
+const DATE_STYLE_OPTIONS = [
+  { value: 'words', label: 'Words' },
+  { value: 'numbers', label: 'Numbers' },
+] as const satisfies readonly { value: DateStyle; label: string }[]
+
+const WEEK_DAYS: WeekStart[] = [1, 2, 3, 4, 5, 6, 0]
+
+/**
+ * Locale, currency, week start and date style (PLAN §8), with a live preview line so a
+ * change shows its effect right here, before going back to Today.
+ */
+function RegionSection() {
+  const { settings, update } = useAppSettings()
+  const f = useFormat()
+  const weekId = useId()
+  const today = todayISO()
+  // Each option shows today in its own style, so the choice is visible, not described.
+  // Day names are words in the (English, v1) UI, not part of the chosen format.
+  const dayName = (d: WeekStart) => makeFormatters('en-IE', 'EUR', 2).weekday(d, 'long')
+  const sample = (style: DateStyle) =>
+    makeFormatters(settings.locale, settings.currency, settings.decimals, style).day(today)
+
+  return (
+    <Section title="Region & format">
+      <div className="space-y-4 rounded-[1.5rem] bg-surface p-5 shadow-card ring-1 ring-line">
+        <p aria-live="polite" className="rounded-2xl bg-bg px-4 py-3 text-[0.9375rem] tabular-nums">
+          <span className="sr-only">Preview: </span>
+          {f.day(today)} · {f.money(123456)} · week starts {dayName(settings.weekStart)}
+        </p>
+        <LocalePickers sameDecimalsOnly />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field id={weekId} label="Week starts on">
+            <select
+              id={weekId}
+              value={settings.weekStart}
+              onChange={(e) => void update({ weekStart: Number(e.target.value) as WeekStart })}
+              className={`${inputClass} appearance-none`}
+            >
+              {WEEK_DAYS.map((d) => (
+                <option key={d} value={d}>
+                  {dayName(d)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="space-y-1.5">
+            <p aria-hidden="true" className="text-sm font-medium">
+              Dates
+            </p>
+            <Segmented
+              label="Date style"
+              value={settings.dateStyle}
+              options={DATE_STYLE_OPTIONS.map((o) => ({
+                value: o.value,
+                label: sample(o.value),
+                name: `${o.label}, like ${sample(o.value)}`,
+              }))}
+              onChange={(dateStyle) => void update({ dateStyle })}
+            />
+          </div>
+        </div>
+      </div>
+    </Section>
   )
 }
 

@@ -7,6 +7,17 @@ import { db, PRIMARY_KEY, type DataTableName, type RowTypes, type TableName } fr
 
 export const UNDO_LIMIT = 20
 
+/**
+ * Runs inside the write's transaction when a user action created rows, with the tables
+ * those rows went into. Throwing aborts the whole action. The demo build installs one
+ * for its entry cap (db/demo.ts); the full app has none, so this costs it nothing.
+ */
+export type CreateGuard = (tables: DataTableName[]) => Promise<void>
+let createGuard: CreateGuard | null = null
+export function setCreateGuard(guard: CreateGuard | null) {
+  createGuard = guard
+}
+
 export interface Writer {
   get<T extends DataTableName>(table: T, key: string): Promise<RowTypes[T] | undefined>
   put<T extends DataTableName>(table: T, row: RowTypes[T]): Promise<void>
@@ -27,14 +38,17 @@ export async function mutate<R>(
   return db.transaction('rw', stores, async () => {
     const ops: UndoEntry['ops'] = []
     const seen = new Set<string>()
+    const created = new Set<DataTableName>()
 
     // Only the FIRST before-image per row counts: if one action writes a row twice,
     // undo must return to the state before the action, not the middle step.
-    async function remember(table: DataTableName, key: string) {
+    async function remember(table: DataTableName, key: string, isPut = false) {
       const id = `${table}\u0000${key}`
       if (label === null || seen.has(id)) return
       seen.add(id)
-      ops.push({ table, key, before: (await db.table(table).get(key)) ?? null })
+      const before = (await db.table(table).get(key)) ?? null
+      if (before === null && isPut) created.add(table)
+      ops.push({ table, key, before })
     }
 
     const writer: Writer = {
@@ -43,6 +57,7 @@ export async function mutate<R>(
         await remember(
           table,
           String((row as unknown as Record<string, unknown>)[PRIMARY_KEY[table]]),
+          true,
         )
         await db.table(table).put(row)
       },
@@ -53,6 +68,7 @@ export async function mutate<R>(
     }
 
     const result = await fn(writer)
+    if (createGuard && created.size > 0) await createGuard([...created])
     if (label !== null && ops.length > 0) {
       await db.undo.add({ at: new Date().toISOString(), label, ops })
       await trimUndo()

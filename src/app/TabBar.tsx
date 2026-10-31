@@ -15,7 +15,8 @@ export function TabBar() {
       aria-label="Main"
       className={cx(
         'fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl',
-        'md:inset-y-0 md:right-auto md:w-24 md:border-t-0 md:border-r md:bg-surface/60 md:pt-[max(env(safe-area-inset-top),1.5rem)] md:pb-6 lg:w-56',
+        // The demo's sticky banner sets --demo-banner-h; the rail starts below it.
+        'md:top-[var(--demo-banner-h,0px)] md:right-auto md:w-24 md:border-t-0 md:border-r md:bg-surface/60 md:pt-[max(env(safe-area-inset-top),1.5rem)] md:pb-6 lg:w-56',
       )}
     >
       <div className="hidden items-center gap-2.5 px-6 pb-8 md:flex md:justify-center lg:justify-start">

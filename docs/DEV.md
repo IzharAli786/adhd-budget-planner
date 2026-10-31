@@ -40,8 +40,18 @@ DevTools can set the flag. That is accepted; the price is low and the demo is fr
 
 `npm run build:demo` runs `vite build --mode demo`, which swaps `src/unlock/unlock.ts`
 for `src/unlock/unlock.stub.ts` (an alias in `vite.config.ts`), and `.env.demo` blanks
-`VITE_UNLOCK_HASHES`. It then runs `scripts/check-demo.mjs`, which fails if any
-hash-shaped string is in `dist`. Never set that variable on the demo project.
+`VITE_UNLOCK_HASHES`. The output goes to `dist-demo` (set the demo Vercel project's
+output directory to that). It then runs `scripts/check-demo.mjs`, which fails if the dev
+code's hash, any `VITE_UNLOCK_HASHES` value (env files or CI env), the dev code itself,
+any hash-shaped string, or a service worker/manifest is in `dist-demo`. Never set that
+variable on the demo project.
+
+The demo stores everything in the `steady-demo` database. Its first screen offers sample
+data (`src/db/seed/demo.ts`, built relative to today) or the normal setup. It holds 25
+entries (a write guard in `db/undo.ts`, installed by `src/db/demo.ts`), resets itself 7
+days after it was started, and More has "Reset demo" and "Bring your setup into the full
+app" (a `source: 'demo'` backup; the full app restores only the setup from it). The
+banner links to `VITE_ETSY_URL`.
 
 Do not use `npm run build -- --mode demo`: npm hands the flag to the last command in the
 script, so that builds the FULL app and then fails.
