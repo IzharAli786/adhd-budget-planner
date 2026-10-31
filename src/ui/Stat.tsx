@@ -12,7 +12,8 @@ interface StatProps {
 /** A labelled number. Money values announce politely when they change (PLAN §8). */
 export function Stat({ label, value, hint, size = 'md', className }: StatProps) {
   return (
-    <div className={className}>
+    // The hero size is measured against this box (cqi), so it never outgrows its column.
+    <div className={cx(size === 'hero' && '@container', className)}>
       <p className="text-sm text-muted">{label}</p>
       <p
         aria-live="polite"

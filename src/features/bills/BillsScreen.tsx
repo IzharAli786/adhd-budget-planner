@@ -142,7 +142,9 @@ function BillsView({
 
   return (
     <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
-      <div className="space-y-6 lg:sticky lg:top-10">
+      {/* Sticky only when summary + calendar fit the window: on a short laptop a sticky
+          column taller than the viewport would hide the calendar's last weeks. */}
+      <div className="space-y-6 lg:[@media(min-height:52rem)]:sticky lg:[@media(min-height:52rem)]:top-10">
         {bills.length === 0 ? (
           <EmptyState
             art="calendar"
@@ -158,7 +160,7 @@ function BillsView({
             until it’s paid.
           </EmptyState>
         ) : (
-          <section className="card p-6">
+          <section className="card @container p-6">
             <p className="text-sm text-muted">
               {period.fromPayday ? 'Left to pay before payday' : 'Left to pay this month'}
             </p>

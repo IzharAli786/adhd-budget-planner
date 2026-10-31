@@ -217,3 +217,45 @@ describe('Today', () => {
     expect((await hero()).textContent).toBe('€30.86')
   })
 })
+
+describe('Coming up', () => {
+  const comingUp = async () => within(await screen.findByRole('region', { name: 'Coming up' }))
+
+  it('lists the next three bills and paydays in date order, read-only', async () => {
+    await salary()
+    await r.addBill({ name: 'Rent', amount: 95000, rule: monthly(20), autopay: false })
+    await r.addBill({ name: 'Phone', amount: 2500, rule: monthly(8), autopay: true })
+    await r.addBill({ name: 'Gym', amount: 3000, rule: monthly(12), autopay: false })
+    await r.addCheckIn(200000, '2026-11-04', EARLIER)
+    render(<App />)
+    const list = await comingUp()
+    const rows = list.getAllByRole('listitem').map((li) => li.textContent)
+    // Salary (30 Nov) is fourth, so it waits its turn.
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toContain('Phone')
+    expect(rows[0]).toContain('autopay')
+    expect(rows[1]).toContain('Gym')
+    expect(rows[2]).toContain('Rent')
+    // A glance, not a to-do list: nothing to tick here.
+    expect(list.queryByRole('checkbox')).toBeNull()
+    expect(list.getByRole('link', { name: /All bills/ }).getAttribute('href')).toBe('/bills')
+  })
+
+  it('shows a payday as money in', async () => {
+    await salary()
+    await r.addCheckIn(200000, '2026-11-04', EARLIER)
+    render(<App />)
+    const row = (await comingUp()).getByRole('listitem')
+    expect(row.textContent).toContain('Payday')
+    expect(row.textContent).toContain('+€2,100.00')
+  })
+
+  it('stays out of Just today', async () => {
+    await salary()
+    await r.addCheckIn(200000, '2026-11-04', EARLIER)
+    render(<App />)
+    await comingUp()
+    await userEvent.click(screen.getByRole('button', { name: 'Just today' }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Coming up' })).toBeNull())
+  })
+})

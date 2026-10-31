@@ -132,16 +132,17 @@
 
 /*
  * Type scale: display (the hero number), figure (a screen's secondary number), title (h1),
- * heading (h2), body and caption, used 
- * everywhere instead of one-off sizes, so screens share a
- * rhythm. rem-based, so Large text (the root scale) grows all of them together.
+ * heading (h2), body and caption, used everywhere instead of one-off sizes, so screens
+ * share a rhythm. rem-based, so Large text (the root scale) grows all of them together.
+ * The two number sizes scale with their card (cqi, inside an @container), not the
+ * viewport: on wide screens the hero sits in a narrower column, and vw would overflow it.
  */
 @theme {
-  --text-display: clamp(3rem, 15vw, 4.75rem);
+  --text-display: clamp(3rem, 19cqi, 4.75rem);
   --text-display--line-height: 1;
   --text-display--letter-spacing: -0.035em;
   --text-display--font-weight: 600;
-  --text-figure: clamp(2.25rem, 10vw, 2.75rem);
+  --text-figure: clamp(2.25rem, 13cqi, 2.75rem);
   --text-figure--line-height: 1.05;
   --text-figure--letter-spacing: -0.03em;
   --text-figure--font-weight: 600;
@@ -221,8 +222,12 @@ body {
   outline-offset: 2px;
   box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 18%, transparent);
 }
-/* Headings get programmatic focus after navigation (tabindex=-1); no ring for those. */
-[tabindex='-1']:focus-visible {
+/*
+ * Headings get programmatic focus after navigation (tabindex=-1); no ring for those.
+ * Only headings: roving-tabindex controls (segmented, theme swatches, calendar days)
+ * also carry tabindex=-1 for a moment while arrow keys move focus, and must keep a ring.
+ */
+:is(h1, h2, h3)[tabindex='-1']:focus-visible {
   outline: none;
   box-shadow: none;
 }

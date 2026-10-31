@@ -181,11 +181,14 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
     <>
       <div
         className={cx(
-          !lite && 'lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-x-8',
+          // "Just today" has no side column, so it keeps the calm reading width.
+          lite
+            ? 'lg:max-w-2xl'
+            : 'lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-x-8',
         )}
       >
         <div className="space-y-5">
-          <section aria-label="Today’s number" className="card-hero p-6 sm:p-7">
+          <section aria-label="Today’s number" className="card-hero @container p-6 sm:p-7">
             <p className="text-body text-muted">
               {short ? 'Before payday' : over ? 'Today' : 'You can spend today'}
             </p>
@@ -193,8 +196,8 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
               aria-live="polite"
               className={cx(
                 'mt-2 leading-none font-semibold tracking-tight tabular-nums',
-                // Long amounts ("€12,345.67") step down so they never overflow a 390px card.
-                heroAmount.length > 8 ? 'text-[clamp(2.25rem,11vw,3.75rem)]' : 'text-display',
+                // Long amounts ("€12,345.67") step down so they never overflow the card.
+                heroAmount.length > 8 ? 'text-[clamp(2.25rem,14cqi,3.75rem)]' : 'text-display',
               )}
             >
               <AnimatedNumber value={heroAmount} />
