@@ -121,6 +121,7 @@ export function useTodayModel(today: ISODate, now: Instant) {
     actionState,
     snoozes: snoozes ?? {},
     checkIn,
+    incomes: incomes ?? [],
     transactions: transactions ?? [],
     envelopes: envelopes ?? [],
     impulse: impulse ?? [],

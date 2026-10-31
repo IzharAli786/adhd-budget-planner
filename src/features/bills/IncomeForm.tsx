@@ -157,7 +157,7 @@ export function IncomeForm({ id, income, showPrimary, today, onSubmit }: IncomeF
         symbol={f.symbol}
         decimals={f.decimals}
         error={shown.amount}
-        hint="What actually lands in your account, after tax."
+        hint="What actually lands in your account, after tax. Today’s number doesn’t change when you edit this: pay counts once it’s in your account."
       />
 
       <Field id={kindId} label="How often">

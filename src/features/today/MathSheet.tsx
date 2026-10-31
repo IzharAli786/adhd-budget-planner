@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import type { Runway } from '../../domain/runway'
 import { simpleLines, type SafeToSpend } from '../../domain/safeToSpend'
-import type { ISODate } from '../../domain/types'
+import type { Cents, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { Segmented } from '../../ui/Segmented'
 import { Sheet } from '../../ui/Sheet'
@@ -19,13 +19,15 @@ interface Props {
   safe: SafeToSpend
   runway: Runway
   today: ISODate
+  /** Shown, never summed: pay that hasn't landed isn't money you can spend yet. */
+  nextPay?: { date: ISODate; amount: Cents }
 }
 
 /**
  * "See the math": renders the very lines safeToSpend() summed, so the breakdown can't
  * disagree with the hero. Simple mode shows 4 lines, Full every line with its items.
  */
-export function MathSheet({ open, onClose, safe, runway, today }: Props) {
+export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props) {
   const f = useFormat()
   const { settings } = useAppSettings()
   const [view, setView] = useState<'simple' | 'full'>(settings.simpleMode ? 'simple' : 'full')
@@ -101,6 +103,17 @@ export function MathSheet({ open, onClose, safe, runway, today }: Props) {
           </div>
         )}
       </dl>
+      {nextPay && (
+        <p className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-sm">
+          <span className="font-medium">
+            Next pay: {f.money(nextPay.amount)} on {f.day(nextPay.date)}.
+          </span>{' '}
+          <span className="text-muted">
+            Not counted yet. It joins this number once it’s in your account and you update your
+            balance.
+          </span>
+        </p>
+      )}
       <p className="mt-3 rounded-2xl bg-bg px-4 py-3 text-sm text-muted">{safe.estimateNote}</p>
     </Sheet>
   )

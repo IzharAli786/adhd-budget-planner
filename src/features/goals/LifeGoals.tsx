@@ -41,6 +41,25 @@ const STATUS_OPTIONS = (['todo', 'doing', 'done'] as const).map((value) => ({
 // In progress first: what you're working on now, then what's next, then what's done.
 const ORDER: Record<LifeGoalStatus, number> = { doing: 0, todo: 1, done: 2 }
 
+// Each status reads differently at a glance, never by colour alone (the label is always
+// there): a dashed "slot" waiting, the accent while it's moving, a calm green when done.
+// --env-sage is the contrast-tested envelope green, with its own dark-mode value.
+const STATUS_CARD: Record<LifeGoalStatus, string> = {
+  todo: 'card-quiet border border-dashed border-line',
+  doing: 'ring-2 ring-accent/40',
+  done: 'card-quiet',
+}
+const STATUS_ICON: Record<LifeGoalStatus, string> = {
+  todo: 'border border-dashed border-muted/60 text-muted',
+  doing: 'bg-accent-soft text-accent',
+  done: 'bg-(--env-sage) text-surface',
+}
+const STATUS_PILL: Record<LifeGoalStatus, string> = {
+  todo: 'bg-bg text-muted ring-1 ring-line',
+  doing: 'bg-accent-soft text-accent',
+  done: 'bg-(--env-sage) text-surface',
+}
+
 /**
  * Life goals on Goals: the why behind the numbers ("Move to Lisbon", "Debt-free by 40").
  * Free-form and pressure-free: no countdowns, no "overdue", just where each one stands,
@@ -75,7 +94,11 @@ export function LifeGoalsCard({ today }: { today: ISODate }) {
           )}
         </div>
         {goals.length > 0 && (
-          <Button variant="ghost" onClick={() => setEditing('new')}>
+          <Button
+            variant="ghost"
+            className="shrink-0 whitespace-nowrap"
+            onClick={() => setEditing('new')}
+          >
             <Icon name="plus" size={18} />
             New goal
           </Button>
@@ -150,13 +173,13 @@ function GoalRow({
   const next: LifeGoalStatus = goal.status === 'todo' ? 'doing' : 'done'
 
   return (
-    <li className={cx('card p-4', isDone && 'card-quiet')}>
+    <li className={cx('card p-4', STATUS_CARD[goal.status])}>
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           className={cx(
             'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full',
-            isDone ? 'bg-accent text-accent-contrast' : 'bg-accent-soft text-accent',
+            STATUS_ICON[goal.status],
           )}
         >
           <Icon
@@ -165,13 +188,20 @@ function GoalRow({
           />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold break-words">{goal.title}</h3>
-          <p className="mt-0.5 text-sm text-muted">
-            {STATUS_LABEL[goal.status]}
+          <h3 className={cx('font-semibold break-words', isDone && 'text-muted')}>{goal.title}</h3>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+            <span
+              className={cx(
+                'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                STATUS_PILL[goal.status],
+              )}
+            >
+              {STATUS_LABEL[goal.status]}
+            </span>
             {isDone && goal.doneAt
-              ? ` · ${f.month(goal.doneAt.slice(0, 10))}`
+              ? f.month(goal.doneAt.slice(0, 10))
               : goal.targetDate
-                ? ` · ${goal.targetDate < today ? 'Hoped for' : 'Aiming for'} ${f.month(goal.targetDate)}`
+                ? `${goal.targetDate < today ? 'Hoped for' : 'Aiming for'} ${f.month(goal.targetDate)}`
                 : ''}
           </p>
           {goal.why && (

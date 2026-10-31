@@ -153,6 +153,28 @@ describe('acceptance: "12 coffee" (PLAN §10 M5)', () => {
     )
   })
 
+  // Pay that hasn't landed isn't money yet: a new amount must not move today's number,
+  // but a different payday must, because the money has to last a different number of days.
+  it('the pay amount never moves today; the payday date does', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 1_000_000 }), (amount) => {
+        const before = planToday(world)
+        const after = planToday({ ...world, incomes: [{ ...world.incomes[0]!, amount }] })
+        if (before.kind !== 'ready' || after.kind !== 'ready') throw new Error('not ready')
+        expect(after.safe.total).toBe(before.safe.total)
+        expect(after.runway.perDay).toBe(before.runway.perDay)
+      }),
+    )
+    const sooner = planToday({
+      ...world,
+      incomes: [{ ...world.incomes[0]!, schedule: { kind: 'monthly', day: 10 } }],
+    })
+    const later = planToday(world)
+    if (sooner.kind !== 'ready' || later.kind !== 'ready') throw new Error('not ready')
+    expect(sooner.runway.daysLeft).toBeLessThan(later.runway.daysLeft)
+    expect(sooner.runway.perDay).toBeGreaterThan(later.runway.perDay)
+  })
+
   it('reports what is missing before there is a number', () => {
     expect(planToday({ ...world, incomes: [] }).kind).toBe('no-income')
     expect(

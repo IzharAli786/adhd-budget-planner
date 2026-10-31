@@ -175,7 +175,15 @@ function IncomeEditor({
   async function save(input: IncomeInput) {
     if (income) await updateIncome(income.id, input)
     else await addIncome({ ...input, active: true })
-    undoToast(income ? `Saved ${input.name}` : `Added ${input.name}`)
+    // A new amount looks like it "did nothing" on Today, so say why right where it happens.
+    const amountChanged = income !== undefined && income.amount !== input.amount
+    undoToast(
+      amountChanged
+        ? `Saved ${input.name}. Today’s number changes when this pay lands`
+        : income
+          ? `Saved ${input.name}`
+          : `Added ${input.name}`,
+    )
     onClose()
   }
 

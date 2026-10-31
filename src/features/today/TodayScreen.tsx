@@ -5,6 +5,7 @@ import { useUndoToast } from '../../app/useUndoToast'
 import { catchUp, type CatchUp } from '../../domain/catchUp'
 import { greeting } from '../../domain/greeting'
 import { nextAction } from '../../domain/nextAction'
+import { primaryIncome } from '../../domain/paySchedule'
 import { recordCarryOver } from '../../db/repos'
 import type { Cents, Instant, ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
@@ -192,6 +193,8 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
   }
 
   const { safe, runway, period } = plan
+  const pay = primaryIncome(model.incomes)
+  const nextPay = pay ? { date: period.end, amount: pay.amount } : undefined
   const short = safe.status === 'short'
   const over = !short && runway.leftToday < 0
   const heroAmount = f.money(short ? -safe.total : over ? -runway.leftToday : runway.leftToday)
@@ -310,6 +313,7 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         safe={safe}
         runway={runway}
         today={today}
+        nextPay={nextPay}
       />
       <CanFitSheet
         open={panel === 'fit'}
