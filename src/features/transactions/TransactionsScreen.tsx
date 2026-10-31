@@ -1,16 +1,10 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useId, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
-import { csvFile, csvFileName, transactionsToCsv } from '../../db/csv'
-import {
-  useDebts,
-  useEnvelopes,
-  useFunds,
-  useIncomes,
-  usePaydayOverrides,
-  useTransactions,
-} from '../../db/hooks'
+import { csvFile, csvFileName, csvNames, transactionsToCsv } from '../../db/csv'
+import { useEnvelopes, useIncomes, usePaydayOverrides, useTransactions } from '../../db/hooks'
 import { deleteTransaction, updateTransaction } from '../../db/repos'
 import { groupByDate } from '../../domain/bills'
 import { addDays, isValidISODate } from '../../domain/dates'
@@ -66,7 +60,13 @@ export function TransactionsScreen() {
   const today = useToday()
   const { locale } = useAppSettings().settings
   const transactions = useTransactions()
-  const envelopes = useEnvelopes()
+  // Every envelope, deleted ones too: an entry keeps its envelope until the 30-day purge,
+  // so its label, its filter chip and the CSV still name it.
+  const names = useLiveQuery(csvNames)
+  const envelopes = useMemo(
+    () => names && [...names.envelopes].sort((a, b) => a.sort - b.sort),
+    [names],
+  )
   const incomes = useIncomes()
   const overrides = usePaydayOverrides()
   const [editing, setEditing] = useState<Transaction | null>(null)
@@ -158,7 +158,7 @@ export function TransactionsScreen() {
                 setEnvelopeId(undefined)
               }}
             />
-            <Summary rows={rows} range={selected} transactions={transactions} />
+            <Summary rows={rows} range={selected} transactions={transactions} names={names} />
             <div className="space-y-3">
               <label className="block">
                 <span className="sr-only">Search notes</span>
@@ -257,6 +257,14 @@ function TransactionRow({
   onOpen: () => void
 }) {
   const f = useFormat()
+  // A move into savings or a debt payment leaves the balance but isn't spending: say so.
+  const kind = t.fundId
+    ? t.amount < 0
+      ? 'Into savings'
+      : 'From savings'
+    : t.debtId
+      ? 'Debt payment'
+      : null
   return (
     <li>
       <button
@@ -268,9 +276,10 @@ function TransactionRow({
           <span className="block truncate font-medium">
             {t.note || (t.amount < 0 ? 'Spent' : 'Money in')}
           </span>
-          {(envelope || t.inBalance) && (
+          {(envelope || t.inBalance || kind) && (
             <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
               {envelope && <EnvelopeLabel name={envelope.name} color={envelope.color} />}
+              {kind && <span>{kind}</span>}
               {t.inBalance && <span>Already in balance</span>}
             </span>
           )}
@@ -349,29 +358,28 @@ function Summary({
   rows,
   range,
   transactions,
+  names,
 }: {
   rows: readonly Transaction[]
   range: RangeOption
   transactions: readonly Transaction[]
+  names: Awaited<ReturnType<typeof csvNames>> | undefined
 }) {
   const f = useFormat()
   const today = useToday()
   const toast = useToast()
   const { currency, decimals } = useAppSettings().settings
-  const envelopes = useEnvelopes()
-  const funds = useFunds()
-  const debts = useDebts()
   const totals = logTotals(rows)
   // Built as the list changes, never in the tap: iOS share must run inside the click.
   const file = useMemo(() => {
-    if (rows.length === 0) return undefined
-    const text = transactionsToCsv([...rows], { currency, decimals, envelopes, funds, debts })
+    if (rows.length === 0 || !names) return undefined
+    const text = transactionsToCsv([...rows], { currency, decimals, ...names })
     const name =
       range.range.kind === 'all'
         ? csvFileName('transactions', today)
         : `steady-transactions-${range.range.start}-to-${addDays(range.range.end, -1)}.csv`
     return csvFile(name, text)
-  }, [rows, currency, decimals, envelopes, funds, debts, range, today])
+  }, [rows, currency, decimals, names, range, today])
 
   return (
     <section aria-label="Totals" className="card p-5">

@@ -444,6 +444,14 @@ describe('notes (schema v3)', () => {
     expect(await db.notes.get('period|2026-10-30')).toEqual(periodNote)
   })
 
+  it('an app still on v2 refuses a v3 file instead of dropping its notes', async () => {
+    const file: Loose = await fixtureFile()
+    file.data.notes = [dayNote]
+    const result = validateBackup(file, 2, {})
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('newer-schema')
+  })
+
   it('an older v2 file without a notes table still restores, with no notes', async () => {
     const file: Loose = await fixtureFile()
     file.schemaVersion = 2

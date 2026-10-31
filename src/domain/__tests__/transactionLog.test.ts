@@ -209,6 +209,16 @@ describe('savingsOnPaydays', () => {
     ])
   })
 
+  it('a fund nearly at its target asks only for what is left', () => {
+    const out = savingsOnPaydays(
+      paydays,
+      [fund({ target: 10000, perPeriod: 4000 })],
+      'pay',
+      new Map([['f', 9250]]),
+    )
+    expect(out.get('2026-11-06')).toEqual([{ fundId: 'f', name: 'Holiday', amount: 750 }])
+  })
+
   it('is empty with no period income or no fund asking', () => {
     expect(savingsOnPaydays(paydays, [fund({})], undefined).size).toBe(0)
     expect(savingsOnPaydays(paydays, [], 'pay').size).toBe(0)

@@ -68,7 +68,7 @@ describe('Transaction log', () => {
     expect(within(totals).getByText('€50.00')).toBeTruthy() // in
     // Envelope chip per row.
     const coffee = screen.getByRole('button', { name: /coffee/ })
-    expect(within(coffee).getByText('Eating out')).toBeTruthy()
+    expect(await within(coffee).findByText('Eating out')).toBeTruthy()
   })
 
   it('switches to the last pay period, a month, or everything', async () => {
@@ -111,6 +111,16 @@ describe('Transaction log', () => {
     const totals = await open()
     const link = await within(totals).findByRole('link', { name: 'Export for spreadsheets (CSV)' })
     expect(link.getAttribute('download')).toBe('steady-transactions-2026-10-30-to-2026-11-29.csv')
+  })
+
+  it('an entry in a deleted envelope keeps its label and filter chip', async () => {
+    const eating = (await r.listEnvelopes()).find((e) => e.name === 'Eating out')!
+    await r.deleteEnvelope(eating.id)
+    await open()
+    const coffee = await screen.findByRole('button', { name: /coffee/ })
+    await waitFor(() => expect(within(coffee).getByText('Eating out')).toBeTruthy())
+    const filter = screen.getByRole('group', { name: 'Envelope' })
+    expect(within(filter).getByRole('button', { name: 'Eating out' })).toBeTruthy()
   })
 
   it('editing still works from a filtered list, with undo', async () => {

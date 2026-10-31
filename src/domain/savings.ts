@@ -64,7 +64,7 @@ export interface PaydaySaving {
  * What each payday sets aside, for the calendar ("Set aside €40 for Holiday"). Only the
  * paydays of the income that defines the period: perPeriod is "per paycheck period", so
  * a side gig's payday reserving it again would double the plan. Funds that already reached
- * their target (per `saved`) ask for nothing more.
+ * their target (per `saved`) ask for nothing more, and one nearly there asks only for the rest.
  */
 export function savingsOnPaydays(
   paydays: readonly { date: ISODate; incomeId: Id }[],
@@ -72,20 +72,17 @@ export function savingsOnPaydays(
   periodIncomeId: Id | undefined,
   saved: ReadonlyMap<Id, Cents> = new Map(),
 ): Map<ISODate, PaydaySaving[]> {
-  const asking = funds.filter(
-    (f) =>
-      f.deletedAt === undefined &&
-      f.perPeriod > 0 &&
-      (f.target === undefined || (saved.get(f.id) ?? f.openingSaved) < f.target),
-  )
+  // A fund 10 short of its target asks for 10, not the full perPeriod.
+  const asking = funds.flatMap((f) => {
+    if (f.deletedAt !== undefined || f.perPeriod <= 0) return []
+    const left = f.target === undefined ? Infinity : f.target - (saved.get(f.id) ?? f.openingSaved)
+    return left > 0 ? [{ fundId: f.id, name: f.name, amount: Math.min(f.perPeriod, left) }] : []
+  })
   const out = new Map<ISODate, PaydaySaving[]>()
   if (asking.length === 0 || periodIncomeId === undefined) return out
   for (const p of paydays) {
     if (p.incomeId !== periodIncomeId || out.has(p.date)) continue
-    out.set(
-      p.date,
-      asking.map((f) => ({ fundId: f.id, name: f.name, amount: f.perPeriod })),
-    )
+    out.set(p.date, asking)
   }
   return out
 }

@@ -38,8 +38,15 @@ export function CanFitSheet({ open, onClose, total, runway, envelopes }: Props) 
   )
 }
 
-export function CanFitForm({ total, runway, envelopes = [] }: Omit<Props, 'open' | 'onClose'>) {
+export function CanFitForm({
+  total,
+  runway,
+  envelopes: all = [],
+}: Omit<Props, 'open' | 'onClose'>) {
   const f = useFormat()
+  // Only envelopes with a budget hold room. The common-categories set starts with empty
+  // budgets, and eleven "€0.00 left" chips would bury the question under noise.
+  const envelopes = all.filter((e) => e.budget > 0)
   const [price, setPrice] = useState<Cents | null>(null)
   const [from, setFrom] = useState<Id | null>(null)
   const envelope = envelopes.find((e) => e.id === from)

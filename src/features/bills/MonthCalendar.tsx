@@ -30,9 +30,10 @@ const EMPTY_NOTES: ReadonlySet<ISODate> = new Set()
 const ARROWS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
 
 /**
- * Month view: a dot for bills, a diamond for debt minimums, a ring for paydays, a small
- * square where a payday sets savings aside and a dash for a note. Shape, not only colour,
- * tells them apart (PLAN §8), and every day button speaks its full content.
+ * Month view: a dot for bills, a diamond for debt minimums, a ring for paydays and a dash
+ * for a note. Shape, not only colour, tells them apart (PLAN §8), and every day button
+ * speaks its full content. What a payday sets aside is spoken and shown in the day sheet,
+ * not drawn: it falls on every main payday, so a mark of its own would only add clutter.
  * Keyboard: one Tab stop for the whole month (roving tabindex), arrows move by day and
  * week, Home/End to the week's ends, Page Up/Down by month, as in the ARIA date grid.
  */
@@ -185,14 +186,6 @@ export function MonthCalendar({
                     )}
                   />
                 )}
-                {saving > 0 && (
-                  <span
-                    className={cx(
-                      'h-[5px] w-[5px] rounded-[1px]',
-                      isToday ? 'bg-accent-contrast' : 'bg-text',
-                    )}
-                  />
-                )}
                 {hasNote && (
                   <span
                     className={cx(
@@ -223,11 +216,6 @@ export function MonthCalendar({
         <span className="inline-flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full border-[1.5px] border-text" /> Payday
         </span>
-        {dates.some((d) => savings.has(d)) && (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-[5px] w-[5px] rounded-[1px] bg-text" /> Savings
-          </span>
-        )}
         {dates.some((d) => notes.has(d)) && (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-[1.5px] w-2 rounded-full bg-muted" /> Note

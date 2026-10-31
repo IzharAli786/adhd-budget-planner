@@ -20,7 +20,9 @@ import { db } from './schema'
 
 // A spreadsheet runs a cell starting with these as a formula (tab and CR too, since some
 // apps trim them first). OWASP's fix: a leading apostrophe, which shows as plain text.
-const FORMULA_START = /^[=+\-@\t\r]/
+// Also after leading spaces (an import that trims them would then see "="), and the
+// full-width forms an East Asian keyboard types, which some spreadsheets read as ASCII.
+export const FORMULA_START = /^[\t\r]|^\s*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/
 
 /** One text cell: formula-guarded, then quoted if it needs to be. */
 export function csvText(value: string): string {
@@ -158,20 +160,31 @@ export const csvFile = (name: string, text: string) =>
 export const csvFileName = (what: 'transactions' | 'bills', today: ISODate) =>
   `steady-${what}-${today}.csv`
 
+/**
+ * Every envelope, fund and debt by id, deleted ones too: an old entry still names the
+ * envelope or fund it went to (it keeps the link until the 30-day purge).
+ */
+export async function csvNames(): Promise<{
+  envelopes: Envelope[]
+  funds: SavingsFund[]
+  debts: Debt[]
+}> {
+  const [envelopes, funds, debts] = await Promise.all([
+    db.envelopes.toArray(),
+    db.funds.toArray(),
+    db.debts.toArray(),
+  ])
+  return { envelopes, funds, debts }
+}
+
 /** Built ahead of the tap, like the backup file (iOS share needs it ready). */
 export async function prepareCsvFile(
   what: 'transactions' | 'bills',
   now: Date = new Date(),
 ): Promise<File> {
   const today = todayISO(now)
-  const [settings, envelopes, funds, debts] = await Promise.all([
-    getSettings(),
-    // Deleted ones too: an old entry still names the envelope or fund it went to.
-    db.envelopes.toArray(),
-    db.funds.toArray(),
-    db.debts.toArray(),
-  ])
-  const ctx = { currency: settings.currency, decimals: settings.decimals, envelopes, funds, debts }
+  const [settings, names] = await Promise.all([getSettings(), csvNames()])
+  const ctx = { currency: settings.currency, decimals: settings.decimals, ...names }
   const text =
     what === 'transactions'
       ? transactionsToCsv(await listTransactions(), ctx)

@@ -5,6 +5,7 @@ import {
   billsToCsv,
   csvFile,
   csvText,
+  FORMULA_START,
   decimalAmount,
   prepareCsvFile,
   repeatText,
@@ -59,8 +60,13 @@ describe('csvText', () => {
     ['@SUM(A1)', "'@SUM(A1)"],
     ['\tcmd', "'\tcmd"],
     ['\r=1', '"\'\r=1"'],
-    // Only the FIRST character matters.
+    // After leading spaces, and the full-width forms, too.
+    [' =1+1', "' =1+1"],
+    ['\u00a0@SUM(A1)', "'\u00a0@SUM(A1)"],
+    ['\uFF1D1+1', "'\uFF1D1+1"],
+    // Only the first character that isn't a space matters.
     ['a=1', 'a=1'],
+    ['  lunch', '  lunch'],
   ])('%j -> %j', (input, expected) => {
     expect(csvText(input)).toBe(expected)
   })
@@ -74,8 +80,8 @@ describe('csvText', () => {
           expect(parsed).toHaveLength(cells.length)
           parsed!.forEach((got, i) => {
             const want = cells[i]!
-            expect(got).toBe(/^[=+\-@\t\r]/.test(want) ? `'${want}` : want)
-            expect(/^[=+\-@\t\r]/.test(got)).toBe(false)
+            expect(got).toBe(FORMULA_START.test(want) ? `'${want}` : want)
+            expect(FORMULA_START.test(got)).toBe(false)
           })
         },
       ),
