@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
-import { quickAdd, unlockAndSetup } from './helpers'
+import { ensureFullMode, quickAdd, unlockAndSetup } from './helpers'
 
 test('common categories, an @tag chip, the log filter and a CSV export', async ({
   page,
@@ -10,8 +10,7 @@ test('common categories, an @tag chip, the log filter and a CSV export', async (
     Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined })
   })
   await unlockAndSetup(page)
-  await page.goto('/more')
-  await page.getByRole('switch', { name: 'Show more tools' }).click()
+  await ensureFullMode(page)
 
   await page.goto('/plan')
   await page.getByRole('switch', { name: 'Use envelopes' }).click()

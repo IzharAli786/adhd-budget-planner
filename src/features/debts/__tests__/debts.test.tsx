@@ -32,6 +32,7 @@ const loan = { ...card, name: 'Car loan', balance: 60000, aprBps: 2400 }
 
 describe('Debts', () => {
   it('Simple mode: More links to Debt payoff, whose empty state names the next step', async () => {
+    await r.updateSettings({ simpleMode: true })
     window.history.replaceState(null, '', '/more')
     render(<App />)
     await userEvent.click(await screen.findByRole('link', { name: /Debt payoff/ }))

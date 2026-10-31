@@ -77,7 +77,7 @@ function EditorBody({
   return (
     <>
       <DebtForm id={formId} debt={debt} onSubmit={(v) => void save(v)} />
-      <div className="sticky bottom-0 -mx-6 mt-2 flex flex-col-reverse gap-2 bg-surface px-6 pt-3 pb-4 sm:flex-row sm:items-center">
+      <div className="sticky -bottom-2 -mx-6 mt-2 flex flex-col-reverse gap-2 border-t border-line bg-surface px-6 pt-3 pb-6 sm:flex-row sm:items-center">
         {debt && (
           <Button
             variant="ghost"

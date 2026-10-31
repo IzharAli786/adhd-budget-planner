@@ -56,7 +56,7 @@ const FAQ: readonly { q: string; a: ReactNode }[] = [
   },
   {
     q: 'Simple or Full?',
-    a: 'Simple shows Today, Bills and More: enough for most days. “Show more tools” in More adds Plan and Goals for savings, debts and envelopes. Switching never deletes anything.',
+    a: 'Steady starts with every tab. Turning off “Show more tools” in More gives a simpler app with just Today, Bills and More. Switching never deletes anything.',
   },
   {
     q: 'Is my data private?',

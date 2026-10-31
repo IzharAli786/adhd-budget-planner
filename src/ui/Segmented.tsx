@@ -45,7 +45,9 @@ export function Segmented<T extends string | number>({
       role="radiogroup"
       aria-label={label}
       onKeyDown={onKeyDown}
-      className="flex rounded-full bg-bg p-1 ring-1 ring-line"
+      // Wraps to a second row on narrow phones instead of squeezing labels ("2 weeks" broke
+      // in two and "Yearly" was clipped at 360px with five options).
+      className="flex flex-wrap gap-y-1 rounded-3xl bg-bg p-1 ring-1 ring-line"
     >
       {options.map((o, i) => {
         const selected = o.value === value
@@ -60,7 +62,7 @@ export function Segmented<T extends string | number>({
             tabIndex={i === tabStop ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cx(
-              'min-h-11 flex-1 rounded-full px-3 text-sm font-medium transition-colors',
+              'min-h-11 flex-1 rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
               selected
                 ? 'bg-surface text-text shadow-card ring-1 ring-line'
                 : 'text-muted hover:text-text',

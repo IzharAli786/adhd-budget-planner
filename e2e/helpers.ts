@@ -76,3 +76,11 @@ export async function addFirstBill(page: Page, name: string, amount: string) {
   await sheet.getByRole('button', { name: 'Add bill' }).click()
   await expect(sheet).toBeHidden()
 }
+
+/** Plan and Goals on. Checks the switch instead of clicking blind, so it holds whatever the default. */
+export async function ensureFullMode(page: Page) {
+  await page.goto('/more')
+  const toggle = page.getByRole('switch', { name: 'Show more tools' })
+  if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+}

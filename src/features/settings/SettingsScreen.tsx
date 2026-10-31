@@ -137,7 +137,7 @@ export function SettingsScreen() {
             <div className="min-w-0 flex-1 py-1.5">
               <p className="font-medium">Show more tools</p>
               <p className="text-sm text-muted">
-                Adds Plan and Goals. Turning it off hides them; nothing is deleted.
+                Shows Plan and Goals. Turn it off for a simpler app; nothing is deleted.
               </p>
             </div>
             <Switch

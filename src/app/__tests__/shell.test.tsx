@@ -28,7 +28,13 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('tabs in Simple and Full mode (PLAN §5)', () => {
-  it('Simple mode (the default) shows Today, Bills, More', async () => {
+  it('new installs show every tab, in thumb order', async () => {
+    await renderAt('/')
+    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Bills', 'Goals', 'More']))
+  })
+
+  it('Simple mode shows Today, Bills, More', async () => {
+    await updateSettings({ simpleMode: true })
     await renderAt('/')
     await waitFor(() => expect(tabNames()).toEqual(['Today', 'Bills', 'More']))
   })
@@ -56,6 +62,7 @@ describe('tabs in Simple and Full mode (PLAN §5)', () => {
   })
 
   it.each(['/plan', '/goals'])('%s redirects to Today in Simple mode', async (path) => {
+    await updateSettings({ simpleMode: true })
     await renderAt(path)
     await waitFor(() => expect(window.location.pathname).toBe('/'))
   })
@@ -76,13 +83,13 @@ describe('tabs in Simple and Full mode (PLAN §5)', () => {
     expect(tabNames()).toEqual(['Today', 'Bills', 'More'])
   })
 
-  it('the More toggle turns on Full mode and it persists', async () => {
+  it('the More toggle turns on Simple mode and it persists', async () => {
     await renderAt('/more')
     await userEvent.click(await screen.findByRole('switch', { name: 'Show more tools' }))
-    await waitFor(() => expect(tabNames()).toContain('Plan'))
+    await waitFor(() => expect(tabNames()).not.toContain('Plan'))
     cleanup()
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toContain('Plan'))
+    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Bills', 'More']))
   })
 
   it('unknown paths fall back to Today', async () => {

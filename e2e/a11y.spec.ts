@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { addFirstBill, logExpense, unlockAndSetup } from './helpers'
+import { addFirstBill, ensureFullMode, logExpense, unlockAndSetup } from './helpers'
 
 const SCREENS = [
   { path: '/', heading: 'Today' },
@@ -36,8 +36,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.getByRole('link', { name: 'Bills' }).first().click()
     await addFirstBill(page, 'Rent', '650')
 
-    await page.goto('/more')
-    await page.getByRole('switch', { name: 'Show more tools' }).click()
+    await ensureFullMode(page)
     await expect(page.getByRole('link', { name: 'Goals' }).first()).toBeVisible()
 
     for (const screen of SCREENS) {

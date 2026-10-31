@@ -111,6 +111,7 @@ describe('Today', () => {
   })
 
   it('"See the math": 4 simple lines that sum, ending with the estimate note', async () => {
+    await r.updateSettings({ simpleMode: true })
     await salary()
     await oldBill('Phone', 2500, 15, true)
     await r.addCheckIn(84250, '2026-11-04', EARLIER)

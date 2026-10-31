@@ -33,7 +33,7 @@ export function MoreScreen() {
           <ListRow
             icon="sparkle"
             label="Show more tools"
-            detail="Adds Plan and Goals: savings, debts, envelopes."
+            detail="Plan and Goals: savings, debts, envelopes. Off for a simpler app."
             trailing={
               <Switch
                 label="Show more tools"

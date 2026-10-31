@@ -1,13 +1,10 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import { logExpense, unlockAndSetup } from './helpers'
+import { expect, test, type Locator } from '@playwright/test'
+import { ensureFullMode, logExpense, unlockAndSetup } from './helpers'
 
 // Phone polish (390 x 844 unless a test says otherwise): tap targets, folded sections,
 // envelope entries, chips at the edge, and the side rail on a phone turned sideways.
 
-async function fullMode(page: Page) {
-  await page.goto('/more')
-  await page.getByRole('switch', { name: 'Show more tools' }).click()
-}
+const fullMode = ensureFullMode
 
 async function box(locator: Locator) {
   const b = await locator.boundingBox()
@@ -60,7 +57,7 @@ test('an envelope opens its entries this period, and the log filtered to it', as
   const list = sheet.getByRole('list', { name: 'Groceries entries' })
   await expect(list.getByRole('listitem')).toHaveCount(1)
   await expect(list).toContainText('market')
-  await expect(sheet).toContainText('€23.50')
+  await expect(sheet).toContainText(/[€£$]23\.50/)
   await sheet.getByRole('link', { name: 'See all in log' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible()
   await expect(

@@ -45,8 +45,9 @@ export const DEFAULT_SETTINGS: Settings = {
   dateStyle: 'words',
   theme: 'clay',
   mode: 'auto',
-  // New users start simple (PLAN §1.6); Full tools are one toggle away.
-  simpleMode: true,
+  // Everything visible from the start (user feedback: Plan and Goals felt hidden behind a
+  // toggle); "Show more tools" off is now the way to simplify, not the way to discover.
+  simpleMode: false,
   largeText: 100,
   reducedMotion: 'auto',
   buffer: 0,
