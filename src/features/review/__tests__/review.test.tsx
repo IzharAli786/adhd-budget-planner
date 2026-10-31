@@ -91,6 +91,26 @@ describe('Look back', () => {
     expect(screen.getByRole('button', { name: 'Next year' }).hasAttribute('disabled')).toBe(true)
   })
 
+  it('says "so far" when a year still under way is behind on paper', async () => {
+    // Steady started on 1 Nov; rent went out that day and the salary comes on the 30th.
+    await salary()
+    await r.addCheckIn(150000, '2026-11-01', local(11, 1))
+    const rent = await r.addBill({
+      name: 'Rent',
+      amount: 90000,
+      rule: { freq: 'monthly', interval: 1, day: 1, anchor: '2026-01-01' },
+      autopay: false,
+    })
+    await r.markPaid(rent.id, '2026-11-01', 90000)
+    goto('/more/review')
+    render(<App />)
+    const tiles = await screen.findByRole('region', { name: '2026 at a glance' })
+    expect(within(tiles).getByText('More out than in so far')).toBeTruthy()
+    expect(within(tiles).getByText('€900.00')).toBeTruthy()
+    const table = screen.getByRole('table')
+    expect(within(table).getByRole('row', { name: /November 2026 \(so far\)/ })).toBeTruthy()
+  })
+
   it('per payday, shows what was carried into each payday', async () => {
     await seedHistory()
     goto('/more/review')

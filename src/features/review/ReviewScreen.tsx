@@ -179,7 +179,13 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
               className="grid grid-cols-2 gap-3 lg:grid-flow-col lg:grid-cols-none lg:auto-cols-fr"
             >
               <Tile
-                label={totals.net >= 0 ? 'Left over' : 'More out than in'}
+                // A year still under way (a January with its second payday to come) says
+                // "so far", as its row does, rather than reading as a year that went wrong.
+                label={
+                  totals.net >= 0
+                    ? 'Left over'
+                    : `More out than in${rows.some((r) => r.end > today) ? ' so far' : ''}`
+                }
                 value={f.money(Math.abs(totals.net))}
                 hint={
                   totals.net >= 0
