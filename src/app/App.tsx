@@ -8,6 +8,7 @@ import { MoreScreen } from '../features/more/MoreScreen'
 import { PlanScreen } from '../features/plan/PlanScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
 import { TodayScreen } from '../features/today/TodayScreen'
+import { TransactionsScreen } from '../features/transactions/TransactionsScreen'
 import { ToastProvider } from '../ui/Toast'
 import { AppShell } from './AppShell'
 import { Boot } from './Boot'
@@ -46,6 +47,7 @@ export function App() {
                   <Route path="more" element={<MoreScreen />} />
                   <Route path="more/settings" element={<SettingsScreen />} />
                   <Route path="more/backup" element={<BackupScreen />} />
+                  <Route path="more/transactions" element={<TransactionsScreen />} />
                   <Route path="more/install" element={<InstallScreen embedded />} />
                   <Route path="start" element={<StartRoute />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
