@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useDebts } from '../../db/hooks'
 import { paidShare } from '../../domain/debt'
 import type { Debt } from '../../domain/types'
@@ -13,9 +13,17 @@ import { PayoffPlan } from './PayoffPlan'
 
 /** Debts list, editor and payoff plan. Lives in Goals (Full) and More > Debt payoff (Simple). */
 export function DebtsSection() {
-  const debts = useDebts()
+  const rows = useDebts()
   const today = useToday()
   const [editing, setEditing] = useState<DebtEditorTarget>(null)
+  // Ids are random UUIDs, so table order is too. Sort by name: the list stays put when a
+  // debt is added, and simulation ties (input order) don't shuffle between renders.
+  const debts = useMemo(
+    () =>
+      rows && [...rows].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
+    [rows],
+  )
+  const owing = debts?.some((d) => d.balance > 0) ?? false
 
   if (debts === undefined)
     return <div aria-hidden="true" className="h-48 animate-pulse rounded-[1.75rem] bg-surface" />
@@ -41,7 +49,13 @@ export function DebtsSection() {
             <Icon name="plus" size={18} />
             Add a debt
           </Button>
-          <PayoffPlan debts={debts} today={today} />
+          {owing ? (
+            <PayoffPlan debts={debts} today={today} />
+          ) : (
+            <p className="rounded-3xl bg-accent-soft/60 px-5 py-4 text-[0.9375rem]">
+              Everything here is paid off. Nice work.
+            </p>
+          )}
         </>
       )}
       <DebtEditor target={editing} today={today} onClose={() => setEditing(null)} />

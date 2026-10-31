@@ -95,11 +95,18 @@ describe('Debts', () => {
       screen.getByText('Estimate. Real lenders may calculate interest differently.'),
     ).toBeTruthy()
 
+    expect(screen.getByText(/^Not financial advice\./)).toBeTruthy()
+
     // Avalanche (default) focuses the 24% loan first; snowball the smaller card.
     const order = screen.getByRole('list', { name: 'Payoff order' })
-    expect(within(order).getAllByRole('listitem')[0]!.textContent).toMatch(/Car loan.*Focus first/)
+    const focused = () =>
+      within(order)
+        .getAllByRole('listitem')
+        .filter((li) => li.textContent?.includes('Focus first'))
+        .map((li) => li.textContent)
+    expect(focused()).toEqual([expect.stringMatching(/Car loan/)])
     await userEvent.click(screen.getByRole('radio', { name: 'Snowball' }))
-    expect(within(order).getAllByRole('listitem')[0]!.textContent).toMatch(/Visa.*Focus first/)
+    expect(focused()).toEqual([expect.stringMatching(/Visa/)])
 
     // The lazy chart arrives with its table alternative.
     const toggle = await screen.findByRole('button', { name: 'Show as a table' })
@@ -111,6 +118,66 @@ describe('Debts', () => {
     await userEvent.clear(budget)
     await userEvent.type(budget, '80')
     expect(await screen.findByText(/needs at least/)).toBeTruthy()
+  })
+
+  it('"Focus first" marks where the extra goes, even when another debt finishes first', async () => {
+    await r.updateSettings({ simpleMode: false })
+    // The 0% card clears on its own minimum in month 1; the extra goes to the loan.
+    await r.addDebt({ ...card, name: 'Store card', balance: 10000, aprBps: 0, minPayment: 10000 })
+    await r.addDebt({ ...loan, balance: 100000, aprBps: 2000, minPayment: 2000 })
+    window.history.replaceState(null, '', '/goals')
+    render(<App />)
+    const order = await screen.findByRole('list', { name: 'Payoff order' })
+    const items = within(order).getAllByRole('listitem')
+    expect(items[0]!.textContent).toMatch(/Store card/)
+    expect(items[0]!.textContent).not.toMatch(/Focus first/)
+    expect(items[1]!.textContent).toMatch(/Car loan.*Focus first/)
+  })
+
+  it('a budget that never finishes says so instead of showing a 50-year total', async () => {
+    await r.addDebt({ ...loan, name: 'Store card', balance: 100000, minPayment: 1500 })
+    window.history.replaceState(null, '', '/more/debts')
+    render(<App />)
+    const budget = await screen.findByRole('textbox', { name: 'Each month toward debts' })
+    await userEvent.clear(budget)
+    await userEvent.type(budget, '15')
+    expect(await screen.findByText(/no finish date within 50 years/)).toBeTruthy()
+    expect(screen.getAllByText('Still adding up')).toHaveLength(2)
+    expect(screen.queryByText(/Avalanche saves/)).toBeNull()
+    expect(
+      within(screen.getByRole('list', { name: 'Payoff order' })).getByText(/Store card/),
+    ).toBeTruthy()
+  })
+
+  it('setting a balance to 0 marks it paid off and takes its minimum out of Bills', async () => {
+    const { debt } = await r.addDebt(card)
+    window.history.replaceState(null, '', '/more/debts')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /Visa/ }))
+    const sheet = await screen.findByRole('dialog', { name: 'Edit Visa' })
+    const balance = within(sheet).getByRole('textbox', { name: 'Balance today' })
+    await userEvent.clear(balance)
+    await userEvent.type(balance, '0')
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
+    await waitFor(async () => expect((await r.getDebt(debt.id))?.balance).toBe(0))
+    expect(await screen.findByText(/Everything here is paid off/)).toBeTruthy()
+    expect(screen.getByText('Paid off')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Your payoff plan' })).toBeNull()
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id && !b.until)).toHaveLength(0)
+  })
+
+  it('a new debt needs something owed', async () => {
+    window.history.replaceState(null, '', '/more/debts')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a debt' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Add a debt' })
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Name' }), 'Visa')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Balance today' }), '0')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Interest (APR)' }), '0')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Minimum payment' }), '50')
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Add debt' }))
+    expect(await within(sheet).findByText(/Nothing owed on this one/)).toBeTruthy()
+    expect(await r.listDebts()).toHaveLength(0)
   })
 
   it('warns when a minimum does not cover the interest', async () => {

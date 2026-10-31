@@ -123,7 +123,8 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
           </svg>
           Snowball
         </span>
-        <span>Total owed, starting at {f.money(max)}</span>
+        {/* The start, not the peak: with interest outrunning a minimum, the peak comes later. */}
+        <span>Total owed, starting at {f.money(snowball[0] ?? 0)}</span>
         <button
           type="button"
           aria-expanded={showTable}

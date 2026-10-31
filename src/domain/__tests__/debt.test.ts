@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  BALANCE_GUARD,
   compare,
   defaultBudget,
   monthlyInterest,
@@ -172,6 +173,32 @@ describe('simulate (PLAN §4.3)', () => {
     expect(s.payoffOrder.map((p) => p.id)).toEqual(expected)
   })
 
+  it('focus is where the extra goes first, not the debt that happens to finish first', () => {
+    expect(ok(simulate([A, B], 20000, 'avalanche')).focus).toBe('B')
+    expect(ok(simulate([A, B], 20000, 'snowball')).focus).toBe('A')
+    // Budget == minimums: there is no extra to focus.
+    expect(ok(simulate([A, B], 10000, 'avalanche')).focus).toBeNull()
+
+    // A small 0% debt with a big minimum clears in month 1 on its minimum alone, while the
+    // extra goes to the 20% loan. "Focus first" must point at the loan.
+    const small = { id: 'small', balance: 10000, aprBps: 0, minPayment: 10000 }
+    const loan = { id: 'loan', balance: 100000, aprBps: 2000, minPayment: 2000 }
+    const s = ok(simulate([small, loan], 15000, 'avalanche'))
+    expect(s.payoffOrder[0]).toEqual({ id: 'small', month: 1 })
+    expect(s.focus).toBe('loan')
+  })
+
+  it('stops at the size guard instead of growing past safe integers', () => {
+    // 1000% APR on a 1-cent minimum: interest outruns the budget forever.
+    const runaway = { id: 'r', balance: 1_000_000, aprBps: 100_000, minPayment: 1 }
+    const s = ok(simulate([runaway], 1, 'avalanche'))
+    expect(s.paidOff).toBe(false)
+    expect(s.months).toBeLessThan(600)
+    expect(s.schedule.at(-2)![0]).toBeLessThanOrEqual(BALANCE_GUARD)
+    for (const row of s.schedule) for (const b of row) expect(Number.isSafeInteger(b)).toBe(true)
+    expect(Number.isSafeInteger(s.totalInterest)).toBe(true)
+  })
+
   it('interest rounds half up per debt per month (the only rounding point)', () => {
     expect(monthlyInterest(10000, 1200)).toBe(100)
     expect(monthlyInterest(15453, 1200)).toBe(155) // 154.53
@@ -203,6 +230,51 @@ describe('simulate (PLAN §4.3)', () => {
           expect(Number.isInteger(s.totalInterest)).toBe(true)
           expect(s.schedule).toHaveLength(s.months + 1)
           if (s.paidOff) expect(end).toBe(0)
+        },
+      ),
+    )
+  })
+})
+
+describe('simulate properties', () => {
+  const debtArb = fc.record({
+    id: fc.uuid(),
+    balance: fc.integer({ min: 0, max: 5_000_000 }),
+    aprBps: fc.integer({ min: 0, max: 100_000 }),
+    minPayment: fc.integer({ min: 0, max: 50_000 }),
+  })
+
+  it('each month: interest first, then at most the budget paid, never below zero', () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(debtArb, { minLength: 1, maxLength: 6, selector: (d) => d.id }),
+        fc.integer({ min: 0, max: 200_000 }),
+        fc.constantFrom('snowball' as const, 'avalanche' as const),
+        (debts, extra, strategy) => {
+          const budget = defaultBudget(debts, extra)
+          const s = ok(simulate(debts, budget, strategy, 120))
+          let interest = 0
+          for (let m = 1; m < s.schedule.length; m++) {
+            const prev = s.schedule[m - 1]!
+            const row = s.schedule[m]!
+            let paid = 0
+            row.forEach((b, i) => {
+              expect(b).toBeGreaterThanOrEqual(0)
+              const charged = prev[i]! > 0 ? monthlyInterest(prev[i]!, debts[i]!.aprBps) : 0
+              interest += charged
+              paid += prev[i]! + charged - b
+              expect(prev[i]! + charged - b).toBeGreaterThanOrEqual(0)
+            })
+            expect(paid).toBeLessThanOrEqual(budget)
+          }
+          expect(interest).toBe(s.totalInterest)
+          // Each debt is listed once, in the month its balance first hit zero.
+          for (const { id, month } of s.payoffOrder) {
+            const i = debts.findIndex((d) => d.id === id)
+            expect(s.schedule[month]![i]).toBe(0)
+            expect(s.schedule[month - 1]![i]).toBeGreaterThan(0)
+          }
+          expect(new Set(s.payoffOrder.map((p) => p.id)).size).toBe(s.payoffOrder.length)
         },
       ),
     )

@@ -2,6 +2,8 @@
 // calendar and in safe-to-spend like any other bill. Every write keeps the pair in sync
 // inside one transaction, so one undo step reverts both.
 import { rebaseRule, ruleChangeHidesPaid, sameRule } from '../../domain/bills'
+import { addDays, maxDate } from '../../domain/dates'
+import { splitSeriesFrom } from '../../domain/recurrence'
 import type { Bill, Debt, Id, ISODate } from '../../domain/types'
 import { db } from '../schema'
 import { mutate, type Writer } from '../undo'
@@ -43,8 +45,33 @@ export function addDebt(input: NewDebt) {
   })
 }
 
-async function syncBills(w: Writer, debt: Debt, today: ISODate) {
-  for (const bill of alive(await linkedBills(debt.id))) {
+/**
+ * A paid-off debt has no minimum left to set aside, so its bill ends before today (or after
+ * the last month marked paid, so no paid row is hidden). Like splitBill, a bill with no
+ * dates left is soft-deleted rather than kept as an empty series.
+ */
+async function endMinimum(w: Writer, bill: Bill, today: ISODate) {
+  const rows = await db.billOccurrences.where('billId').equals(bill.id).toArray()
+  const lastPaid = rows
+    .filter((o) => o.status === 'paid')
+    .reduce((d, o) => maxDate(d, o.originalDate), addDays(today, -1))
+  const { before } = splitSeriesFrom(bill, addDays(lastPaid, 1), bill.id)
+  await bills.put(w, before ?? { ...bill, deletedAt: nowInstant() })
+}
+
+async function syncBills(w: Writer, prev: Debt, debt: Debt, today: ISODate) {
+  const live = alive(await linkedBills(debt.id))
+  if (debt.balance <= 0) {
+    for (const bill of live) if (bill.until === undefined) await endMinimum(w, bill, today)
+    return
+  }
+  // Back above zero (new borrowing, or a mistaken "paid off"): the minimum starts again from
+  // today. Only on that transition, so a minimum bill the user deleted stays deleted.
+  if (prev.balance <= 0 && !live.some((b) => b.until === undefined)) {
+    await bills.put(w, minimumBill({ ...debt, balanceAsOf: today }))
+    return
+  }
+  for (const bill of live) {
     // The ended half of a split is history: a new minimum must not reprice it.
     if (bill.until !== undefined) continue
     const changes = { name: debt.name, amount: debt.minPayment }
@@ -67,7 +94,8 @@ export type DebtPatch = Partial<Omit<Debt, 'id' | 'deletedAt'>>
 
 /**
  * Edits a debt and its minimum bill. `today` dates a new balance (balanceAsOf) and is where
- * a due-day change splits the bill if moving it in place would hide paid months.
+ * a due-day change splits the bill if moving it in place would hide paid months. A balance
+ * of zero ends the minimum bill; going back above zero starts a new one.
  */
 export function updateDebt(id: Id, patch: DebtPatch, today: ISODate) {
   return mutate('Edit debt', ['debts', ...SPLIT_TABLES], async (w) => {
@@ -80,7 +108,7 @@ export function updateDebt(id: Id, patch: DebtPatch, today: ISODate) {
         next.originalBalance = next.balance
     }
     await debts.put(w, next)
-    await syncBills(w, next, today)
+    await syncBills(w, prev, next, today)
     return next
   })
 }

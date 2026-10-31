@@ -253,6 +253,42 @@ describe('debts', () => {
     expect(linked[0]).toMatchObject({ id: bill.id, rule: { day: 3 } })
   })
 
+  it('paying a debt off ends its minimum bill, keeping paid months; a new balance restarts it', async () => {
+    const { debt, bill } = await r.addDebt({ ...card, balanceAsOf: '2026-08-01' })
+    await r.markPaid(bill.id, '2026-11-20', 4000) // paid early, after "today"
+    await r.updateDebt(debt.id, { balance: 0 }, '2026-11-10')
+    expect(await r.getBill(bill.id)).toMatchObject({ until: '2026-11-20' })
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id && !b.until)).toHaveLength(0)
+
+    // Editing the paid-off debt again does not bring the bill back.
+    await r.updateDebt(debt.id, { name: 'Old card' }, '2026-11-12')
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id)).toHaveLength(1)
+
+    await r.updateDebt(debt.id, { balance: 50000 }, '2026-12-01')
+    const open = (await r.listBills()).filter((b) => b.debtId === debt.id && !b.until)
+    expect(open).toHaveLength(1)
+    expect(open[0]).toMatchObject({
+      name: 'Old card',
+      amount: 4000,
+      rule: { day: 20, anchor: '2026-12-01' },
+    })
+
+    // One undo per edit: back to paid off, then back to the open original bill.
+    await undoLast()
+    expect((await r.listBills()).filter((b) => b.debtId === debt.id)).toHaveLength(1)
+    await undoLast()
+    await undoLast()
+    expect((await r.getBill(bill.id))?.until).toBeUndefined()
+  })
+
+  it('a debt paid off before its first due date soft-deletes the empty minimum bill', async () => {
+    const { debt, bill } = await r.addDebt(card) // first due 20 Nov
+    await r.updateDebt(debt.id, { balance: 0 }, '2026-11-05')
+    expect((await r.getBill(bill.id))?.deletedAt).toBeDefined()
+    expect(await r.listBills()).toHaveLength(0)
+    expect(await r.listDebts()).toHaveLength(1)
+  })
+
   it('undo of addDebt removes both rows in one step', async () => {
     await r.addDebt(card)
     expect(await undoLast()).toBe('Add debt')

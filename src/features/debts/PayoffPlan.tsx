@@ -22,7 +22,7 @@ const PayoffChart = lazy(() => import('./PayoffChart'))
 
 const STRATEGY_INFO: Record<Strategy, { title: string; blurb: string }> = {
   snowball: { title: 'Snowball', blurb: 'Smallest balance first. Quick wins.' },
-  avalanche: { title: 'Avalanche', blurb: 'Highest interest first. Costs least.' },
+  avalanche: { title: 'Avalanche', blurb: 'Highest interest first. Usually less interest.' },
 }
 const STRATEGY_OPTIONS = [
   { value: 'avalanche', label: 'Avalanche' },
@@ -120,16 +120,17 @@ export function PayoffPlan({ debts, today }: { debts: Debt[]; today: ISODate }) 
                 <span className="tabular-nums">
                   {f.money(monthlyInterest(d.balance, d.aprBps))}
                 </span>{' '}
-                a month), so the minimum alone won’t shrink it. Anything extra helps.
+                a month), so paying only the minimum won’t shrink it.
               </p>
             ))}
           </div>
         </div>
       )}
 
-      <p className="text-sm text-muted">
-        Estimate. Real lenders may calculate interest differently.
-      </p>
+      <div className="space-y-1 text-sm text-muted">
+        <p>Estimate. Real lenders may calculate interest differently.</p>
+        <p>Not financial advice. All numbers are estimates based on what you enter.</p>
+      </div>
     </section>
   )
 }
@@ -152,17 +153,30 @@ function Comparison(p: ComparisonProps) {
   const picked = sims[p.strategy]
   const orderId = useId()
   const names = new Map(p.debts.map((d) => [d.id, d.name]))
+  // Still-owing debts that never finish in time are listed after the ones that do.
+  const unfinished = picked.paidOff
+    ? []
+    : p.debts.filter((d) => d.balance > 0 && !picked.payoffOrder.some((o) => o.id === d.id))
 
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
         {(['snowball', 'avalanche'] as const).map((s) => (
-          <StrategyCard key={s} strategy={s} sim={sims[s]} today={today} f={f} />
+          <StrategyCard
+            key={s}
+            strategy={s}
+            sim={sims[s]}
+            today={today}
+            f={f}
+            selected={s === p.strategy}
+          />
         ))}
       </div>
 
       <p className="text-[0.9375rem]" aria-live="polite">
-        {summary(p.interestSaved, p.monthsDiff, f)}
+        {p.snowball.paidOff && p.avalanche.paidOff
+          ? summary(p.interestSaved, p.monthsDiff, f)
+          : 'At this amount there’s no finish date within 50 years. A higher monthly amount shows one.'}
       </p>
 
       <div className="space-y-3">
@@ -185,22 +199,26 @@ function Comparison(p: ComparisonProps) {
                 {i + 1}
               </span>
               <span className="min-w-0 flex-1 truncate font-medium">{names.get(o.id)}</span>
-              {i === 0 && (
-                <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-contrast">
-                  Focus first
-                </span>
-              )}
+              {o.id === picked.focus && <FocusChip />}
               <span className="text-sm text-muted tabular-nums">
                 {f.month(addMonths(today, o.month))}
               </span>
             </li>
           ))}
+          {unfinished.map((d, i) => (
+            <li key={d.id} className="flex min-h-12 items-center gap-3 py-2">
+              <span
+                aria-hidden="true"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-bg text-sm font-medium text-muted tabular-nums"
+              >
+                {picked.payoffOrder.length + i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">{d.name}</span>
+              {d.id === picked.focus && <FocusChip />}
+              <span className="text-sm text-muted">Over 50 years</span>
+            </li>
+          ))}
         </ol>
-        {!picked.paidOff && (
-          <p className="text-sm text-muted">
-            The rest wouldn’t be paid off within 50 years at this amount.
-          </p>
-        )}
       </div>
 
       <Suspense
@@ -217,21 +235,37 @@ function Comparison(p: ComparisonProps) {
   )
 }
 
+// Marks where the money above the minimums goes now (sim.focus), which is not always the
+// debt that finishes first.
+function FocusChip() {
+  return (
+    <span className="shrink-0 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-contrast">
+      Focus first
+    </span>
+  )
+}
+
 function StrategyCard({
   strategy,
   sim,
   today,
   f,
+  selected,
 }: {
   strategy: Strategy
   sim: SimulationOk
   today: ISODate
   f: Formatters
+  selected: boolean
 }) {
   const info = STRATEGY_INFO[strategy]
+  // The ring follows the order being shown below, so neither plan looks like "the answer".
   return (
     <div
-      className={cx('rounded-3xl bg-bg p-4', strategy === 'avalanche' && 'ring-1 ring-accent/30')}
+      className={cx(
+        'rounded-3xl bg-bg p-4 ring-1 transition-shadow',
+        selected ? 'ring-accent/40' : 'ring-transparent',
+      )}
     >
       <h4 className="font-semibold">{info.title}</h4>
       <p className="text-sm text-muted">{info.blurb}</p>
@@ -244,11 +278,14 @@ function StrategyCard({
         </div>
         <div>
           <dt className="text-xs text-muted">Months</dt>
-          <dd className="tabular-nums">{sim.paidOff ? sim.months : '600+'}</dd>
+          <dd className="tabular-nums">{sim.paidOff ? sim.months : 'Over 600'}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted">Total interest</dt>
-          <dd className="tabular-nums">{f.money(sim.totalInterest)}</dd>
+          {/* Unfinished, the total is just wherever the 50-year window stopped: not a real figure. */}
+          <dd className="tabular-nums">
+            {sim.paidOff ? f.money(sim.totalInterest) : 'Still adding up'}
+          </dd>
         </div>
       </dl>
     </div>

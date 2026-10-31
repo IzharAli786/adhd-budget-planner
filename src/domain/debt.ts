@@ -26,8 +26,13 @@ export interface SimulationOk {
   strategy: Strategy
   /** Months until every balance is zero, or maxMonths if it never gets there. */
   months: number
-  /** False when maxMonths ran out first (negative amortization at this budget). */
+  /** False when maxMonths (or the size guard) ran out first, e.g. negative amortization. */
   paidOff: boolean
+  /**
+   * Where the money above the minimums goes in month 1, or null when there is none. Not
+   * payoffOrder[0]: a small debt can finish first on its minimum alone.
+   */
+  focus: Id | null
   totalInterest: Cents
   payoffOrder: Payoff[]
   /** schedule[m][i] = balance of debts[i] after month m; schedule[0] is the start. */
@@ -51,6 +56,11 @@ export const sumMinimums = (debts: readonly DebtInput[]): Cents =>
 
 type Live = { i: number; balance: Cents; aprBps: number }
 
+// balance × aprBps must stay an exact integer (aprBps ≤ 100 000). A balance this big
+// (about 900 million in major units) only happens when interest outruns the budget for
+// decades, so stopping there loses nothing and keeps every number safe to show.
+export const BALANCE_GUARD = Math.floor(Number.MAX_SAFE_INTEGER / 100_000)
+
 // Ties fall through to the input order (i), so the result never depends on sort internals.
 const ORDER: Record<Strategy, (a: Live, b: Live) => number> = {
   snowball: (a, b) => a.balance - b.balance || b.aprBps - a.aprBps || a.i - b.i,
@@ -72,6 +82,7 @@ export function simulate(
   const payoffOrder: Payoff[] = []
   let totalInterest = 0
   let month = 0
+  let focus: Id | null = null
   const settle = (i: number) => {
     if (balances[i] === 0) payoffOrder.push({ id: debts[i]!.id, month })
   }
@@ -98,12 +109,14 @@ export function simulate(
       .sort(ORDER[strategy])
     for (const { i } of order) {
       if (pool <= 0) break
+      if (month === 1 && focus === null) focus = debts[i]!.id
       const extra = Math.min(pool, balances[i]!)
       balances[i]! -= extra
       pool -= extra
       settle(i)
     }
     schedule.push([...balances])
+    if (balances.some((b) => b > BALANCE_GUARD)) break
   }
 
   return {
@@ -111,6 +124,7 @@ export function simulate(
     strategy,
     months: month,
     paidOff: balances.every((b) => b === 0),
+    focus,
     totalInterest,
     payoffOrder,
     schedule,

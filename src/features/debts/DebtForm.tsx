@@ -34,10 +34,14 @@ export function validateDebt(v: {
   balance: Cents | null
   aprBps: number | null
   minPayment: Cents | null
+  /** Editing may set the balance to 0 (paid off); a new debt needs something owed. */
+  adding?: boolean
 }): DebtFormErrors {
   const errors: DebtFormErrors = {}
   if (!v.name.trim()) errors.name = 'Give it a name, like “Visa” or “Car loan”.'
   if (v.balance === null) errors.balance = 'What do you owe today? An estimate is fine.'
+  else if (v.adding && v.balance <= 0)
+    errors.balance = 'Nothing owed on this one, so there’s nothing to plan. Nice.'
   if (v.aprBps === null) errors.apr = 'Enter the yearly rate, like 19.9. Use 0 if there’s none.'
   else if (v.aprBps > MAX_APR_BPS) errors.apr = 'That rate looks too high. Check your statement?'
   if (v.minPayment === null) errors.minPayment = 'What’s the smallest payment they accept?'
@@ -72,7 +76,7 @@ export function DebtForm({ id, debt, onSubmit }: DebtFormProps) {
   const dayId = useId()
 
   const aprBps = parseApr(apr)
-  const errors = validateDebt({ name, balance, aprBps, minPayment })
+  const errors = validateDebt({ name, balance, aprBps, minPayment, adding: !debt })
   const shown = submitted ? errors : {}
 
   function submit(e: FormEvent) {
@@ -115,6 +119,7 @@ export function DebtForm({ id, debt, onSubmit }: DebtFormProps) {
         symbol={f.symbol}
         decimals={f.decimals}
         error={shown.balance}
+        hint={debt ? 'Paid it off? Set this to 0 and its minimum leaves Bills.' : undefined}
       />
 
       <div className="grid grid-cols-2 gap-3">
