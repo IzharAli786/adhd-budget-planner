@@ -6,14 +6,19 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath } from 'node:url'
 
 const pwaStub = fileURLToPath(new URL('./src/lib/pwaStub.ts', import.meta.url))
+const unlockStub = fileURLToPath(new URL('./src/unlock/unlock.stub.ts', import.meta.url))
 
 export default defineConfig(({ mode }) => ({
   resolve: {
-    // No service worker in the demo or in unit tests, so the register hook becomes a no-op.
-    alias:
-      mode === 'demo' || mode === 'test'
+    alias: [
+      // No service worker in the demo or in unit tests, so the register hook is a no-op.
+      ...(mode === 'demo' || mode === 'test'
         ? [{ find: 'virtual:pwa-register/react', replacement: pwaStub }]
-        : [],
+        : []),
+      // The demo has no lock and must not carry a single hash (PLAN §7): every import of
+      // src/unlock/unlock resolves to the stub, so the real module is never bundled.
+      ...(mode === 'demo' ? [{ find: /^.*\/unlock\/unlock$/, replacement: unlockStub }] : []),
+    ],
   },
   plugins: [
     react(),

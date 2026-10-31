@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axe from 'axe-core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { resetDb } from '../../db/__tests__/helpers'
+import { resetDb, seedReadyInstall } from '../../db/__tests__/helpers'
 import { updateSettings } from '../../db/repos'
 import { App } from '../App'
 
@@ -22,6 +22,7 @@ const tabNames = () =>
 
 beforeEach(async () => {
   await resetDb()
+  await seedReadyInstall()
   localStorage.clear()
 })
 afterEach(cleanup)

@@ -161,16 +161,25 @@ export const settingsSchema = z.object({
   envelopesEnabled: z.optional(z.boolean()),
 })
 
-/**
- * Values of the other exportable meta keys. setupProgress is left open until its shape
- * lands with setup (M6); the rest are read as numbers/instants and must be that.
- */
+// domain/setup.ts SetupProgress. A bad row would send a restored device back into setup
+// with nonsense answers prefilled, so it is checked like any other row.
+const setupProgressSchema = z.object({
+  step: z.enum(['ack', 'payday', 'pay', 'balance', 'done']),
+  ackAt: z.optional(instant),
+  nextPayday: z.optional(isoDate),
+  kind: z.optional(z.enum(['weekly', 'biweekly', 'semimonthly', 'monthly', 'irregular'])),
+  otherDay: z.optional(dayOfMonth),
+  amount: z.optional(amount),
+  doneAt: z.optional(instant),
+})
+
+/** Values of the other exportable meta keys; each must have the shape the app writes. */
 export const metaValueSchemas: Record<(typeof EXPORTED_META_KEYS)[number], z.ZodMiniType> = {
   settings: settingsSchema,
   lastBackupAt: instant,
   lastOpened: z.union([isoDate, instant]),
   gardenPoints: int.check(z.nonnegative()),
-  setupProgress: z.unknown(),
+  setupProgress: setupProgressSchema,
 }
 
 export const headerSchema = z.object({

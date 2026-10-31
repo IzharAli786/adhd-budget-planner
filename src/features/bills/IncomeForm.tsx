@@ -18,7 +18,7 @@ import { useFormat } from './format'
 
 type Kind = PaySchedule['kind']
 
-const KINDS: { value: Kind; label: string }[] = [
+export const KINDS: { value: Kind; label: string }[] = [
   { value: 'weekly', label: 'Every week' },
   { value: 'biweekly', label: 'Every 2 weeks' },
   { value: 'semimonthly', label: 'Twice a month' },
@@ -282,7 +282,7 @@ export function IncomeForm({ id, income, showPrimary, today, onSubmit }: IncomeF
   )
 }
 
-function DaySelect({
+export function DaySelect({
   label,
   value,
   onChange,
