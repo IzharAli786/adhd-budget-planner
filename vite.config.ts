@@ -3,12 +3,13 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { fileURLToPath } from 'node:url'
 
 const pwaStub = fileURLToPath(new URL('./src/lib/pwaStub.ts', import.meta.url))
 const unlockStub = fileURLToPath(new URL('./src/unlock/unlock.stub.ts', import.meta.url))
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   // Hashes are not in the shared .env (PLAN §7): a production build without them from
   // the host locks everyone out. Say so loudly instead of shipping that by surprise.
   if (mode === 'production' && !loadEnv(mode, process.cwd(), 'VITE_').VITE_UNLOCK_HASHES) {
@@ -31,6 +32,9 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      // `npm run dev:phone`: a phone on the LAN is not a secure context over plain http, so
+      // crypto.subtle (unlock) and crypto.randomUUID (every new row) would be missing.
+      command === 'serve' && process.env.STEADY_HTTPS === '1' && basicSsl(),
       // The demo lives on its own origin with no service worker (PLAN §7): a cached demo
       // would keep serving stale sample data long after the buyer moved to the full app.
       mode !== 'demo' &&

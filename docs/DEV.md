@@ -170,3 +170,14 @@ locally; add `webkit` to the CI step when it is stable on Linux runners.
 Before every commit:
 
     npx prettier --write src e2e && npm test && npm run build && npm run lint && npm run build:demo
+
+## Testing on your phone (same Wi‑Fi)
+
+```bash
+npm run dev:phone    # https + --host, prints a Network: https://<your-ip>:5173 URL
+```
+
+A phone on the LAN is not a secure context over plain http, so `crypto.subtle` (unlock) and
+`crypto.randomUUID` (new rows) would be missing. `dev:phone` serves a self-signed certificate:
+accept the warning once on the phone. Install-to-home-screen and offline still need a trusted
+certificate (mkcert) or a real https host.
