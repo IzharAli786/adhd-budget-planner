@@ -4,7 +4,7 @@
 import type { Instant } from '../domain/types'
 import { getMeta, setMeta } from './repos/meta'
 import { db, type DataTableName } from './schema'
-import { setCreateGuard } from './undo'
+import { setCreateGuard, type CreateGuard } from './undo'
 
 export const DEMO_CAP = 25
 export const DEMO_DAYS = 7
@@ -18,7 +18,11 @@ export interface DemoState {
   entries: number
 }
 
-/** What counts as "an entry": things a person adds. Paid ticks and no-spend marks don't. */
+/**
+ * What counts as "an entry": things a person adds. Paid ticks, no-spend marks and balance
+ * check-ins don't: a check-in (or a catch-up after a gap) is how Today stays true, so a
+ * demo at its cap must still allow it, or the main number goes stale with no way out.
+ */
 export const ENTRY_TABLES: readonly DataTableName[] = [
   'transactions',
   'bills',
@@ -27,8 +31,13 @@ export const ENTRY_TABLES: readonly DataTableName[] = [
   'funds',
   'debts',
   'impulse',
-  'checkIns',
 ]
+
+// An edit can create a row too: "change from this date on" splits a bill into a new one,
+// and so can a debt's due-day or balance change. Those are still edits, so never counted.
+const isEdit = (label: string) => label.startsWith('Edit')
+const countsAsEntry = (tables: DataTableName[], label: string) =>
+  !isEdit(label) && tables.some((t) => ENTRY_TABLES.includes(t))
 
 export class DemoLimitError extends Error {
   constructor() {
@@ -74,16 +83,28 @@ export async function resetIfExpired(now: Date = new Date()): Promise<boolean> {
  * The cap, as a write guard (db/undo.ts): it runs inside the action's transaction, so
  * the count and the new row commit together, and a refused action writes nothing.
  * One action is one entry, even when it writes two rows (a debt and its minimum bill).
+ * Undoing an add gives the entry back, so trying things out and undoing them is free.
  */
-export async function demoCapGuard(tables: DataTableName[]) {
-  if (!tables.some((t) => ENTRY_TABLES.includes(t))) return
-  const state = (await db.meta.get('demo'))?.value as DemoState | undefined
-  if (!state) return
-  if (state.entries >= DEMO_CAP) {
-    for (const listener of listeners) listener()
-    throw new DemoLimitError()
-  }
-  await db.meta.put({ key: 'demo', value: { ...state, entries: state.entries + 1 } })
+export const demoCapGuard: CreateGuard = {
+  async created(tables, label) {
+    if (!countsAsEntry(tables, label)) return
+    const state = await readState()
+    if (!state) return
+    if (state.entries >= DEMO_CAP) {
+      for (const listener of listeners) listener()
+      throw new DemoLimitError()
+    }
+    await writeState({ ...state, entries: state.entries + 1 })
+  },
+  async undone(tables, label) {
+    if (!countsAsEntry(tables, label)) return
+    const state = await readState()
+    if (state && state.entries > 0) await writeState({ ...state, entries: state.entries - 1 })
+  },
 }
+
+// Direct reads and writes: the guard is already inside a transaction that includes meta.
+const readState = async () => (await db.meta.get('demo'))?.value as DemoState | undefined
+const writeState = (state: DemoState) => db.meta.put({ key: 'demo', value: state })
 
 export const installDemoCap = () => setCreateGuard(demoCapGuard)

@@ -8,11 +8,15 @@ import { db, PRIMARY_KEY, type DataTableName, type RowTypes, type TableName } fr
 export const UNDO_LIMIT = 20
 
 /**
- * Runs inside the write's transaction when a user action created rows, with the tables
- * those rows went into. Throwing aborts the whole action. The demo build installs one
- * for its entry cap (db/demo.ts); the full app has none, so this costs it nothing.
+ * Hooks for user actions that created rows. The demo build installs one for its entry cap
+ * (db/demo.ts); the full app has none, so this costs it nothing.
  */
-export type CreateGuard = (tables: DataTableName[]) => Promise<void>
+export interface CreateGuard {
+  /** Inside the action's transaction, with the tables new rows went into. Throwing aborts it. */
+  created(tables: DataTableName[], label: string): Promise<void>
+  /** Inside undo's transaction, when the undone action had created rows: a refund. */
+  undone(tables: DataTableName[], label: string): Promise<void>
+}
 let createGuard: CreateGuard | null = null
 export function setCreateGuard(guard: CreateGuard | null) {
   createGuard = guard
@@ -68,7 +72,8 @@ export async function mutate<R>(
     }
 
     const result = await fn(writer)
-    if (createGuard && created.size > 0) await createGuard([...created])
+    if (createGuard && label !== null && created.size > 0)
+      await createGuard.created([...created], label)
     if (label !== null && ops.length > 0) {
       await db.undo.add({ at: new Date().toISOString(), label, ops })
       await trimUndo()
@@ -106,11 +111,15 @@ export async function undoLast(): Promise<string | null> {
   return db.transaction('rw', db.tables, async () => {
     const entry = await db.undo.orderBy('seq').last()
     if (!entry) return null
+    const created = new Set<DataTableName>()
     for (const op of entry.ops) {
       const table = db.table(op.table)
-      if (op.before === null) await table.delete(op.key)
-      else await table.put(op.before)
+      if (op.before === null) {
+        await table.delete(op.key)
+        created.add(op.table as DataTableName) // mutate() only logs data tables
+      } else await table.put(op.before)
     }
+    if (createGuard && created.size > 0) await createGuard.undone([...created], entry.label)
     await db.undo.delete(entry.seq!)
     await countChange()
     return entry.label

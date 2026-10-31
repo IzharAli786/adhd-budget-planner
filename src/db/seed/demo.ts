@@ -18,6 +18,7 @@ import type {
 } from '../../domain/types'
 import { occurrenceId } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
+import { detectLocaleDefaults } from '../../lib/locale'
 import type { DemoState } from '../demo'
 import { resetDemo } from '../demo'
 import { db, type RowTypes } from '../schema'
@@ -298,13 +299,14 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
 
 /**
  * Replaces whatever is in the demo database with the sample household, finished setup
- * included, in one transaction. Settings keep the device's locale and currency; Full
- * mode is on so every tab has something to show.
+ * included, in one transaction. Settings keep what was chosen before, or on a first visit
+ * (no settings yet) the device's locale, currency and week start, as setup would pick:
+ * a visitor in the US should see "$" and a Sunday week, not the app's EUR default.
+ * Full mode is on so every tab has something to show.
  */
 export async function seedDemo(now: Date = new Date()): Promise<void> {
-  const previous = withDefaults(
-    (await db.meta.get('settings'))?.value as Partial<Settings> | undefined,
-  )
+  const stored = (await db.meta.get('settings'))?.value as Partial<Settings> | undefined
+  const previous = withDefaults(stored ?? detectLocaleDefaults())
   await resetDemo()
   const today = todayISO(now)
   const data = buildDemoData(today, now, previous.decimals)

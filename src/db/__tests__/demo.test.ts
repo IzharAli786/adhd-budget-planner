@@ -20,7 +20,7 @@ import {
 import * as r from '../repos'
 import { db } from '../schema'
 import { buildDemoData, seedDemo } from '../seed/demo'
-import { setCreateGuard } from '../undo'
+import { setCreateGuard, undoLast } from '../undo'
 import { resetDb } from './helpers'
 
 // Sat 31 Oct 2026, 10:00 local.
@@ -180,6 +180,17 @@ describe('seedDemo', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('on a first visit, uses the device locale (as setup would), not the EUR default', async () => {
+    vi.stubGlobal('navigator', { language: 'en-US' })
+    try {
+      await seedDemo(NOW)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    const settings = await r.getSettings()
+    expect(settings).toMatchObject({ locale: 'en-US', currency: 'USD', decimals: 2, weekStart: 0 })
+  })
+
   it('uses the decimals of the currency already chosen', async () => {
     await r.updateSettings({ currency: 'JPY', decimals: 0 })
     await seedDemo(NOW)
@@ -242,6 +253,48 @@ describe('entry cap', () => {
     })
     expect(await db.bills.count()).toBe(1)
     expect((await getDemoState())!.entries).toBe(1)
+  })
+
+  const fillToCap = async () => {
+    for (let i = 0; i < DEMO_CAP; i++) await spend(`coffee ${i}`)
+    expect((await getDemoState())!.entries).toBe(DEMO_CAP)
+  }
+
+  it('still allows a balance check-in and a catch-up at the cap, so Today never goes stale', async () => {
+    await seedDemo(NOW)
+    await fillToCap()
+    const before = await db.checkIns.count()
+    await r.addCheckIn(120000, TODAY)
+    await r.applyFreshStart({ balance: 110000, date: TODAY, paid: [], archive: [] })
+    expect(await db.checkIns.count()).toBe(before + 2)
+    expect((await getDemoState())!.entries).toBe(DEMO_CAP)
+  })
+
+  it('never counts an edit, even one that splits a bill or debt into a new row', async () => {
+    await seedDemo(NOW)
+    await fillToCap()
+    const rent = (await db.bills.get('demo-bill-rent'))!
+    const bills = await db.bills.count()
+    // "Change from this date on" ends the old series and starts a new bill row.
+    await r.editBillFrom(rent.id, addDays(TODAY, 20), { amount: 99000 })
+    // A due-day change on a debt with a paid month splits its minimum bill too.
+    await r.updateDebt('demo-debt-car', { dueDay: 20 }, TODAY)
+    expect(await db.bills.count()).toBeGreaterThan(bills)
+    expect((await getDemoState())!.entries).toBe(DEMO_CAP)
+  })
+
+  it('gives the entry back when an add is undone, but not when an edit is', async () => {
+    await startDemo('own', NOW)
+    await fillToCap()
+    await undoLast()
+    expect((await getDemoState())!.entries).toBe(DEMO_CAP - 1)
+    await spend('again')
+    expect((await getDemoState())!.entries).toBe(DEMO_CAP)
+
+    const [tx] = await db.transactions.toArray()
+    await r.updateTransaction(tx!.id, { note: 'edited' })
+    await undoLast()
+    expect((await getDemoState())!.entries).toBe(DEMO_CAP)
   })
 
   it('has no cap outside the demo (no demo state, no guard)', async () => {
