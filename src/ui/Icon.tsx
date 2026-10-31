@@ -37,6 +37,8 @@ const PATHS = {
   edit: 'M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4',
   skip: 'M6 5l8 7-8 7M18 5v14',
   list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4',
+  note: 'M5 4h14v11l-5 5H5zM14 20v-5h5M8.5 9h7M8.5 12.5h4',
   up: 'M6 15l6-6 6 6',
   down: 'M6 9l6 6 6-6',
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2',

@@ -37,6 +37,7 @@ export function BillRow({ entry, today, onOpen, showDate = true }: BillRowProps)
   }
 
   const meta = [
+    entry.debtId ? 'debt minimum' : null,
     paid ? 'Paid' : skipped ? 'Skipped' : overdue ? `Due ${f.relative(entry.date, today)}` : null,
     showDate && !paid && !skipped && !overdue ? f.relative(entry.date, today) : null,
     entry.moved ? `moved from ${f.day(entry.originalDate)}` : null,

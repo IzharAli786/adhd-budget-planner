@@ -416,3 +416,81 @@ describe('demo files', () => {
     expect(clean.data.bills.find((b) => b.id === 'bill-rent')).not.toHaveProperty('envelopeId')
   })
 })
+
+describe('notes (schema v3)', () => {
+  const dayNote = {
+    id: 'day|2026-11-02',
+    date: '2026-11-02',
+    text: 'Car service at 9',
+    updatedAt: '2026-10-31T09:00:00.000Z',
+  }
+  const periodNote = {
+    id: 'period|2026-10-30',
+    periodStart: '2026-10-30',
+    text: 'Go easy, birthday month',
+    updatedAt: '2026-10-31T09:00:00.000Z',
+  }
+
+  it('are exported, validated and restored with everything else', async () => {
+    await loadRows({ ...clone(LATEST_ROWS), notes: [dayNote, periodNote] })
+    const file = JSON.parse(JSON.stringify(await exportBackup(NOW, 'full'))) as BackupFile
+    expect(file.schemaVersion).toBe(3)
+    expect(file.data.notes).toHaveLength(2)
+    await resetDb()
+    const valid = mustValidate(file)
+    expect(valid.preview.counts.notes).toBe(2)
+    await importBackup(valid, NOW)
+    expect(await db.notes.get('day|2026-11-02')).toEqual(dayNote)
+    expect(await db.notes.get('period|2026-10-30')).toEqual(periodNote)
+  })
+
+  it('an app still on v2 refuses a v3 file instead of dropping its notes', async () => {
+    const file: Loose = await fixtureFile()
+    file.data.notes = [dayNote]
+    const result = validateBackup(file, 2, {})
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('newer-schema')
+  })
+
+  it('an older v2 file without a notes table still restores, with no notes', async () => {
+    const file: Loose = await fixtureFile()
+    file.schemaVersion = 2
+    delete file.data.notes
+    await db.notes.put(dayNote)
+    const valid = mustValidate(file)
+    expect(valid.file.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(valid.file.data.notes).toEqual([])
+    await importBackup(valid, NOW)
+    expect(await db.notes.count()).toBe(0)
+    expect(await db.transactions.count()).toBe(LATEST_ROWS.transactions!.length)
+  })
+
+  it.each<[string, Record<string, unknown>, string]>([
+    ['both a date and a period', { ...dayNote, periodStart: '2026-10-30' }, 'data.notes[0].id'],
+    [
+      'neither a date nor a period',
+      { id: 'day|x', text: 'x', updatedAt: dayNote.updatedAt },
+      'data.notes[0].id',
+    ],
+    [
+      'an id that does not match its date',
+      { ...dayNote, id: 'day|2026-11-03' },
+      'data.notes[0].id',
+    ],
+    ['a date that does not exist', { ...dayNote, date: '2026-02-30' }, 'data.notes[0].date'],
+    ['text over the length cap', { ...dayNote, text: 'x'.repeat(2001) }, 'data.notes[0].text'],
+  ])('rejects a note with %s', async (_, note, path) => {
+    const file: Loose = await fixtureFile()
+    file.data.notes = [note]
+    const result = validateBackup(file)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.path).toBe(path)
+  })
+
+  it('a demo file brings no notes (they are activity, not setup)', async () => {
+    const file: Loose = await fixtureFile()
+    file.source = 'demo'
+    file.data.notes = [dayNote]
+    expect(mustValidate(file).file.data.notes).toEqual([])
+  })
+})

@@ -209,3 +209,45 @@ export function frequentEntries(history: readonly Transaction[], limit = 4): Fre
       ...(envelopeId ? { envelopeId } : {}),
     }))
 }
+
+// --- @tag suggestions -------------------------------------------------------------------
+
+type Taggable = Pick<Envelope, 'id' | 'name' | 'sort' | 'deletedAt'>
+
+/**
+ * The word to type after @ for this envelope: its first word ("Rent & housing" -> "rent").
+ * A tag is one token, so only the first word can be a prefix of the name. Null when that
+ * word would land on an earlier envelope instead, so a chip never writes a wrong tag.
+ */
+export function envelopeTag(env: Taggable, envelopes: readonly Taggable[]): string | null {
+  const word = env.name.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+  if (!word || env.deletedAt !== undefined) return null
+  return matchEnvelope(word, envelopes)?.id === env.id ? word : null
+}
+
+/** The tag being typed at the end of the text ("12 lunch @fo" -> "fo"), or null. */
+export function typingTag(text: string): string | null {
+  const m = /(?:^|\s)@(\S*)$/.exec(text)
+  return m ? m[1]! : null
+}
+
+export interface TagSuggestion {
+  envelopeId: Id
+  name: string
+  tag: string
+}
+
+/** Envelopes whose name starts with what's typed after @, in the user's order. */
+export function tagSuggestions(partial: string, envelopes: readonly Taggable[]): TagSuggestion[] {
+  const p = partial.toLowerCase()
+  return envelopes
+    .filter((e) => e.deletedAt === undefined && e.name.toLowerCase().startsWith(p))
+    .sort((a, b) => a.sort - b.sort)
+    .flatMap((e) => {
+      const tag = envelopeTag(e, envelopes)
+      return tag ? [{ envelopeId: e.id, name: e.name, tag }] : []
+    })
+}
+
+/** Replaces the @partial at the end with the full tag and a space, ready for "today". */
+export const completeTag = (text: string, tag: string) => text.replace(/@\S*$/, `@${tag} `)

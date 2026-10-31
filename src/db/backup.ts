@@ -2,7 +2,7 @@
 // Restore is all-or-nothing: validate the whole file first, snapshot what is on the device,
 // then replace everything in ONE transaction so a crash halfway can't leave a mix.
 import { withDefaults, type Settings } from '../domain/settings'
-import type { Instant, ISODate } from '../domain/types'
+import { noteId, type Instant, type ISODate } from '../domain/types'
 import { CURRENCY_DECIMALS, type CurrencyCode } from '../domain/currencies'
 import {
   dataSchema,
@@ -353,6 +353,24 @@ function checkIntegrity(data: BackupData): RestoreError | null {
     }
   }
 
+  // A note belongs to a day OR a pay period, and its id says which (noteId), so a save
+  // after restore finds it again instead of writing a twin.
+  for (const [i, note] of data.notes.entries()) {
+    const target =
+      note.date !== undefined && note.periodStart === undefined
+        ? { date: note.date }
+        : note.periodStart !== undefined && note.date === undefined
+          ? { periodStart: note.periodStart }
+          : null
+    if (target === null || note.id !== noteId(target)) {
+      return {
+        code: 'invalid-shape',
+        message: MESSAGES['invalid-shape'],
+        path: `data.notes[${i}].id`,
+      }
+    }
+  }
+
   return null
 }
 
@@ -385,6 +403,7 @@ function setupOnly(data: BackupData): BackupData {
     debts,
     impulse: [],
     noSpend: [],
+    notes: [],
     meta: [],
   }
 }

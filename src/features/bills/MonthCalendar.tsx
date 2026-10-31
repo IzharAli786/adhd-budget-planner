@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { monthGrid, weekdayOrder, isSameMonth } from '../../domain/calendar'
 import type { BillEntry, PaydayEntry } from '../../domain/bills'
+import type { PaydaySaving } from '../../domain/savings'
 import { addDays, addMonths, dayOfWeek, mod } from '../../domain/dates'
 import type { ISODate } from '../../domain/types'
 import { cx } from '../../ui/cx'
@@ -15,15 +16,24 @@ interface MonthCalendarProps {
   weekStart: number
   bills: Map<ISODate, BillEntry[]>
   paydays: Map<ISODate, PaydayEntry[]>
+  /** What each payday sets aside for savings funds. */
+  savings?: ReadonlyMap<ISODate, PaydaySaving[]>
+  /** Days that have a note. */
+  notes?: ReadonlySet<ISODate>
   onMonthChange: (delta: -1 | 1 | 0) => void
   onSelectDay: (date: ISODate) => void
 }
 
+const EMPTY_SAVINGS: ReadonlyMap<ISODate, PaydaySaving[]> = new Map()
+const EMPTY_NOTES: ReadonlySet<ISODate> = new Set()
+
 const ARROWS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
 
 /**
- * Month view with a dot per day that has bills and a ring for paydays. Shape, not only
- * colour, tells them apart (PLAN §8), and every day button speaks its full content.
+ * Month view: a dot for bills, a diamond for debt minimums, a ring for paydays and a dash
+ * for a note. Shape, not only colour, tells them apart (PLAN §8), and every day button
+ * speaks its full content. What a payday sets aside is spoken and shown in the day sheet,
+ * not drawn: it falls on every main payday, so a mark of its own would only add clutter.
  * Keyboard: one Tab stop for the whole month (roving tabindex), arrows move by day and
  * week, Home/End to the week's ends, Page Up/Down by month, as in the ARIA date grid.
  */
@@ -33,6 +43,8 @@ export function MonthCalendar({
   weekStart,
   bills,
   paydays,
+  savings = EMPTY_SAVINGS,
+  notes = EMPTY_NOTES,
   onMonthChange,
   onSelectDay,
 }: MonthCalendarProps) {
@@ -120,11 +132,18 @@ export function MonthCalendar({
         className="grid grid-cols-7 gap-y-0.5"
       >
         {dates.map((date) => {
-          const dayBills = (bills.get(date) ?? []).filter((b) => b.status !== 'skipped')
+          const live = (bills.get(date) ?? []).filter((b) => b.status !== 'skipped')
+          const dayBills = live.filter((b) => b.debtId === undefined)
+          const dayDebts = live.filter((b) => b.debtId !== undefined)
           const dayPaydays = paydays.get(date) ?? []
+          const saving = (savings.get(date) ?? []).reduce((a, s) => a + s.amount, 0)
+          const hasNote = notes.has(date)
           const inMonth = isSameMonth(date, first)
           const isToday = date === today
-          const allPaid = dayBills.length > 0 && dayBills.every((b) => b.status === 'paid')
+          const allPaid = (list: BillEntry[]) =>
+            list.length > 0 && list.every((b) => b.status === 'paid')
+          const mark = (paid: boolean) =>
+            isToday ? 'bg-accent-contrast' : paid ? 'bg-muted/50' : 'bg-accent'
           return (
             <button
               key={date}
@@ -136,7 +155,10 @@ export function MonthCalendar({
                 onSelectDay(date)
               }}
               onKeyDown={(e) => onDayKey(e, date)}
-              aria-label={calendarDayLabel(date, today, dayBills, dayPaydays.length, f)}
+              aria-label={calendarDayLabel(date, today, live, dayPaydays.length, f, {
+                saving,
+                note: hasNote,
+              })}
               aria-current={isToday ? 'date' : undefined}
               className={cx(
                 'relative mx-auto flex h-12 w-full max-w-12 flex-col items-center justify-center rounded-2xl text-body tabular-nums transition-colors',
@@ -149,14 +171,12 @@ export function MonthCalendar({
               )}
             >
               <span>{Number(date.slice(8))}</span>
-              <span aria-hidden="true" className="flex h-1.5 items-center gap-1">
+              <span aria-hidden="true" className="flex h-1.5 items-center gap-[3px]">
                 {dayBills.length > 0 && (
-                  <span
-                    className={cx(
-                      'h-1.5 w-1.5 rounded-full',
-                      isToday ? 'bg-accent-contrast' : allPaid ? 'bg-muted/50' : 'bg-accent',
-                    )}
-                  />
+                  <span className={cx('h-1.5 w-1.5 rounded-full', mark(allPaid(dayBills)))} />
+                )}
+                {dayDebts.length > 0 && (
+                  <span className={cx('h-[5px] w-[5px] rotate-45', mark(allPaid(dayDebts)))} />
                 )}
                 {dayPaydays.length > 0 && (
                   <span
@@ -166,22 +186,41 @@ export function MonthCalendar({
                     )}
                   />
                 )}
+                {hasNote && (
+                  <span
+                    className={cx(
+                      'h-[1.5px] w-2 rounded-full',
+                      isToday ? 'bg-accent-contrast' : 'bg-muted',
+                    )}
+                  />
+                )}
               </span>
             </button>
           )
         })}
       </div>
 
+      {/* Only the marks this month uses, so the key stays short. */}
       <div
         aria-hidden="true"
-        className="mt-3 flex items-center justify-center gap-5 text-xs text-muted"
+        className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted"
       >
         <span className="inline-flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Bill
         </span>
+        {dates.some((d) => bills.get(d)?.some((b) => b.debtId !== undefined)) && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-[5px] w-[5px] rotate-45 bg-accent" /> Debt minimum
+          </span>
+        )}
         <span className="inline-flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full border-[1.5px] border-text" /> Payday
         </span>
+        {dates.some((d) => notes.has(d)) && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-[1.5px] w-2 rounded-full bg-muted" /> Note
+          </span>
+        )}
       </div>
     </section>
   )

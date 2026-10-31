@@ -1,15 +1,19 @@
 import { useId, useMemo, useState } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import {
+  completeTag,
   frequentEntries,
   parseQuickAdd,
   signedAmount,
   suggestEnvelope,
+  tagSuggestions,
+  typingTag,
   type QuickAddError,
 } from '../../domain/quickAdd'
 import type { Envelope, ISODate, Transaction } from '../../domain/types'
 import { Chip } from '../../ui/Chip'
 import { cx } from '../../ui/cx'
+import { EnvelopeDot } from '../../ui/EnvelopeDot'
 import { useFormat } from '../bills/format'
 import { useQuickAdd } from './QuickAddProvider'
 
@@ -52,6 +56,9 @@ export function QuickAddField({ today, transactions, envelopes }: Props) {
   const envelopeId = parsed.ok ? (parsed.envelopeId ?? suggested ?? undefined) : undefined
   const envelopeName = live.find((e) => e.id === envelopeId)?.name
   const recent = useMemo(() => frequentEntries(transactions.slice(-300), 4), [transactions])
+  // "12 lunch @" shows the envelopes as chips; a tap writes the tag (PLAN §4.4 grammar).
+  const partialTag = live.length > 0 ? typingTag(text) : null
+  const tags = partialTag === null ? [] : tagSuggestions(partialTag, live)
 
   async function commit(entry: Parameters<typeof save>[0], fromField: boolean) {
     setSaving(true)
@@ -140,7 +147,28 @@ export function QuickAddField({ today, transactions, envelopes }: Props) {
         ) : null}
       </div>
 
-      {recent.length > 0 && (
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Envelopes">
+          {tags.map((t) => {
+            const color = live.find((e) => e.id === t.envelopeId)?.color
+            return (
+              <Chip
+                key={t.envelopeId}
+                aria-label={`Tag ${t.name}`}
+                onClick={() => {
+                  setText(completeTag(text, t.tag))
+                  fieldRef.current?.focus()
+                }}
+              >
+                <EnvelopeDot color={color} className="h-2 w-2" />
+                {t.name}
+              </Chip>
+            )
+          })}
+        </div>
+      )}
+
+      {recent.length > 0 && tags.length === 0 && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Log again">
           {recent.map((c) => (
             <Chip

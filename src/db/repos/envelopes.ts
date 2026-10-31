@@ -1,3 +1,4 @@
+import { missingStarters } from '../../domain/categories'
 import type { Envelope, Id } from '../../domain/types'
 import { db } from '../schema'
 import { mutate } from '../undo'
@@ -42,6 +43,30 @@ export function ensureDefaultEnvelope(name = 'Everyday') {
     }
     await w.put('envelopes', env)
     return env
+  })
+}
+
+/**
+ * "Start with common categories": the starter set with empty budgets, after what's there,
+ * in one undo step. Names that already exist are skipped. Returns how many were added.
+ */
+export function addStarterEnvelopes() {
+  return mutate('Add common categories', ['envelopes'], async (w) => {
+    const all = await db.envelopes.toArray()
+    let sort = Math.max(-1, ...all.map((e) => e.sort))
+    const add = missingStarters(all)
+    for (const c of add) {
+      sort += 1
+      await w.put('envelopes', {
+        id: newId(),
+        name: c.name,
+        budget: 0,
+        isDefault: false,
+        color: c.color,
+        sort,
+      })
+    }
+    return add.length
   })
 }
 

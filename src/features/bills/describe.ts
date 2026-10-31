@@ -47,13 +47,20 @@ export function describeSchedule(schedule: PaySchedule, f: Formatters): string {
 /** Day number of a date, for "on the 31st" hints in the form. */
 export const dayNumber = (date: string) => parseISODate(date).day
 
+export interface DayExtras {
+  /** Total set aside for savings on this payday. */
+  saving?: number
+  note?: boolean
+}
+
 /** "Today, Saturday 31 October, 2 bills, 1 paid, payday": the dots, in words. */
 export function calendarDayLabel(
   date: string,
   today: string,
-  bills: readonly { status: 'due' | 'paid' | 'skipped' }[],
+  bills: readonly { status: 'due' | 'paid' | 'skipped'; debtId?: string }[],
   paydays: number,
-  f: Pick<Formatters, 'dayLong'>,
+  f: Pick<Formatters, 'dayLong' | 'money'>,
+  extras: DayExtras = {},
 ) {
   const parts = [f.dayLong(date)]
   if (date === today) parts.unshift('Today')
@@ -66,6 +73,13 @@ export function calendarDayLabel(
       parts.push(bills.length === 1 ? 'unpaid' : `${bills.length - paid} unpaid`)
     else if (paid > 0) parts.push(`${paid} paid`)
   }
+  const debts = bills.filter((b) => b.debtId !== undefined).length
+  // "1 bill, debt minimum" when that is all there is; "3 bills, 1 debt minimum" otherwise.
+  if (debts === bills.length && debts > 0)
+    parts.push(debts === 1 ? 'debt minimum' : 'debt minimums')
+  else if (debts) parts.push(debts === 1 ? '1 debt minimum' : `${debts} debt minimums`)
   if (paydays) parts.push(paydays === 1 ? 'payday' : `${paydays} paydays`)
+  if (extras.saving) parts.push(`set aside ${f.money(extras.saving)}`)
+  if (extras.note) parts.push('note')
   return parts.join(', ')
 }

@@ -2,7 +2,7 @@
 // fund's total is derived (opening + Σ moves) and can never drift from the history.
 import { daysBetween } from './dates'
 import type { Cents } from './money'
-import type { ISODate, SavingsFund, Transaction } from './types'
+import type { Id, ISODate, SavingsFund, Transaction } from './types'
 
 export const CHALLENGE_WEEKS = 52
 
@@ -52,6 +52,39 @@ export function challengeStep(start: ISODate, today: ISODate, unit: Cents) {
 export function perPaydayToReach(remaining: Cents, paydaysLeft: number): Cents | null {
   if (remaining <= 0) return null
   return paydaysLeft <= 0 ? remaining : Math.ceil(remaining / paydaysLeft)
+}
+
+export interface PaydaySaving {
+  fundId: Id
+  name: string
+  amount: Cents
+}
+
+/**
+ * What each payday sets aside, for the calendar ("Set aside €40 for Holiday"). Only the
+ * paydays of the income that defines the period: perPeriod is "per paycheck period", so
+ * a side gig's payday reserving it again would double the plan. Funds that already reached
+ * their target (per `saved`) ask for nothing more, and one nearly there asks only for the rest.
+ */
+export function savingsOnPaydays(
+  paydays: readonly { date: ISODate; incomeId: Id }[],
+  funds: readonly SavingsFund[],
+  periodIncomeId: Id | undefined,
+  saved: ReadonlyMap<Id, Cents> = new Map(),
+): Map<ISODate, PaydaySaving[]> {
+  // A fund 10 short of its target asks for 10, not the full perPeriod.
+  const asking = funds.flatMap((f) => {
+    if (f.deletedAt !== undefined || f.perPeriod <= 0) return []
+    const left = f.target === undefined ? Infinity : f.target - (saved.get(f.id) ?? f.openingSaved)
+    return left > 0 ? [{ fundId: f.id, name: f.name, amount: Math.min(f.perPeriod, left) }] : []
+  })
+  const out = new Map<ISODate, PaydaySaving[]>()
+  if (asking.length === 0 || periodIncomeId === undefined) return out
+  for (const p of paydays) {
+    if (p.incomeId !== periodIncomeId || out.has(p.date)) continue
+    out.set(p.date, asking)
+  }
+  return out
 }
 
 /** The payday a fund reaches its target at `perPeriod` a payday, or null if out of view. */

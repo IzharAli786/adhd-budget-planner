@@ -3,7 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { prepareBackupFile } from '../../db/backup'
 import { recordBackup } from '../../db/repos'
 import { canShareFile, shareOrDownload, type SaveResult } from '../../lib/share'
-import { Button, buttonClass } from '../../ui/Button'
+import { Button, buttonClass, type ButtonVariant } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
 
@@ -24,12 +24,39 @@ interface Props {
   className?: string
 }
 
+/** Save backup: a SaveFileButton that also records the backup (resets the nudge). */
+export function SaveBackupButton({ onSaved, label = 'Save backup', ...rest }: Props) {
+  return (
+    <SaveFileButton
+      {...rest}
+      label={label}
+      onSaved={async (result) => {
+        await recordBackup()
+        onSaved?.(result)
+      }}
+    />
+  )
+}
+
+interface SaveFileProps extends Props {
+  label: string
+  variant?: ButtonVariant
+  size?: 'md' | 'lg'
+}
+
 /**
- * One tap to save. Where the share sheet takes files it is a button that calls
+ * One tap to save a ready file. Where the share sheet takes files it is a button that calls
  * navigator.share() synchronously in the click; elsewhere it is a plain download link,
  * which needs no script at all at tap time.
  */
-export function SaveBackupButton({ file, onSaved, label = 'Save backup', className }: Props) {
+export function SaveFileButton({
+  file,
+  onSaved,
+  label,
+  className,
+  variant = 'primary',
+  size = 'lg',
+}: SaveFileProps) {
   const share = file !== undefined && canShareFile(file)
   const href = useMemo(
     () => (file && !share ? URL.createObjectURL(file) : undefined),
@@ -45,10 +72,7 @@ export function SaveBackupButton({ file, onSaved, label = 'Save backup', classNa
     [href],
   )
 
-  async function saved(result: Exclude<SaveResult, 'cancelled'>) {
-    await recordBackup()
-    onSaved?.(result)
-  }
+  const saved = (result: Exclude<SaveResult, 'cancelled'>) => void onSaved?.(result)
 
   const content = (
     <>
@@ -62,8 +86,8 @@ export function SaveBackupButton({ file, onSaved, label = 'Save backup', classNa
       <a
         href={href}
         download={file.name}
-        onClick={() => void saved('downloaded')}
-        className={cx(buttonClass('primary', 'lg', true), className)}
+        onClick={() => saved('downloaded')}
+        className={cx(buttonClass(variant, size, true), className)}
       >
         {content}
       </a>
@@ -72,14 +96,15 @@ export function SaveBackupButton({ file, onSaved, label = 'Save backup', classNa
   return (
     <Button
       block
-      size="lg"
+      size={size}
+      variant={variant}
       className={className}
       disabled={!file}
       onClick={() => {
         if (!file) return
         // No await before this call: it must run inside the tap (PLAN §6).
         void shareOrDownload(file).then((result) => {
-          if (result !== 'cancelled') void saved(result)
+          if (result !== 'cancelled') saved(result)
         })
       }}
     >

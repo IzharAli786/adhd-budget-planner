@@ -18,6 +18,7 @@ import { CatchUpCard } from '../catchup/CatchUpCard'
 import { useCatchUpSession } from '../catchup/CatchUpProvider'
 import { FreshStart } from '../catchup/FreshStart'
 import { GardenGlance } from '../goals/GardenCard'
+import { PaydayNote } from '../notes/PaydayNote'
 import { QuickAddField } from '../quickadd/QuickAddField'
 import { useQuickAdd } from '../quickadd/QuickAddProvider'
 import { ActionCard } from './ActionCard'
@@ -275,6 +276,8 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         {!lite && (
           <aside aria-label="At a glance" className="mt-8 space-y-6 lg:sticky lg:top-10 lg:mt-0">
             <ComingUp today={today} />
+            {/* Full mode only: Simple stays one number and the next step (PLAN §5). */}
+            {!settings.simpleMode && <PaydayNote periodStart={period.start} />}
             {/* Only where the garden lives (Goals is a Full-mode tab). */}
             {!settings.simpleMode && <GardenGlance />}
           </aside>

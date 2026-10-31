@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { importBackup, readBackupFile, type RestoreError, type ValidBackup } from '../../db/backup'
+import { prepareCsvFile } from '../../db/csv'
 import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import type { DataTableName } from '../../db/schema'
 import type { Instant } from '../../domain/types'
@@ -12,7 +13,7 @@ import { Icon } from '../../ui/Icon'
 import { PageHeader } from '../../ui/PageHeader'
 import { useToast } from '../../ui/Toast'
 import { relativeDays } from './relative'
-import { SaveBackupButton, useBackupFile } from './SaveBackup'
+import { SaveBackupButton, SaveFileButton, useBackupFile } from './SaveBackup'
 
 const TABLE_LABELS: Partial<Record<DataTableName, string>> = {
   incomes: 'Income sources',
@@ -24,6 +25,7 @@ const TABLE_LABELS: Partial<Record<DataTableName, string>> = {
   debts: 'Debts',
   impulse: '48-hour list',
   noSpend: 'No-spend days',
+  notes: 'Notes',
 }
 
 // Midday local time, so no time zone can move the calendar day either way.
@@ -37,6 +39,9 @@ export function BackupScreen() {
   const changes = useLiveQuery(getChangesSinceBackup)
   // Prepared as the screen opens, so Save runs inside the tap (see SaveBackup).
   const file = useBackupFile()
+  // Same reason: ready before the tap. Rebuilt when the data changes.
+  const transactionsCsv = useLiveQuery(() => prepareCsvFile('transactions'))
+  const billsCsv = useLiveQuery(() => prepareCsvFile('bills'))
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<ValidBackup | null>(null)
   const [error, setError] = useState<RestoreError | null>(null)
@@ -109,6 +114,37 @@ export function BackupScreen() {
               {file.name} · {Math.max(1, Math.round(file.size / 1024))} KB
             </p>
           )}
+        </section>
+
+        <section className="card p-6">
+          <div className="flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+              <Icon name="list" size={22} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-heading">Export for spreadsheets (CSV)</h2>
+              <p className="text-body text-muted">
+                Open your entries or bills in Excel, Numbers or Google Sheets. It’s a copy to look
+                at, not a backup: only the backup file above can be restored.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            <SaveFileButton
+              file={transactionsCsv}
+              label="Transactions (CSV)"
+              variant="secondary"
+              size="md"
+              onSaved={() => toast.show({ message: 'Transactions exported.' })}
+            />
+            <SaveFileButton
+              file={billsCsv}
+              label="Bills (CSV)"
+              variant="secondary"
+              size="md"
+              onSaved={() => toast.show({ message: 'Bills exported.' })}
+            />
+          </div>
         </section>
 
         <section className="card p-6">

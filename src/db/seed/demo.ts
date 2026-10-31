@@ -1,6 +1,7 @@
 // "Look around with sample data" (PLAN §7): one calm, believable household, built
 // relative to TODAY so the demo never shows stale dates. buildDemoData is pure (dates and
 // the clock are parameters), which is what the tests check; seedDemo writes it.
+import { STARTER_CATEGORIES } from '../../domain/categories'
 import { addDays, addMonths, isWeekend, parseISODate } from '../../domain/dates'
 import { challengeTotal } from '../../domain/savings'
 import { withDefaults, type Settings } from '../../domain/settings'
@@ -9,14 +10,16 @@ import type {
   Bill,
   BillOccurrence,
   Debt,
+  Envelope,
   ImpulseItem,
   IncomeSource,
   ISODate,
   NoSpendDay,
+  Note,
   SavingsFund,
   Transaction,
 } from '../../domain/types'
-import { occurrenceId } from '../../domain/types'
+import { noteId, occurrenceId } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
 import { detectLocaleDefaults } from '../../lib/locale'
 import type { DemoState } from '../demo'
@@ -33,6 +36,8 @@ export interface DemoData {
   debts: Debt[]
   impulse: ImpulseItem[]
   noSpend: NoSpendDay[]
+  envelopes: Envelope[]
+  notes: Note[]
   gardenPoints: number
 }
 
@@ -48,6 +53,8 @@ export const SEEDED_TABLES = [
   'debts',
   'impulse',
   'noSpend',
+  'envelopes',
+  'notes',
 ] as const satisfies readonly (keyof DemoData)[]
 
 /**
@@ -204,34 +211,63 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
   const noSpendOffsets = [-9, -6, -3]
   const noSpend: NoSpendDay[] = noSpendOffsets.map((o) => ({ date: day(o) }))
 
-  const spending: [offset: number, note: string, amount: number][] = [
-    [-13, 'Groceries', 46.8],
-    [-13, 'Coffee', 3.2],
-    [-12, 'Lunch', 9.5],
-    [-12, 'Bus', 2.4],
-    [-11, 'Pharmacy', 12.35],
-    [-11, 'Coffee', 3.2],
-    [-10, 'Takeaway', 18.9],
+  // The "common categories" set, as one tap in Plan makes it, plus Everyday. Budgets stay
+  // empty, so the sample numbers on Today are the same with envelopes on or off.
+  const envelopes: Envelope[] = [
+    {
+      id: 'demo-env-everyday',
+      name: 'Everyday',
+      budget: 0,
+      isDefault: true,
+      color: 'accent',
+      sort: 0,
+    },
+    ...STARTER_CATEGORIES.map((c, i) => ({
+      id: `demo-env-${i + 1}`,
+      name: c.name,
+      budget: 0,
+      isDefault: false,
+      color: c.color,
+      sort: i + 1,
+    })),
+  ]
+  const env = (name: string) => envelopes.find((e) => e.name === name)!.id
+  const [groceries, eatingOut, transport, care, fun] = [
+    env('Groceries'),
+    env('Eating out'),
+    env('Transport'),
+    env('Personal care'),
+    env('Fun'),
+  ]
+
+  const spending: [offset: number, note: string, amount: number, envelope?: string][] = [
+    [-13, 'Groceries', 46.8, groceries],
+    [-13, 'Coffee', 3.2, eatingOut],
+    [-12, 'Lunch', 9.5, eatingOut],
+    [-12, 'Bus', 2.4, transport],
+    [-11, 'Pharmacy', 12.35, care],
+    [-11, 'Coffee', 3.2, eatingOut],
+    [-10, 'Takeaway', 18.9, eatingOut],
     [-10, 'Snacks', 4.1],
-    [-8, 'Groceries', 38.15],
-    [-8, 'Bus', 2.8],
-    [-7, 'Coffee', 3.2],
-    [-7, 'Books', 14.99],
-    [-5, 'Groceries', 52.4],
-    [-5, 'Dinner out', 27],
-    [-4, 'Coffee', 3.2],
-    [-4, 'Petrol', 45],
-    [-2, 'Lunch', 8.7],
-    [-2, 'Haircut', 22],
-    [-1, 'Groceries', 31.6],
-    [-1, 'Coffee', 3.4],
-    [-1, 'Cinema', 11.5],
-    [0, 'Coffee', 3.2],
-    [0, 'Lunch', 9.8],
+    [-8, 'Groceries', 38.15, groceries],
+    [-8, 'Bus', 2.8, transport],
+    [-7, 'Coffee', 3.2, eatingOut],
+    [-7, 'Books', 14.99, fun],
+    [-5, 'Groceries', 52.4, groceries],
+    [-5, 'Dinner out', 27, eatingOut],
+    [-4, 'Coffee', 3.2, eatingOut],
+    [-4, 'Petrol', 45, transport],
+    [-2, 'Lunch', 8.7, eatingOut],
+    [-2, 'Haircut', 22, care],
+    [-1, 'Groceries', 31.6, groceries],
+    [-1, 'Coffee', 3.4, eatingOut],
+    [-1, 'Cinema', 11.5, fun],
+    [0, 'Coffee', 3.2, eatingOut],
+    [0, 'Lunch', 9.8, eatingOut],
   ]
   const transactions: Transaction[] = []
   let todayCount = 0
-  for (const [i, [offset, note, amount]] of spending.entries()) {
+  for (const [i, [offset, note, amount, envelopeId]] of spending.entries()) {
     const date = day(offset)
     // Earlier days: entered that day, before the last check-in (already in its balance).
     // Today: entered after it and before now, so today's number already counts them.
@@ -245,6 +281,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
       amount: -money(amount),
       note,
       createdAt,
+      ...(envelopeId ? { envelopeId } : {}),
     })
   }
   // Moves into savings: they leave the balance but are saving, not spending.
@@ -283,6 +320,22 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     },
   ]
 
+  // One note for this payday and one for a day ahead, so Plan and the calendar show both.
+  const notes: Note[] = [
+    {
+      id: noteId({ periodStart: lastPayday }),
+      periodStart: lastPayday,
+      text: 'Mum’s birthday this period. Her present comes from Gifts.',
+      updatedAt: at(lastPayday, 19),
+    },
+    {
+      id: noteId({ date: day(4) }),
+      date: day(4),
+      text: 'Car service at 9. Keep the morning free.',
+      updatedAt: at(day(-1), 21),
+    },
+  ]
+
   return {
     incomes,
     bills,
@@ -293,6 +346,8 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
     debts,
     impulse,
     noSpend,
+    envelopes,
+    notes,
     gardenPoints: 14,
   }
 }
@@ -302,7 +357,7 @@ export function buildDemoData(today: ISODate, now: Date, decimals = 2): DemoData
  * included, in one transaction. Settings keep what was chosen before, or on a first visit
  * (no settings yet) the device's locale, currency and week start, as setup would pick:
  * a visitor in the US should see "$" and a Sunday week, not the app's EUR default.
- * Full mode is on so every tab has something to show.
+ * Full mode and envelopes are on so every tab has something to show.
  */
 export async function seedDemo(now: Date = new Date()): Promise<void> {
   const stored = (await db.meta.get('settings'))?.value as Partial<Settings> | undefined
@@ -313,7 +368,10 @@ export async function seedDemo(now: Date = new Date()): Promise<void> {
   const stamp = now.toISOString()
   const demo: DemoState = { startedAt: stamp, kind: 'sample', entries: 0 }
   const meta: RowTypes['meta'][] = [
-    { key: 'settings', value: { ...previous, simpleMode: false } satisfies Settings },
+    {
+      key: 'settings',
+      value: { ...previous, simpleMode: false, envelopesEnabled: true } satisfies Settings,
+    },
     { key: 'setupProgress', value: { step: 'done', ackAt: stamp, doneAt: stamp } },
     { key: 'lastOpened', value: today },
     { key: 'gardenPoints', value: data.gardenPoints },

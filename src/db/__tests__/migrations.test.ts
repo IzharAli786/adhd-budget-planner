@@ -11,7 +11,7 @@ import {
   type SchemaVersion,
 } from '../schema'
 import { openDatabase, readSnapshot, snapshotDbName, writeSnapshot } from '../snapshot'
-import { LATEST_ROWS, openFixture, V1_ROWS } from './fixtures/v1'
+import { LATEST_ROWS, openFixture, V1_ROWS, V2_ROWS } from './fixtures/v1'
 
 const names: string[] = []
 const fresh = (label: string) => {
@@ -58,7 +58,8 @@ describe('migrateData', () => {
   })
 
   it('v2 fills debt.originalBalance from the balance, keeping one that exists', () => {
-    expect(SCHEMA_VERSION).toBe(2)
+    expect(SCHEMA_VERSION).toBe(3)
+    // v3 only added the notes table: no transform.
     expect(Object.keys(MIGRATIONS)).toEqual(['2'])
     const out = migrateData(
       {
@@ -103,6 +104,30 @@ describe('real-fixture upgrades', () => {
       expect(await db.table(table).toArray()).toEqual(sorted)
     }
     expect(await readSnapshot(name, 'migration')).toMatchObject({ fromVersion: 1 })
+    db.close()
+  })
+
+  it('a v2 database gains an empty notes table, keeps every row, and takes notes', async () => {
+    const name = fresh('v2-real')
+    await openFixture(name, 2, V2_ROWS)
+    const db = new SteadyDB(name)
+    await openDatabase(db, new Date('2026-10-31T00:00:00Z'))
+    expect(db.verno).toBe(3)
+    expect(await db.notes.count()).toBe(0)
+    for (const [table, rows] of Object.entries(V2_ROWS)) {
+      expect(await db.table(table).count()).toBe(rows.length)
+    }
+    expect(await db.debts.get('debt-card')).toMatchObject({ originalBalance: 250000 })
+    // The new indexes work on the upgraded database.
+    await db.notes.bulkPut([
+      { id: 'day|2026-11-02', date: '2026-11-02', text: 'Dentist', updatedAt: 'x' },
+      { id: 'period|2026-10-30', periodStart: '2026-10-30', text: 'Go easy', updatedAt: 'x' },
+    ])
+    expect(await db.notes.where('date').equals('2026-11-02').count()).toBe(1)
+    expect(await db.notes.where('periodStart').equals('2026-10-30').count()).toBe(1)
+    const snap = await readSnapshot(name, 'migration')
+    expect(snap).toMatchObject({ fromVersion: 2 })
+    expect(snap!.data).not.toHaveProperty('notes')
     db.close()
   })
 

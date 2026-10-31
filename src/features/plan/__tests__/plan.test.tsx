@@ -111,6 +111,8 @@ describe('Plan', () => {
     await userEvent.type(within(fit).getByRole('textbox', { name: 'Price' }), '40')
     await userEvent.click(within(fit).getByRole('button', { name: /Food · €100\.00 left/ }))
     expect(await within(fit).findByText(/fits inside Food/)).toBeTruthy()
+    // Envelopes without a budget (Everyday here) hold no room, so they are not offered.
+    expect(within(fit).queryByRole('button', { name: /Everyday/ })).toBeNull()
   })
 })
 
