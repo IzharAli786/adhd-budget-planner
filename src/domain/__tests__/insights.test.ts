@@ -168,6 +168,17 @@ describe('spendByCategory (envelopes off)', () => {
     ])
   })
 
+  it('counts a debt minimum paid through a logged entry once', () => {
+    const rows = spendByCategory(
+      [tx(-5000, { debtId: 'card', billOccurrenceId: 'card|2026-11-15' })],
+      [paid(debtMin)],
+      [debtMin],
+      [],
+      PERIOD,
+    )
+    expect(rows.find((r) => r.id === 'debt')!.actual).toBe(5000)
+  })
+
   it('scales the savings plan by the number of pay periods', () => {
     const rows = spendByCategory([], [], [], [fund], PERIOD, 12)
     expect(rows.find((r) => r.id === 'savings')!.planned).toBe(60000)

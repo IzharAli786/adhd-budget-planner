@@ -206,7 +206,8 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                 <p className="mt-4 text-body">{carryLine(latest.carried.amount, f.money)}</p>
               )}
               <p className="mt-3 text-sm text-muted">
-                Rebuilt from what you entered. Estimates only, not financial advice.
+                Out includes bills and debt payments; Debt shows that part on its own. Rebuilt from
+                what you entered. Estimates only, not financial advice.
               </p>
             </section>
 

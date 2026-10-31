@@ -150,7 +150,10 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         if (offerBackup) {
           setCarried(null)
           setPanel('backup')
-          void recordCarryOver(today).then((c) => setCarried(c?.amount ?? null))
+          // Bookkeeping only: if it fails, the sheet simply shows no carry-over line.
+          void recordCarryOver(today)
+            .then((c) => setCarried(c?.amount ?? null))
+            .catch(() => {})
         }
       }}
     />

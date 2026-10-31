@@ -38,7 +38,8 @@ export function InsightsSection({
           <InsightsCharts
             rows={rows}
             f={f}
-            caption={`Spending by ${by}, ${f.day(range.start)} to ${f.day(addDays(range.end, -1))}`}
+            caption={`${by === 'envelope' ? 'Spending' : 'Money out'} by ${by}, ${f.day(range.start)} to ${f.day(addDays(range.end, -1))}`}
+            centerLabel={by === 'envelope' ? 'Spent' : 'Out'}
           />
         </Suspense>
       ) : (

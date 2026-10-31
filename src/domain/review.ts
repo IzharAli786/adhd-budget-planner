@@ -6,7 +6,7 @@
 // savings and debt payments. Check-ins anchor the carry-over where there is one.
 import { paydayEntriesBetween } from './bills'
 import { addDays, makeDate, maxDate, minDate } from './dates'
-import { isEverydaySpend, paidBillsIn, type DateRange } from './insights'
+import { isDebtPayment, isEverydaySpend, paidBillsIn, type DateRange } from './insights'
 import type { Cents } from './money'
 import { currentPeriod, paydaysBetween, primaryIncome } from './paySchedule'
 import type {
@@ -93,15 +93,22 @@ export function historyStart(input: Pick<ReviewInput, 'today' | 'transactions' |
  * Money in and out over [start, end). Paydays count from the start of the history up to
  * today: future ones haven't come, and ones before Steady was used were never tracked.
  */
-export function flowsIn(input: ReviewInput, range: DateRange): Flows {
+export function flowsIn(input: ReviewInput, whole: DateRange): Flows {
+  // Clipped to the history for every kind of flow, not only paydays: bills ticked paid
+  // during setup are dated before it, and counting them without the pay that covered
+  // them would make a first month look like a loss.
+  const range = { start: maxDate(whole.start, input.since ?? historyStart(input)), end: whole.end }
+  if (range.start >= range.end) return totalFlows([])
   const txs = input.transactions.filter((t) => t.deletedAt === undefined && within(t.date, range))
-  const payStart = maxDate(range.start, input.since ?? historyStart(input))
   const payEnd = minDate(range.end, addDays(input.today, 1))
-  const pay = sum(
-    paydayEntriesBetween(input.incomes, input.paydayOverrides, payStart, payEnd).map(
-      (p) => p.amount,
-    ),
-  )
+  const pay =
+    range.start < payEnd
+      ? sum(
+          paydayEntriesBetween(input.incomes, input.paydayOverrides, range.start, payEnd).map(
+            (p) => p.amount,
+          ),
+        )
+      : 0
   const everyday = txs.filter(isEverydaySpend)
   const otherIn = sum(everyday.filter((t) => t.amount > 0).map((t) => t.amount))
   const spending = 0 - sum(everyday.filter((t) => t.amount < 0).map((t) => t.amount))
@@ -109,7 +116,7 @@ export function flowsIn(input: ReviewInput, range: DateRange): Flows {
   const billsPaid = sum(paid.filter((e) => e.debtId === undefined).map((e) => e.amount))
   const debtPaid =
     sum(paid.filter((e) => e.debtId !== undefined).map((e) => e.amount)) -
-    sum(txs.filter((t) => t.debtId !== undefined && t.fundId === undefined).map((t) => t.amount))
+    sum(txs.filter(isDebtPayment).map((t) => t.amount))
   const saved = 0 - sum(txs.filter((t) => t.fundId !== undefined).map((t) => t.amount))
   const incomeIn = pay + otherIn
   const moneyOut = spending + billsPaid + debtPaid
@@ -192,9 +199,9 @@ export function carryOver(
   const sorted = [...input.checkIns].sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.at < b.at ? -1 : a.at > b.at ? 1 : 0,
   )
-  const inPeriod = sorted.find(
-    (c) => c.date >= payday && (periodEnd === null || c.date < periodEnd),
-  )
+  const first = sorted.find((c) => c.date >= payday && (periodEnd === null || c.date < periodEnd))
+  // The latest one on that day: a second check-in the same day corrects the first.
+  const inPeriod = first && sorted.findLast((c) => c.date === first.date)
   if (inPeriod) {
     const since = flowsIn(input, { start: payday, end: addDays(inPeriod.date, 1) })
     return { amount: inPeriod.balance - since.net, source: 'check-in' }
@@ -256,14 +263,10 @@ export function totalFlows(rows: readonly Flows[]): Flows {
   }
 }
 
-/** Years Look back can show: from the first thing entered up to this year. */
+/** Years Look back can show: from the start of the history up to this year. Bills paid
+ *  before it are not counted (see flowsIn), so they open no empty year either. */
 export function reviewYears(input: ReviewInput): number[] {
   const thisYear = Number(input.today.slice(0, 4))
-  const dates = [
-    ...input.transactions.map((t) => t.date),
-    ...input.checkIns.map((c) => c.date),
-    ...input.occurrences.filter((o) => o.status === 'paid').map((o) => o.movedTo ?? o.originalDate),
-  ]
-  const first = dates.reduce((y, d) => Math.min(y, Number(d.slice(0, 4))), thisYear)
+  const first = Math.min(thisYear, Number((input.since ?? historyStart(input)).slice(0, 4)))
   return Array.from({ length: thisYear - first + 1 }, (_, i) => first + i)
 }

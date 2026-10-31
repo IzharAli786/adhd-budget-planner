@@ -33,6 +33,13 @@ const live = <T extends { deletedAt?: string }>(rows: readonly T[]) =>
 export const isEverydaySpend = (t: Transaction) =>
   t.fundId === undefined && t.debtId === undefined && t.billOccurrenceId === undefined
 
+/**
+ * A payment logged against a debt. One logged for a bill occurrence (the debt's minimum)
+ * is left out: that money already counts once, as the paid bill.
+ */
+export const isDebtPayment = (t: Transaction) =>
+  t.debtId !== undefined && t.fundId === undefined && t.billOccurrenceId === undefined
+
 /** Paid bill entries whose (moved) date is in the range. */
 export function paidBillsIn(
   bills: readonly Bill[],
@@ -120,9 +127,7 @@ export function spendByCategory(
   const everyday =
     0 - sum(txs.filter((t) => isEverydaySpend(t) && t.amount < 0).map((t) => t.amount))
   const saved = 0 - sum(txs.filter((t) => t.fundId !== undefined).map((t) => t.amount))
-  const debtTx =
-    0 -
-    sum(txs.filter((t) => t.debtId !== undefined && t.fundId === undefined).map((t) => t.amount))
+  const debtTx = 0 - sum(txs.filter(isDebtPayment).map((t) => t.amount))
   const entries = billEntriesBetween(bills, occurrences, period.start, period.end).filter(
     (e) => e.status !== 'skipped',
   )

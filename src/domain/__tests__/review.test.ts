@@ -96,7 +96,10 @@ const base: ReviewInput = {
 
 describe('flowsIn', () => {
   it('adds up October: pay, spending, bills, savings, debt', () => {
-    const october = flowsIn(base, { start: '2026-10-01', end: '2026-11-01' })
+    const october = flowsIn(
+      { ...base, since: '2026-10-01' },
+      { start: '2026-10-01', end: '2026-11-01' },
+    )
     expect(october).toEqual({
       incomeIn: 210000 + 1500,
       spending: 6500,
@@ -122,6 +125,50 @@ describe('flowsIn', () => {
     }
     const october = flowsIn(input, { start: '2026-10-01', end: '2026-11-01' })
     expect(october.moneyOut).toBe(0)
+  })
+
+  it('leaves out bills paid before the history starts, like the pay before it', () => {
+    // History starts 3 Oct: rent on 1 Oct was ticked paid during setup, and the pay that
+    // covered it (30 Sep) is not counted, so neither is the rent.
+    const october = flowsIn(base, { start: '2026-10-01', end: '2026-11-01' })
+    expect(october.billsPaid).toBe(0)
+    expect(october.debtPaid).toBe(6000 + 3000)
+    expect(flowsIn(base, { start: '2026-09-01', end: '2026-10-01' })).toEqual(totalFlows([]))
+  })
+
+  it('counts a debt payment logged for a paid minimum once (as the bill)', () => {
+    const input: ReviewInput = {
+      ...base,
+      since: '2026-10-01',
+      transactions: [
+        tx('2026-10-15', -6000, { debtId: 'card', billOccurrenceId: 'card|2026-10-15' }),
+      ],
+    }
+    const october = flowsIn(input, { start: '2026-10-01', end: '2026-11-01' })
+    expect(october.debtPaid).toBe(6000)
+    expect(october.spending).toBe(0)
+  })
+
+  it('stays fast with a few years of entries', () => {
+    const many = Array.from({ length: 3000 }, (_, i) =>
+      tx(addDays('2024-01-01', i % 1000), -(100 + (i % 50)), i % 7 === 0 ? { fundId: 'f' } : {}),
+    )
+    const input: ReviewInput = {
+      ...base,
+      today: '2026-12-31',
+      transactions: many,
+      checkIns: Array.from({ length: 36 }, (_, i) => ({
+        at: `x${i}`,
+        date: addDays('2024-01-05', i * 30),
+        balance: 100000,
+      })),
+    }
+    const t0 = performance.now()
+    for (const y of [2024, 2025, 2026]) {
+      periodSummaries(y, 'month', input)
+      periodSummaries(y, 'payday', input)
+    }
+    expect(performance.now() - t0).toBeLessThan(1500)
   })
 })
 
@@ -176,6 +223,12 @@ describe('periodSummaries', () => {
       2024, 2025, 2026,
     ])
   })
+
+  it('opens no year for bills ticked paid before the history', () => {
+    const old = { id: 'rent|2024-03-01', billId: 'rent', originalDate: '2024-03-01' }
+    const input = { ...base, occurrences: [{ ...old, status: 'paid' as const, paidAt: 'x' }] }
+    expect(reviewYears(input)).toEqual([2026])
+  })
 })
 
 describe('carryOver', () => {
@@ -205,6 +258,21 @@ describe('carryOver', () => {
     expect(carryOver(input, '2026-10-30', '2026-11-30')).toEqual({
       amount: 50000 - 2000 + 1500 - 7500 - 3000,
       source: 'flows',
+    })
+  })
+
+  it('takes a same-day correction over the first check-in', () => {
+    const input = {
+      ...base,
+      checkIns: [
+        { at: '2026-11-02T20:00:00.000Z', date: '2026-11-02', balance: 999999 },
+        { at: '2026-11-02T20:05:00.000Z', date: '2026-11-02', balance: 150000 },
+        { at: '2026-11-03T09:00:00.000Z', date: '2026-11-03', balance: 1 },
+      ],
+    }
+    expect(carryOver(input, '2026-10-30', '2026-11-30')).toEqual({
+      amount: 150000 - (210000 - 90000 - 1200),
+      source: 'check-in',
     })
   })
 

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { addDays } from '../../domain/dates'
+import { addDays, maxDate } from '../../domain/dates'
 import { paidShare } from '../../domain/debt'
 import { paidBillsIn, type DateRange } from '../../domain/insights'
-import { carryOver, flowsIn, type PeriodSummary } from '../../domain/review'
+import { carryOver, flowsIn, historyStart, type PeriodSummary } from '../../domain/review'
 import { fundSaved } from '../../domain/savings'
 import type { ISODate } from '../../domain/types'
 import type { Formatters } from '../bills/format'
@@ -41,9 +41,15 @@ export function PrintReport({
   const flows = flowsIn(data.input, range)
   const carried =
     target.kind === 'period' && target.payday ? carryOver(data.input, range.start, range.end) : null
-  const categories = insightRows(data, range, target.kind === 'year' ? target.periods : 1)
+  // The same span the summary counts (flowsIn starts at the history), so the tables below
+  // never list bills the totals above leave out.
+  const counted = {
+    start: maxDate(range.start, data.input.since ?? historyStart(data.input)),
+    end: range.end,
+  }
+  const categories = insightRows(data, counted, target.kind === 'year' ? target.periods : 1)
   const spent = categories.reduce((a, r) => a + r.actual, 0)
-  const paid = paidBillsIn(data.bills, data.occurrences, range)
+  const paid = paidBillsIn(data.bills, data.occurrences, counted)
 
   return (
     <article className="print-report hidden text-[10pt] leading-snug text-text">

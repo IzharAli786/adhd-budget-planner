@@ -189,6 +189,10 @@ describe('Insights on Plan', () => {
     const spending = within(past).getByText('Spending').parentElement!
     expect(within(spending).getByText('€20.00')).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Can this fit?' })).toBeNull()
+    // Nothing was tracked before 25 Oct: no empty periods to step through.
+    expect(screen.getByRole('button', { name: 'Previous period' }).hasAttribute('disabled')).toBe(
+      true,
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Back to now' }))
     expect(await screen.findByRole('region', { name: 'This period' })).toBeTruthy()
   })

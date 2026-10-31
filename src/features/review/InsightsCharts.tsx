@@ -14,6 +14,9 @@ interface Props {
   f: Formatters
   /** Names the figure for screen readers, e.g. "Spending by envelope, this period". */
   caption: string
+  /** The word in the donut's middle: "Spent" for envelopes; "Out" when the groups include
+   *  savings and debt, which are not spending. */
+  centerLabel?: string
 }
 
 const REST = 'rest'
@@ -22,7 +25,7 @@ const R = 52
 const STROKE = 18
 const C = 2 * Math.PI * R
 
-export default function InsightsCharts({ rows, f, caption }: Props) {
+export default function InsightsCharts({ rows, f, caption, centerLabel = 'Spent' }: Props) {
   const [showTable, setShowTable] = useState(false)
   const tableId = useId()
   const { top, rest, total } = topCategories(rows)
@@ -48,7 +51,7 @@ export default function InsightsCharts({ rows, f, caption }: Props) {
       {!showTable && (
         <div aria-hidden="true" className="mb-3 space-y-7">
           <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-7">
-            <Donut slices={slices} colorOf={colorOf} total={f.money(total)} />
+            <Donut slices={slices} colorOf={colorOf} label={centerLabel} total={f.money(total)} />
             <ul className="w-full min-w-0 flex-1 space-y-2 text-body">
               {slices.map((s) => (
                 <li key={s.key} className="flex items-center gap-2.5 whitespace-nowrap">
@@ -97,10 +100,12 @@ export default function InsightsCharts({ rows, f, caption }: Props) {
 function Donut({
   slices,
   colorOf,
+  label,
   total,
 }: {
   slices: { key: string; share: number }[]
   colorOf: (key: string) => string
+  label: string
   total: string
 }) {
   // A hairline of surface between slices separates neighbours without relying on colour.
@@ -138,7 +143,7 @@ function Donut({
         </g>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-caption text-muted">Spent</span>
+        <span className="text-caption text-muted">{label}</span>
         <span className="max-w-[5.5rem] truncate text-sm font-semibold tabular-nums">{total}</span>
       </div>
     </div>

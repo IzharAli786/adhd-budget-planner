@@ -4,9 +4,9 @@ import type { DateRange } from '../../domain/insights'
 import {
   carryOver,
   flowsIn,
+  historyStart,
   payPeriodRanges,
   previousPayPeriod,
-  reviewYears,
 } from '../../domain/review'
 import { Icon } from '../../ui/Icon'
 import { useFormat } from '../bills/format'
@@ -34,9 +34,9 @@ export function PeriodNav({
 }) {
   const f = useFormat()
   const shown = viewing ?? current
-  const firstYear = reviewYears(data.input)[0]!
   const prev = previousPayPeriod(data.input, shown.start)
-  const canGoBack = prev !== null && Number(prev.start.slice(0, 4)) >= firstYear
+  // Only periods with some history in them: before it, every one would read as empty.
+  const canGoBack = prev !== null && prev.end > (data.input.since ?? historyStart(data.input))
 
   function next() {
     if (!viewing) return
