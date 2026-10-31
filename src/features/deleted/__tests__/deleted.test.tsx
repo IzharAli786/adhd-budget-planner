@@ -57,6 +57,30 @@ describe('Recently deleted', () => {
   })
 })
 
+describe('Recently deleted counts', () => {
+  it('counts a deleted debt once, as the list shows it', async () => {
+    const { debt } = await r.addDebt({
+      name: 'Card',
+      balance: 50000,
+      balanceAsOf: '2026-11-01',
+      aprBps: 1999,
+      minPayment: 2500,
+      dueDay: 15,
+    })
+    await r.deleteDebt(debt.id)
+    window.history.replaceState(null, '', '/more/deleted')
+    render(<App />)
+
+    expect(await screen.findByText('Debt · 30 days left')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /^Restore / })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Delete all for good' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Delete these for good?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete for good' }))
+    expect(await screen.findByText('1 item deleted for good.')).toBeTruthy()
+    expect(await r.listBills()).toEqual([])
+  })
+})
+
 describe('More > Undo last change', () => {
   it('names the change and reverts it, even after a reload', async () => {
     await r.addTransaction({ date: '2026-11-04', amount: -1200, note: 'coffee' })

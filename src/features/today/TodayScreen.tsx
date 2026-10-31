@@ -31,6 +31,7 @@ export function TodayScreen() {
   // Ticks each minute and on return to the app, so a 24 h "Not now" ends on time.
   const now = useNow()
   const model = useTodayModel(today, now)
+  const { ready } = useCatchUpSession()
 
   return (
     <div className="space-y-5">
@@ -39,7 +40,7 @@ export function TodayScreen() {
       <p aria-hidden="true" className="text-sm font-medium tracking-wide text-muted md:hidden">
         Steady
       </p>
-      {!model.loaded || !model.plan ? (
+      {!model.loaded || !model.plan || !ready ? (
         <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
       ) : (
         <TodayBody model={model} today={today} now={now} />

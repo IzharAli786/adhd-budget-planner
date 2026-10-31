@@ -39,6 +39,7 @@ export function FreshStart({ gap, today, onDone }: Props) {
   const [negative, setNegative] = useState(false)
   const [tried, setTried] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [picking, setPicking] = useState(false)
   // "Mark all paid" is the default; the user unticks the ones that didn't go out.
   const [notYet, setNotYet] = useState<ReadonlySet<string>>(new Set())
@@ -51,6 +52,7 @@ export function FreshStart({ gap, today, onDone }: Props) {
     setTried(true)
     if (amount === null) return
     setSaving(true)
+    setFailed(false)
     try {
       await applyFreshStart({
         balance: negative ? -amount : amount,
@@ -58,6 +60,10 @@ export function FreshStart({ gap, today, onDone }: Props) {
         paid: [...autoPaid.map((b) => pick(b, true)), ...paidManual.map((b) => pick(b, false))],
         archive,
       })
+    } catch {
+      // One transaction: nothing was written, so trying again is safe.
+      setFailed(true)
+      return
     } finally {
       setSaving(false)
     }
@@ -163,6 +169,11 @@ export function FreshStart({ gap, today, onDone }: Props) {
           </fieldset>
         )}
 
+        {failed && (
+          <p role="alert" className="text-[0.9375rem] text-muted">
+            That didn’t save. Nothing changed, so you can try again.
+          </p>
+        )}
         <div className="flex flex-col gap-2 pt-1">
           <Button type="submit" block size="lg" disabled={saving}>
             Update and carry on

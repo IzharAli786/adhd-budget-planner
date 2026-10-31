@@ -7,6 +7,8 @@ import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
 
+const REVOKE_DELAY_MS = 10_000
+
 /**
  * The backup file, built as soon as the screen or sheet using it mounts and rebuilt when
  * the data changes (useLiveQuery re-runs the export), so a tap never waits on IndexedDB.
@@ -33,7 +35,15 @@ export function SaveBackupButton({ file, onSaved, label = 'Save backup', classNa
     () => (file && !share ? URL.createObjectURL(file) : undefined),
     [file, share],
   )
-  useEffect(() => () => void (href && URL.revokeObjectURL(href)), [href])
+  // Not revoked at once: tapping the link saves a backup, the data change re-prepares the
+  // file, and revoking the old URL milliseconds after the tap can cancel the download in
+  // Safari (same reason as download() in lib/share).
+  useEffect(
+    () => () => {
+      if (href) setTimeout(() => URL.revokeObjectURL(href), REVOKE_DELAY_MS)
+    },
+    [href],
+  )
 
   async function saved(result: Exclude<SaveResult, 'cancelled'>) {
     await recordBackup()

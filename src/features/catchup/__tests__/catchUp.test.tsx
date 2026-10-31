@@ -85,6 +85,20 @@ describe('fresh start after three weeks away', () => {
     expect(await r.listTransactions()).toEqual([])
   })
 
+  it('never flashes the usual Today before the welcome', async () => {
+    await awayThreeWeeks()
+    let heroSeen = false
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[aria-labelledby="fresh-start"]')) return
+      if (screen.queryByRole('region', { name: 'Today’s number' })) heroSeen = true
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    render(<App />)
+    await screen.findByRole('region', { name: /Welcome back/ })
+    observer.disconnect()
+    expect(heroSeen).toBe(false)
+  })
+
   it('lets the user keep a bill unpaid as an exception', async () => {
     const { phone } = await awayThreeWeeks()
     render(<App />)

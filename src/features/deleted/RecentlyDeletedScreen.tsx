@@ -42,7 +42,9 @@ export function RecentlyDeletedScreen() {
   }
 
   async function empty() {
-    const n = await purgeDeleted(new Date(), 0)
+    // Count what the list showed: a debt's minimum bill goes with it but is not its own row.
+    const n = items?.length ?? 0
+    await purgeDeleted(new Date(), 0)
     setConfirmEmpty(false)
     toast.show({ message: n === 1 ? '1 item deleted for good.' : `${n} items deleted for good.` })
   }

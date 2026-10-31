@@ -17,11 +17,18 @@ import { useToday } from '../../lib/useToday'
 interface CatchUpSession {
   /** The day the app was last open before this session; null when there is nothing to show. */
   since: ISODate | null
+  /** lastOpened has been read. Until then Today waits, so it never flashes the usual
+   *  screen and then swaps it for the fresh start. */
+  ready: boolean
   /** The catch-up was shown and handled (or set aside). */
   dismiss: () => void
 }
 
-const CatchUpContext = createContext<CatchUpSession>({ since: null, dismiss: () => {} })
+const CatchUpContext = createContext<CatchUpSession>({
+  since: null,
+  ready: true,
+  dismiss: () => {},
+})
 
 // Old installs (and hand-edited backups) may hold an instant; compare by local day.
 const toLocalDay = (v: ISODate | Instant) => (v.length > 10 ? todayISO(new Date(v)) : v)
@@ -56,7 +63,10 @@ export function CatchUpProvider({ children }: { children: ReactNode }) {
   }, [since, freshPending, today])
 
   const dismiss = useCallback(() => setSince(null), [])
-  const value = useMemo(() => ({ since: since ?? null, dismiss }), [since, dismiss])
+  const value = useMemo(
+    () => ({ since: since ?? null, ready: since !== undefined, dismiss }),
+    [since, dismiss],
+  )
   return <CatchUpContext.Provider value={value}>{children}</CatchUpContext.Provider>
 }
 
