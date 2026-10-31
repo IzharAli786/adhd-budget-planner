@@ -160,7 +160,7 @@ end-to-end journeys, and a manual checklist for what automation can't reach.
 | Database      | Vitest + fake-indexeddb                | Repositories, real v1 to latest migration fixtures, the pre-migration snapshot, backup round-trip, every restore rejection, the undo log                                                                                                                                   |
 | Components    | Vitest + Testing Library (happy-dom)   | Setup flow, quick-add, Today math always sums, bills editor scopes, dialogs and focus                                                                                                                                                                                      |
 | End to end    | Playwright (Chromium + WebKit, 390 px) | Unlock, four setup steps and a number in under 60 s; "12 coffee" lowers today by exactly €12; add a bill, mark paid, undo; backup download and restore; offline after the SW is ready (Chromium); `page.clock` across local midnight; the demo build has no lock and no SW |
-| Accessibility | @axe-core/playwright                   | Zero serious or critical violations on Today, Bills, Goals, More and Settings, in light and dark                                                                                                                                                                           |
+| Accessibility | @axe-core/playwright                   | Zero serious or critical violations on Today, Plan, Bills, Goals, More, Settings and the "See the math" sheet, with data on screen, in light and dark                                                                                                                      |
 | Bundle        | Node scripts                           | Manifest and SW checks; the demo bundle carries no hash                                                                                                                                                                                                                    |
 | Manual        | A real iPhone                          | Install from the PDF, update, share a backup to Files, restore on a second device                                                                                                                                                                                          |
 
@@ -173,8 +173,7 @@ which is why the manual checklist exists.
 
 ## Roadmap
 
-- Demo polish: sample data seeded relative to today, a 25-entry cap, reset, and "bring
-  your setup into the full app".
+- Demo polish: sample data seeded relative to today, a 25-entry cap and reset.
 - Help FAQ ("How this number works"), what's new, and strings behind `t()` for
   translation.
 - Large-text (150%) layout pass and a performance budget (initial JS under 200 KB gzip)

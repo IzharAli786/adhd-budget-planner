@@ -72,8 +72,9 @@ longer after today is asked again. Setup counts as done when
 Locally a server that is already running on those ports is reused, so stop an old
 `preview` if you changed code. CI always builds fresh.
 
-Specs in `e2e/`, helpers in `e2e/helpers.ts` (`unlockAndSetup`, `heroCents`,
-`logExpense`). Each test gets a fresh browser context, so a fresh IndexedDB: every spec
+Specs in `e2e/`, helpers in `e2e/helpers.ts` (`unlockAndSetup`, `answerSetup`,
+`heroCents`, `logExpense`, `addFirstBill`). `heroCents` is signed: "€5.00 short" reads
+as -500, so a "drops by exactly" check can't pass on a number that crossed zero. Each test gets a fresh browser context, so a fresh IndexedDB: every spec
 starts from the unlock screen and answers setup through the UI.
 
 Notes:
@@ -88,7 +89,10 @@ Notes:
 - The offline spec is Chromium only (PLAN §9). The first load is never controlled by a new
   service worker, so it reloads once before going offline.
 - The a11y spec emulates `prefers-reduced-motion: reduce`, or axe can measure colours
-  halfway through a fade-in.
+  halfway through a fade-in. It logs an expense and adds a bill first, so rows, chips
+  and calendar dots are scanned, not just empty states.
+- The demo spec finishes setup before checking for a service worker: the full app only
+  registers one from the shell, so checking on the setup screen would prove nothing.
 - `midnight.spec.ts` uses `page.clock.install()` with an explicit `+01:00` offset, then
   `runFor` past midnight, to check `useToday` rolls over while the app stays open.
 

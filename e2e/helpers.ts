@@ -14,9 +14,15 @@ export function hero(page: Page): Locator {
   return page.getByRole('region', { name: 'Today’s number' }).locator('p[aria-live="polite"]')
 }
 
+/**
+ * Signed: the hero never shows a minus, it says "€5.00 short" or "€5.00 over". Reading
+ * that as +500 would let a "lowers by exactly" check pass on a number that went the
+ * wrong way past zero.
+ */
 export async function heroCents(page: Page): Promise<number> {
   const text = (await hero(page).textContent()) ?? ''
-  return Number(text.replace(/[^\d]/g, ''))
+  const cents = Number(text.replace(/[^\d]/g, ''))
+  return /\b(short|over)\b/.test(text) ? -cents : cents
 }
 
 /** Unlock with the dev code and answer the four setup steps, ending on Today. */
@@ -24,7 +30,11 @@ export async function unlockAndSetup(page: Page, opts: SetupOptions = {}) {
   await page.goto('/')
   await page.getByLabel('Unlock code').fill(DEV_CODE)
   await page.getByRole('button', { name: 'Unlock' }).click()
+  await answerSetup(page, opts)
+}
 
+/** The four setup steps from the disclaimer on; the demo starts here with no lock. */
+export async function answerSetup(page: Page, opts: SetupOptions = {}) {
   await page.getByRole('button', { name: 'I understand' }).click()
 
   await expect(page.getByRole('heading', { name: 'When do you next get paid?' })).toBeVisible()
@@ -55,4 +65,14 @@ export async function logExpense(page: Page, text: string) {
   await quickAdd(page).press('Enter')
   await expect(quickAdd(page)).toHaveValue('')
   return before
+}
+
+/** From Bills with no bills yet: add one monthly bill through the sheet. */
+export async function addFirstBill(page: Page, name: string, amount: string) {
+  await page.getByRole('button', { name: 'Add your first bill' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Add a bill' })
+  await sheet.getByLabel('Name').fill(name)
+  await sheet.getByLabel('Amount').fill(amount)
+  await sheet.getByRole('button', { name: 'Add bill' }).click()
+  await expect(sheet).toBeHidden()
 }
