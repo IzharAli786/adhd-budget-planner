@@ -71,6 +71,18 @@ longer after today is asked again. Setup counts as done when
   transform: older databases and backups simply have no notes. A step's upgrade only reads
   stores that already exist, since a later version's tables are created after it runs.
 
+  Settings later gained optional `displayName` and `accent` fields; both are optional in
+  `backupSchema.ts`, so no version bump: older files simply lack them.
+
+## Custom accent and erase
+
+`src/domain/accent.ts` judges a picked accent against the theme's backgrounds (a copy of
+app.css, checked by `styles/__tests__/accentPalettes.test.ts`) and refuses one below AA,
+offering the nearest passing shade. `app/theme.ts` sets the derived `--l-accent*` and
+`--d-accent*` inline on `<html>`. More > Backup > "Erase everything" (`db/erase.ts`)
+clears every table (the unlock flag included), the safety-copy database and the cached
+appearance.
+
 ## Look back and Insights
 
 `src/domain/insights.ts` (spending per envelope or per kind) and `src/domain/review.ts`

@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { GARDEN_STAGES } from '../../domain/garden'
+import { Icon } from '../../ui/Icon'
 import { ProgressBar } from '../../ui/Progress'
 import { GardenArt } from './GardenArt'
 import { useGarden } from './useGarden'
@@ -45,22 +46,40 @@ export function GardenCard() {
   )
 }
 
-/** The small glance below the fold on Today (PLAN §5). */
+/**
+ * The small glance below the fold on Today (PLAN §5). Horizontal and compact: the
+ * picture, the stage, and how close the next one is, so the side column isn't half empty.
+ */
 export function GardenGlance() {
   const garden = useGarden()
   if (!garden) return null
+  const { stage, points } = garden
+  const toNext = stage.nextAt === null ? null : stage.nextAt - points
+  const next = GARDEN_STAGES[stage.index + 1]
   return (
     <Link
       to="/goals"
-      className="card-quiet flex min-h-14 items-center gap-3 px-4 py-2 transition-colors hover:bg-accent-soft/40"
+      className="card-quiet flex min-h-14 items-center gap-4 px-4 py-3 transition-colors hover:bg-accent-soft/40"
     >
       <span className="w-16 shrink-0">
-        <GardenArt stage={garden.stage.index} size={64} />
+        <GardenArt stage={stage.index} size={64} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm text-muted">Your garden</span>
-        <span className="block font-medium">{garden.stage.name}</span>
+        <span className="block font-medium">{stage.name}</span>
+        <span className="mt-0.5 block text-sm text-muted">
+          {toNext === null || !next
+            ? 'Fully grown'
+            : `Next: ${next.name.toLowerCase()}, ${toNext} ${toNext === 1 ? 'good moment' : 'good moments'} away`}
+        </span>
+        {/* Decorative here: the line above already says how far, in words. */}
+        {toNext !== null && (
+          <span aria-hidden="true" className="mt-2 block">
+            <ProgressBar value={stage.progress} label="Growth to the next stage" />
+          </span>
+        )}
       </span>
+      <Icon name="chevron" size={18} className="shrink-0 text-muted" />
     </Link>
   )
 }

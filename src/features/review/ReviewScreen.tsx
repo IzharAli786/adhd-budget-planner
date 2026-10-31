@@ -163,13 +163,21 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                 value={f.money(totals.debtPaid)}
                 hint="Minimums and extra payments"
               />
-              {interest && (
-                <Tile
-                  label="Interest avalanche saves"
-                  value={f.money(Math.max(0, interest.interestSaved))}
-                  hint="Compared with snowball, an estimate"
-                />
-              )}
+              {interest &&
+                // Never "saves €0.00": when neither order is cheaper, say so plainly.
+                (interest.interestSaved === 0 ? (
+                  <Tile
+                    label="Snowball or avalanche"
+                    value="Same cost"
+                    hint="Both plans cost the same here"
+                  />
+                ) : (
+                  <Tile
+                    label={`Interest ${interest.interestSaved > 0 ? 'avalanche' : 'snowball'} saves`}
+                    value={f.money(Math.abs(interest.interestSaved))}
+                    hint={`Compared with ${interest.interestSaved > 0 ? 'snowball' : 'avalanche'}, an estimate`}
+                  />
+                ))}
             </section>
 
             <section aria-labelledby="flow-title" className="card p-5 sm:p-6">

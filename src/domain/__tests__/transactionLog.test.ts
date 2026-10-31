@@ -4,11 +4,12 @@ import { savingsOnPaydays } from '../savings'
 import {
   ALL_TIME,
   filterLog,
-  logMonths,
+  logYears,
   logTotals,
   monthRange,
   newestFirst,
   payPeriods,
+  yearMonths,
   type LogRange,
 } from '../transactionLog'
 import type { IncomeSource, SavingsFund, Transaction } from '../types'
@@ -100,12 +101,23 @@ describe('months', () => {
     })
   })
 
-  it('logMonths lists months with entries plus the current one, newest first', () => {
-    const months = logMonths(
-      [tx({ date: '2026-09-03' }), tx({ date: '2026-11-01' }), tx({ date: '2026-09-30' })],
-      '2026-12-02',
-    )
-    expect(months.map((m) => m.start)).toEqual(['2026-12-01', '2026-11-01', '2026-09-01'])
+  it('logYears lists years with entries plus the current one, newest first', () => {
+    expect(
+      logYears(
+        [tx({ date: '2024-09-03' }), tx({ date: '2026-11-01' }), tx({ date: '2024-01-30' })],
+        '2026-12-02',
+      ),
+    ).toEqual(['2026', '2024'])
+    expect(logYears([], '2026-12-02')).toEqual(['2026'])
+  })
+
+  it('yearMonths gives January up to this month this year, all twelve before', () => {
+    const now = yearMonths('2026', '2026-03-15')
+    expect(now.map((m) => m.start)).toEqual(['2026-01-01', '2026-02-01', '2026-03-01'])
+    expect(now[2]).toEqual({ kind: 'month', start: '2026-03-01', end: '2026-04-01' })
+    const past = yearMonths('2025', '2026-03-15')
+    expect(past).toHaveLength(12)
+    expect(past[11]).toEqual({ kind: 'month', start: '2025-12-01', end: '2026-01-01' })
   })
 })
 
@@ -150,8 +162,31 @@ describe('logTotals and order', () => {
       count: 3,
       in: 150000,
       out: 1300,
+      inCount: 1,
+      outCount: 2,
+      averageOut: 650,
+      averageIn: 150000,
     })
-    expect(logTotals([])).toEqual({ count: 0, in: 0, out: 0 })
+    expect(logTotals([])).toEqual({
+      count: 0,
+      in: 0,
+      out: 0,
+      inCount: 0,
+      outCount: 0,
+      averageOut: 0,
+      averageIn: 0,
+    })
+  })
+
+  it('averages round to whole cents and stay within the smallest and largest entry', () => {
+    expect(logTotals([{ amount: -100 }, { amount: -101 }]).averageOut).toBe(101)
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: -1e9, max: -1 }), { minLength: 1 }), (amounts) => {
+        const { averageOut } = logTotals(amounts.map((amount) => ({ amount })))
+        expect(averageOut).toBeGreaterThanOrEqual(-Math.max(...amounts))
+        expect(averageOut).toBeLessThanOrEqual(-Math.min(...amounts))
+      }),
+    )
   })
 
   it('in - out is always the net of the amounts', () => {

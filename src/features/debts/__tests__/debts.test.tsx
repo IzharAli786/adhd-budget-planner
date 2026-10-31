@@ -77,6 +77,15 @@ describe('Debts', () => {
     expect(await r.listDebts()).toHaveLength(0)
   })
 
+  it('never says a plan "saves €0.00": equal plans are named as the same cost', async () => {
+    await r.updateSettings({ simpleMode: false })
+    await r.addDebt(card)
+    window.history.replaceState(null, '', '/goals')
+    render(<App />)
+    expect(await screen.findByText(/Both plans cost the same here/)).toBeTruthy()
+    expect(screen.queryByText(/saves .*0\.00/)).toBeNull()
+  })
+
   it('Full mode: Goals compares snowball and avalanche with order, chart table and note', async () => {
     await r.updateSettings({ simpleMode: false })
     await r.addDebt(card)

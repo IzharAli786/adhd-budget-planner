@@ -2,15 +2,13 @@ import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { useToast } from '../ui/Toast'
 
 const HOUR = 60 * 60 * 1000
 
 // registerType 'prompt' (PLAN §6): a new version installs in the background and WAITS.
 // The user decides when to switch, so nobody loses a half-typed amount to a reload. If
 // they ignore it, the new version takes over at the next cold start anyway.
-export function UpdateToast() {
-  const toast = useToast()
+export function UpdateToast({ onOfflineReady }: { onOfflineReady: () => void }) {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     offlineReady: [offlineReady, setOfflineReady],
@@ -30,11 +28,13 @@ export function UpdateToast() {
     },
   })
 
+  // Not a toast: on the first run it lands right after setup, where a phone toast would
+  // sit on the one-thing-now card. The shell shows it as a slim note in the page instead.
   useEffect(() => {
     if (!offlineReady) return
-    toast.show({ message: 'Steady now works offline.' })
+    onOfflineReady()
     setOfflineReady(false)
-  }, [offlineReady, setOfflineReady, toast])
+  }, [offlineReady, setOfflineReady, onOfflineReady])
 
   if (!needRefresh) return null
 

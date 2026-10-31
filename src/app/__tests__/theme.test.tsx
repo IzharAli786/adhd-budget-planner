@@ -39,6 +39,20 @@ describe('applyAppearance', () => {
     expect(root().style.getPropertyValue('--text-scale')).toBe(scale)
   })
 
+  it('a custom accent overrides the theme tokens for both modes, and clears again', () => {
+    const base = { theme: 'clay', mode: 'auto', largeText: 100, reducedMotion: 'auto' } as const
+    applyAppearance({ ...base, accent: '#2d6688' })
+    expect(root().style.getPropertyValue('--l-accent')).toBe('#2d6688')
+    // Dark mode gets its own, lighter shade of the same colour.
+    const dark = root().style.getPropertyValue('--d-accent')
+    expect(dark).toMatch(/^#[0-9a-f]{6}$/)
+    expect(dark).not.toBe('#2d6688')
+    expect(root().style.getPropertyValue('--l-accent-soft')).toMatch(/^#[0-9a-f]{6}$/)
+    applyAppearance({ ...base, accent: null })
+    expect(root().style.getPropertyValue('--l-accent')).toBe('')
+    expect(root().style.getPropertyValue('--d-accent-soft')).toBe('')
+  })
+
   it('caches the appearance so the next start paints in the right theme at once', () => {
     applyAppearance({ theme: 'ocean', mode: 'dark', largeText: 115, reducedMotion: 'auto' })
     delete root().dataset.theme

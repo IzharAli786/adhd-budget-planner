@@ -14,13 +14,14 @@ import { primaryIncome } from '../../domain/paySchedule'
 import {
   ALL_TIME,
   filterLog,
-  logMonths,
   logTotals,
+  logYears,
   newestFirst,
   payPeriods,
+  yearMonths,
   type LogRange,
 } from '../../domain/transactionLog'
-import type { Envelope, ISODate, Transaction } from '../../domain/types'
+import type { Envelope, Transaction } from '../../domain/types'
 import { useToday } from '../../lib/useToday'
 import { Button, buttonClass } from '../../ui/Button'
 import { Chip } from '../../ui/Chip'
@@ -47,6 +48,8 @@ interface RangeOption {
   key: string
   label: string
   range: LogRange
+  /** Full name where the chip is short ("October 2026" for "Oct"). */
+  name?: string
 }
 
 const rangeKey = (r: LogRange) => (r.kind === 'all' ? 'all' : `${r.kind}:${r.start}`)
@@ -74,16 +77,13 @@ export function TransactionsScreen() {
   const [envelopeId, setEnvelopeId] = useState<string | undefined>(undefined)
   const [query, setQuery] = useState('')
 
-  const options = useMemo<RangeOption[]>(() => {
-    const periods = payPeriods(incomes && primaryIncome(incomes), today, overrides ?? [], 4)
-    const short = dateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
-    const shortYear = dateTimeFormat(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' })
-    const monthLabel = (start: ISODate) =>
-      (start.slice(0, 4) === today.slice(0, 4) ? short : shortYear).format(
-        new Date(`${start}T00:00:00Z`),
-      )
+  const [pickedYear, setPickedYear] = useState<string | null>(null)
+
+  // Pay periods first (how Steady thinks), then everything. Months get their own row.
+  const periods = useMemo<RangeOption[]>(() => {
+    const ranges = payPeriods(incomes && primaryIncome(incomes), today, overrides ?? [], 4)
     return [
-      ...periods.map((range, i) => ({
+      ...ranges.map((range, i) => ({
         key: rangeKey(range),
         range,
         label:
@@ -93,17 +93,35 @@ export function TransactionsScreen() {
               ? 'Last pay period'
               : `${f.day(range.start)} – ${f.day(addDays(range.end, -1))}`,
       })),
-      ...logMonths(transactions ?? [], today).map((range) => ({
-        key: rangeKey(range),
-        range,
-        label: monthLabel(range.start),
-      })),
       { key: 'all', range: ALL_TIME, label: 'All' },
     ]
-  }, [incomes, overrides, transactions, today, locale, f])
+  }, [incomes, overrides, today, f])
+
+  const years = useMemo(() => logYears(transactions ?? [], today), [transactions, today])
+  // Every month of every year with entries, so a picked month is found whichever year shows.
+  const months = useMemo(() => {
+    const short = dateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
+    const long = dateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    return years.flatMap((year) =>
+      yearMonths(year, today).map((range) => {
+        const at = new Date(`${range.start}T00:00:00Z`)
+        return { key: rangeKey(range), range, label: short.format(at), name: long.format(at) }
+      }),
+    )
+  }, [years, today, locale])
 
   // Default: this pay period, or this month without a payday to anchor on.
-  const selected = options.find((o) => o.key === picked) ?? options[0]!
+  const thisMonth = months.find((m) => m.range.start === `${today.slice(0, 7)}-01`)
+  const selected =
+    [...periods, ...months].find((o) => o.key === picked) ??
+    (periods.length > 1 ? periods[0]! : (thisMonth ?? periods[0]!))
+  const year =
+    pickedYear ?? (selected.range.kind === 'month' ? selected.range.start.slice(0, 4) : years[0]!)
+  const pick = (key: string) => {
+    setPicked(key)
+    setEnvelopeId(undefined)
+  }
+
   const inRange = useMemo(
     () => filterLog(transactions ?? [], { range: selected.range }),
     [transactions, selected.range],
@@ -150,14 +168,17 @@ export function TransactionsScreen() {
       ) : (
         <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
           <div className="space-y-5 lg:sticky lg:top-10">
-            <PeriodPicker
-              options={options}
-              value={selected.key}
-              onChange={(key) => {
-                setPicked(key)
-                setEnvelopeId(undefined)
-              }}
-            />
+            <div className="space-y-2">
+              <ChipRow label="Period" options={periods} value={selected.key} onChange={pick} />
+              <MonthRow
+                years={years}
+                year={year}
+                onYear={setPickedYear}
+                months={months.filter((m) => m.range.start.startsWith(year))}
+                value={selected.key}
+                onChange={pick}
+              />
+            </div>
             <Summary rows={rows} range={selected} transactions={transactions} names={names} />
             <div className="space-y-3">
               <label className="block">
@@ -293,23 +314,25 @@ function TransactionRow({
   )
 }
 
-/** Pay periods first (how Steady thinks), then month pills, then everything. */
-function PeriodPicker({
+// `relative`: the chips' sr-only spans are absolutely positioned, and without a positioned
+// ancestor they escape the scroller and widen the page.
+const rowClass =
+  'relative -mx-4 flex gap-2 overflow-x-auto p-1.5 px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0'
+
+function ChipRow({
+  label,
   options,
   value,
   onChange,
 }: {
-  options: readonly RangeOption[]
+  label: string
+  options: readonly (RangeOption & { name?: string })[]
   value: string
   onChange: (key: string) => void
 }) {
   return (
     // Scrolls sideways on a phone instead of wrapping into a wall of pills; wraps on desktop.
-    <div
-      role="group"
-      aria-label="Period"
-      className="-mx-4 flex gap-2 overflow-x-auto p-1.5 px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0"
-    >
+    <div role="group" aria-label={label} className={rowClass}>
       {options.map((o) => (
         <Chip
           key={o.key}
@@ -318,8 +341,52 @@ function PeriodPicker({
           className="shrink-0 whitespace-nowrap"
         >
           {o.label}
+          {/* Heard as "Oct 2026": the year is in the row's label, but not in each chip. */}
+          {o.range.kind === 'month' && (
+            <span className="sr-only"> {o.range.start.slice(0, 4)}</span>
+          )}
         </Chip>
       ))}
+    </div>
+  )
+}
+
+/**
+ * The months of one year, January to December (or to now). A year switch appears only
+ * once entries span more than one year, so most people never see it.
+ */
+function MonthRow({
+  years,
+  year,
+  onYear,
+  months,
+  value,
+  onChange,
+}: {
+  years: readonly string[]
+  year: string
+  onYear: (year: string) => void
+  months: readonly (RangeOption & { name: string })[]
+  value: string
+  onChange: (key: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      {years.length > 1 && (
+        <div role="group" aria-label="Year" className={rowClass}>
+          {years.map((y) => (
+            <Chip
+              key={y}
+              selected={y === year}
+              onClick={() => onYear(y)}
+              className="shrink-0 tabular-nums"
+            >
+              {y}
+            </Chip>
+          ))}
+        </div>
+      )}
+      <ChipRow label={`Months in ${year}`} options={months} value={value} onChange={onChange} />
     </div>
   )
 }
@@ -384,12 +451,19 @@ function Summary({
   return (
     <section aria-label="Totals" className="card p-5">
       <p className="text-sm text-muted">
-        {range.label} · {totals.count} of {transactions.length}{' '}
+        {range.name ?? range.label} · {totals.count} of {transactions.length}{' '}
         {transactions.length === 1 ? 'entry' : 'entries'}
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-4">
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
         <Stat label="Money out" value={f.money(totals.out)} size="sm" />
         <Stat label="Money in" value={f.money(totals.in)} size="sm" />
+        <Stat label="Entries" value={totals.count} size="sm" />
+        {/* Per side: a salary would swamp a mixed average. Spending is the usual question. */}
+        {totals.outCount > 0 || totals.inCount === 0 ? (
+          <Stat label="Average spend" value={f.money(totals.averageOut)} size="sm" />
+        ) : (
+          <Stat label="Average in" value={f.money(totals.averageIn)} size="sm" />
+        )}
       </div>
       {file && (
         <SaveFileButton

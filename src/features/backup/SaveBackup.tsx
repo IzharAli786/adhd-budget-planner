@@ -25,7 +25,11 @@ interface Props {
 }
 
 /** Save backup: a SaveFileButton that also records the backup (resets the nudge). */
-export function SaveBackupButton({ onSaved, label = 'Save backup', ...rest }: Props) {
+export function SaveBackupButton({
+  onSaved,
+  label = 'Save backup',
+  ...rest
+}: Props & Pick<SaveFileProps, 'variant' | 'size'>) {
   return (
     <SaveFileButton
       {...rest}

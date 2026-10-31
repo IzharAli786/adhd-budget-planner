@@ -77,11 +77,41 @@ describe('Transaction log', () => {
     await userEvent.click(within(period).getByRole('button', { name: 'Last pay period' }))
     await waitFor(() => expect(listed()).toEqual(['Lidl']))
 
-    await userEvent.click(within(period).getByRole('button', { name: /^Oct/ }))
+    const months = screen.getByRole('group', { name: 'Months in 2026' })
+    await userEvent.click(within(months).getByRole('button', { name: 'Oct 2026' }))
     await waitFor(() => expect(listed()).toEqual(['Bus', 'Lidl']))
 
     await userEvent.click(within(period).getByRole('button', { name: 'All' }))
     await waitFor(() => expect(listed()).toEqual(['refund', 'coffee', 'Bus', 'Lidl']))
+  })
+
+  it('shows every month of the year so far, and switches year once entries span two', async () => {
+    await open()
+    const months = screen.getByRole('group', { name: 'Months in 2026' })
+    // January up to this month; nothing ahead. (Short names vary by ICU: "Sep"/"Sept".)
+    const chips = within(months).getAllByRole('button')
+    expect(chips).toHaveLength(11)
+    expect(chips[0]!.textContent).toBe('Jan 2026')
+    expect(chips[10]!.textContent).toBe('Nov 2026')
+    expect(screen.queryByRole('group', { name: 'Year' })).toBeNull()
+    cleanup()
+
+    await r.addTransaction({ date: '2025-12-20', amount: -2500, note: 'Bus' })
+    await open()
+    const years = screen.getByRole('group', { name: 'Year' })
+    await userEvent.click(within(years).getByRole('button', { name: '2025' }))
+    const old = screen.getByRole('group', { name: 'Months in 2025' })
+    expect(within(old).getAllByRole('button')).toHaveLength(12)
+    await userEvent.click(within(old).getByRole('button', { name: 'Dec 2025' }))
+    await waitFor(() => expect(listed()).toEqual(['Bus']))
+  })
+
+  it('totals show the count and the average per spending entry', async () => {
+    const totals = await open()
+    await waitFor(() => expect(listed()).toEqual(['refund', 'coffee', 'Bus']))
+    // Two spends, €12 and €8: €10 on average. The refund is money in, not averaged with them.
+    expect(within(totals).getByText('Entries').nextSibling?.textContent).toBe('3')
+    expect(within(totals).getByText('Average spend').nextSibling?.textContent).toBe('€10.00')
   })
 
   it('searches notes and filters by envelope, with a way back', async () => {

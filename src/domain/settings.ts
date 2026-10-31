@@ -31,6 +31,10 @@ export interface Settings {
   appBadge: boolean | null
   /** Low-energy Today (PLAN §5): the number and one card, nothing else. */
   justToday: boolean
+  /** Optional first name for Today's greeting. Empty = "Good morning" on its own. */
+  displayName: string
+  /** A custom accent (#rrggbb) that passed the contrast check, or null for the theme's. */
+  accent: string | null
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -50,6 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   envelopesEnabled: false,
   appBadge: null,
   justToday: false,
+  displayName: '',
+  accent: null,
 }
 
 /** Fills missing fields so rows written by older versions still read as full Settings. */

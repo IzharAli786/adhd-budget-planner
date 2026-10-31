@@ -59,10 +59,16 @@ export const backupFileName = (today: ISODate, source: BackupSource = defaultSou
  * navigator.share() run inside the tap's transient activation, and awaiting IndexedDB
  * in the click handler would use it up (PLAN §6). Named by the LOCAL date.
  */
-export async function prepareBackupFile(now: Date = new Date()): Promise<File> {
+export async function prepareBackupFile(
+  now: Date = new Date(),
+  name: string = backupFileName(todayISO(now)),
+): Promise<File> {
   const json = JSON.stringify(await exportBackup(now), null, 2)
-  return new File([json], backupFileName(todayISO(now)), { type: 'application/json' })
+  return new File([json], name, { type: 'application/json' })
 }
+
+/** "Save this year as a file": the same full backup, named for the year it closes. */
+export const archiveFileName = (year: string) => `steady-${year}-archive.json`
 
 export async function exportBackup(
   now: Date = new Date(),

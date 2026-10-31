@@ -295,5 +295,5 @@ function summary(saved: Cents, monthsDiff: number, f: Formatters): string {
   if (saved < 0) return `Here snowball costs ${f.money(-saved)} less in interest.`
   if (monthsDiff !== 0)
     return `Same interest either way; ${monthsDiff > 0 ? 'avalanche' : 'snowball'} finishes ${plural(Math.abs(monthsDiff), 'month')} sooner.`
-  return 'Both cost the same here. Pick the one that keeps you going.'
+  return 'Both plans cost the same here. Pick the one that keeps you going.'
 }

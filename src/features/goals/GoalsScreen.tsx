@@ -1,6 +1,7 @@
 import { useDebts, useFunds, useTransactions } from '../../db/hooks'
 import { GARDEN_STAGES } from '../../domain/garden'
 import { savingsTotals } from '../../domain/savings'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import { useToday } from '../../lib/useToday'
 import { PageHeader } from '../../ui/PageHeader'
 import { StatStrip } from '../../ui/StatStrip'
@@ -14,35 +15,59 @@ import { useGarden } from './useGarden'
 
 // Goals (Full mode, PLAN §5): savings, debts, no-spend days, the 48-hour list and the
 // garden. Everything here only grows; nothing counts down or "breaks".
-// Desktop: funds and debts side by side, the slower glances (no-spend, 48h, garden) below.
+// Desktop: two independent stacks (savings, no-spend, 48h | debts, garden), so a tall
+// card on one side never leaves a hole on the other the way a shared-row grid does.
 export function GoalsScreen() {
   const today = useToday()
+  // Rendered in each layout's own order rather than reordered with CSS, so keyboard and
+  // screen-reader order always match what is on screen.
+  const wide = useMediaQuery('(min-width: 64rem)')
+  const funds = <FundsSection today={today} />
+  const debts = (
+    <section aria-labelledby="goals-debts" className="space-y-3">
+      <h2 id="goals-debts" className="flex min-h-11 items-end px-1 text-heading">
+        Debts
+      </h2>
+      <DebtsSection />
+    </section>
+  )
+  const noSpend = <NoSpendCard today={today} />
+  const impulse = (
+    <section aria-labelledby="impulse-title" className="space-y-3">
+      <h2 id="impulse-title" className="px-1 text-heading">
+        48-hour list
+      </h2>
+      <ImpulseList />
+    </section>
+  )
+  const garden = <GardenCard />
+
   return (
     <>
       <PageHeader title="Goals" subtitle="Small steps that add up." />
       <div className="space-y-8">
         <GoalsStrip />
-        <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-          <FundsSection today={today} />
-          <section aria-labelledby="goals-debts" className="space-y-3">
-            <h2 id="goals-debts" className="flex min-h-11 items-end px-1 text-heading">
-              Debts
-            </h2>
-            <DebtsSection />
-          </section>
-        </div>
-        <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-          <div className="space-y-8">
-            <NoSpendCard today={today} />
-            <section aria-labelledby="impulse-title" className="space-y-3">
-              <h2 id="impulse-title" className="px-1 text-heading">
-                48-hour list
-              </h2>
-              <ImpulseList />
-            </section>
+        {wide ? (
+          <div className="grid grid-cols-2 items-start gap-8">
+            <div className="space-y-8">
+              {funds}
+              {noSpend}
+              {impulse}
+            </div>
+            <div className="space-y-8">
+              {debts}
+              {garden}
+            </div>
           </div>
-          <GardenCard />
-        </div>
+        ) : (
+          <>
+            {funds}
+            {debts}
+            {noSpend}
+            {impulse}
+            {garden}
+          </>
+        )}
       </div>
     </>
   )
