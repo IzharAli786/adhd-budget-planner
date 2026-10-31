@@ -119,6 +119,7 @@ export const rowSchemas = {
     id,
     name: z.string(),
     target: z.optional(amount),
+    targetDate: z.optional(isoDate),
     perPeriod: amount,
     openingSaved: amount,
     challenge: z.optional(z.object({ kind: z.enum(['52week', 'fixed']), start: isoDate })),
@@ -159,6 +160,7 @@ export const settingsSchema = z.object({
   reducedMotion: z.optional(z.enum(['auto', 'on', 'off'])),
   buffer: z.optional(amount),
   envelopesEnabled: z.optional(z.boolean()),
+  justToday: z.optional(z.boolean()),
 })
 
 // domain/setup.ts SetupProgress. A bad row would send a restored device back into setup

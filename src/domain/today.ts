@@ -2,7 +2,7 @@
 // reconciliation, safe-to-spend and the runway in one pure function, so the screen stays
 // a thin view and the whole chain can be property-tested end to end.
 import { currentPeriod, previousPayday, primaryIncome, type PayPeriod } from './paySchedule'
-import { lookbackStart, paydaySinceCheckIn, type CheckInLike } from './reconcile'
+import { isSpend, lookbackStart, paydaySinceCheckIn, type CheckInLike } from './reconcile'
 import { runway, spentLast7Days, spentOn, type Runway } from './runway'
 import { safeToSpend, type SafeToSpend } from './safeToSpend'
 import type {
@@ -60,21 +60,32 @@ export function planToday(input: TodayInput): TodayPlan {
     anchor.date,
     checkIn ? previousPayday(income, checkIn.date, paydayOverrides) : period.start,
   )
-  const safe = safeToSpend({
-    today,
-    period,
-    checkIn: anchor,
-    lookback,
-    transactions: input.transactions,
-    bills: input.bills,
-    occurrences: input.occurrences,
-    funds: input.funds,
-    envelopes: input.envelopes,
-    envelopesEnabled: input.envelopesEnabled,
-    buffer: input.buffer,
-    addedOn: input.addedOn,
-  })
+  const safeWith = (transactions: readonly Transaction[]) =>
+    safeToSpend({
+      today,
+      period,
+      checkIn: anchor,
+      lookback,
+      transactions,
+      bills: input.bills,
+      occurrences: input.occurrences,
+      funds: input.funds,
+      envelopes: input.envelopes,
+      envelopesEnabled: input.envelopesEnabled,
+      buffer: input.buffer,
+      addedOn: input.addedOn,
+    })
+  const safe = safeWith(input.transactions)
   if (!checkIn) return { kind: 'no-balance', period, due: safe.dueEntries }
+
+  // The day's allowance is fixed at the start of the day (PLAN §4.2): safe-to-spend as it
+  // was before today's spending. Recomputed rather than "safe + spentToday", because with
+  // envelopes on, money spent inside an envelope's room never lowered safe-to-spend.
+  const spentTodayRows = new Set(safe.counted.filter((t) => t.date === today && isSpend(t)))
+  const startOfDaySafe =
+    spentTodayRows.size === 0
+      ? safe.total
+      : safeWith(input.transactions.filter((t) => !spentTodayRows.has(t))).total
 
   return {
     kind: 'ready',
@@ -86,6 +97,7 @@ export function planToday(input: TodayInput): TodayPlan {
       spentToday: spentOn(safe.counted, today),
       daysLeft: period.daysLeft,
       spentLast7Days: spentLast7Days(input.transactions, today),
+      startOfDaySafe,
     }),
     paydaySinceCheckIn: paydaySinceCheckIn(period.start, checkIn.date),
   }

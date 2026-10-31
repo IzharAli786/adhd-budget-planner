@@ -23,6 +23,8 @@ export interface Settings {
   /** Kept aside from safe-to-spend as a cushion. */
   buffer: Cents
   envelopesEnabled: boolean
+  /** Low-energy Today (PLAN §5): the number and one card, nothing else. */
+  justToday: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   buffer: 0,
   // Off by default (PLAN §10 M9): most people start with one number, not categories.
   envelopesEnabled: false,
+  justToday: false,
 }
 
 /** Fills missing fields so rows written by older versions still read as full Settings. */

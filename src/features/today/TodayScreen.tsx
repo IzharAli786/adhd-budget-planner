@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useAppSettings } from '../../app/SettingsProvider'
 import { useToast } from '../../ui/Toast'
 import { useUndoToast } from '../../app/useUndoToast'
 import { nextAction } from '../../domain/nextAction'
@@ -9,6 +10,7 @@ import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon, type IconName } from '../../ui/Icon'
 import { useFormat } from '../bills/format'
+import { GardenGlance } from '../goals/GardenCard'
 import { QuickAddField } from '../quickadd/QuickAddField'
 import { useQuickAdd } from '../quickadd/QuickAddProvider'
 import { ActionCard } from './ActionCard'
@@ -29,9 +31,12 @@ export function TodayScreen() {
     <div className="space-y-5">
       {/* Every screen needs an h1 for heading navigation; Today's is the hero itself. */}
       <h1 className="sr-only">Today</h1>
-      <p aria-hidden="true" className="text-sm font-medium tracking-wide text-muted md:hidden">
-        Steady
-      </p>
+      <div className="-my-2 flex items-center justify-between gap-3">
+        <p aria-hidden="true" className="text-sm font-medium tracking-wide text-muted md:invisible">
+          Steady
+        </p>
+        <JustTodayToggle />
+      </div>
       {!model.loaded || !model.plan ? (
         <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
       ) : (
@@ -41,12 +46,37 @@ export function TodayScreen() {
   )
 }
 
+/**
+ * "Just today" (PLAN §5): a low-energy variant of this screen, not a separate mode. The
+ * number and one card, nothing else to read or decide.
+ */
+function JustTodayToggle() {
+  const { settings, update } = useAppSettings()
+  const on = settings.justToday
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => void update({ justToday: !on })}
+      className={cx(
+        'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors',
+        on ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-accent-soft/60',
+      )}
+    >
+      <Icon name={on ? 'check' : 'leaf'} size={16} />
+      Just today
+    </button>
+  )
+}
+
 function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
   const f = useFormat()
+  const { settings } = useAppSettings()
+  const lite = settings.justToday
   const navigate = useNavigate()
   const toast = useToast()
   const undoToast = useUndoToast()
-  const { fieldRef } = useQuickAdd()
+  const { fieldRef, openSheet } = useQuickAdd()
   const [panel, setPanel] = useState<Panel>(null)
   const [offerBackup, setOfferBackup] = useState(false)
   const { plan, actionState, snoozes } = model
@@ -167,29 +197,31 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
             That’s fine. It spreads over the days left.
           </p>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 text-sm text-muted">
-          <span>
-            {runway.daysLeft === 1 ? 'Payday tomorrow' : `${runway.daysLeft} days to payday`} ·
-            balance from {f.relative(model.checkIn!.date, today)}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setOfferBackup(false)
-              setPanel('checkin')
-            }}
-            className="-mx-1 min-h-11 rounded-full px-1 font-medium text-accent"
-          >
-            Update
-          </button>
-          <button
-            type="button"
-            onClick={() => setPanel('math')}
-            className="-mx-1 ml-auto min-h-11 rounded-full px-1 font-medium text-accent"
-          >
-            See the math
-          </button>
-        </div>
+        {!lite && (
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 text-sm text-muted">
+            <span>
+              {runway.daysLeft === 1 ? 'Payday tomorrow' : `${runway.daysLeft} days to payday`} ·
+              balance from {f.relative(model.checkIn!.date, today)}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setOfferBackup(false)
+                setPanel('checkin')
+              }}
+              className="-mx-1 min-h-11 rounded-full px-1 font-medium text-accent"
+            >
+              Update
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanel('math')}
+              className="-mx-1 ml-auto min-h-11 rounded-full px-1 font-medium text-accent"
+            >
+              See the math
+            </button>
+          </div>
+        )}
       </section>
 
       {action && (
@@ -200,20 +232,31 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
             setOfferBackup(backup)
             setPanel('checkin')
           }}
-          onLog={() => fieldRef.current?.focus()}
+          onLog={() => (fieldRef.current ? fieldRef.current.focus() : openSheet())}
         />
       )}
 
-      <QuickAddField today={today} transactions={model.transactions} envelopes={model.envelopes} />
+      {!lite && (
+        <>
+          <QuickAddField
+            today={today}
+            transactions={model.transactions}
+            envelopes={model.envelopes}
+          />
 
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button variant="secondary" onClick={() => setPanel('fit')}>
-          Can this fit?
-        </Button>
-        <Link to="/more/transactions" className={buttonClass('ghost')}>
-          All entries
-        </Link>
-      </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setPanel('fit')}>
+              Can this fit?
+            </Button>
+            <Link to="/more/transactions" className={buttonClass('ghost')}>
+              All entries
+            </Link>
+          </div>
+
+          {/* Below the fold, and only where the garden lives (Goals is a Full-mode tab). */}
+          {!settings.simpleMode && <GardenGlance />}
+        </>
+      )}
 
       <MathSheet
         open={panel === 'math'}
@@ -227,6 +270,7 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
         onClose={() => setPanel(null)}
         total={safe.total}
         runway={runway}
+        envelopes={settings.envelopesEnabled ? safe.envelopes : []}
       />
       {checkIn}
     </>

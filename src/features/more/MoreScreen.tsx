@@ -39,6 +39,15 @@ export function MoreScreen() {
             detail="Everything you’ve logged, by day"
             to="/more/transactions"
           />
+          {/* Full mode keeps the 48-hour list in Goals (PLAN §5). */}
+          {settings.simpleMode && (
+            <ListRow
+              icon="clock"
+              label="48-hour list"
+              detail="Wait two days before buying, then decide"
+              to="/more/wait"
+            />
+          )}
         </ListGroup>
 
         <ListGroup title="Your data">

@@ -7,6 +7,7 @@ import {
   useCheckIns,
   useEnvelopes,
   useFunds,
+  useImpulse,
   useIncomes,
   usePaydayOverrides,
   useTransactions,
@@ -14,10 +15,12 @@ import {
 import { getMeta } from '../../db/repos'
 import { addedOnMap } from '../../domain/bills'
 import { daysBetween } from '../../domain/dates'
+import { readyItems } from '../../domain/impulse'
 import { type ActionState, type Snoozes } from '../../domain/nextAction'
 import { overdueManual, planToday } from '../../domain/today'
 import type { Instant, ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
+import { useNow } from '../../lib/useNow'
 
 const localDate = (at: Instant) => todayISO(new Date(at))
 
@@ -35,6 +38,8 @@ export function useTodayModel(today: ISODate) {
   const checkIns = useCheckIns()
   const envelopes = useEnvelopes()
   const funds = useFunds()
+  const impulse = useImpulse()
+  const now = useNow()
   // `?? {}` inside the query: useLiveQuery's own undefined means "still loading".
   const snoozes = useLiveQuery(async () => (await getMeta<Snoozes>('snoozes')) ?? {})
   const lastBackupAt = useLiveQuery(async () => (await getMeta<Instant>('lastBackupAt')) ?? null)
@@ -48,6 +53,7 @@ export function useTodayModel(today: ISODate) {
     checkIns !== undefined &&
     envelopes !== undefined &&
     funds !== undefined &&
+    impulse !== undefined &&
     snoozes !== undefined &&
     lastBackupAt !== undefined
 
@@ -95,10 +101,11 @@ export function useTodayModel(today: ISODate) {
       balanceAgeDays: plan.safe.balanceAgeDays,
       paydaySinceCheckIn: plan.paydaySinceCheckIn,
       daysSinceBackup: daysBetween(since, today),
+      expiredImpulse: readyItems(impulse ?? [], now).length,
       hasBills: (bills?.length ?? 0) > 0,
       loggedToday: (transactions ?? []).some((t) => t.date === today),
     }
-  }, [plan, checkIns, lastBackupAt, today, bills, transactions])
+  }, [plan, checkIns, lastBackupAt, today, bills, transactions, impulse, now])
 
   return {
     loaded,

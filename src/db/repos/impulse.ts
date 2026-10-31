@@ -32,6 +32,17 @@ export function decideImpulse(ids: Id[], decision: ImpulseDecision, decidedAt = 
   )
 }
 
+/** "Later": another 48 hours from now, instead of a decision made under pressure. */
+export function waitAgain(ids: Id[], now = nowInstant()) {
+  return mutate('Wait 48 more hours', ['impulse'], async (w) => {
+    for (const id of ids) {
+      const item = await w.get('impulse', id)
+      if (!item) throw new NotFoundError('impulse', id)
+      await w.put('impulse', { ...item, addedAt: now })
+    }
+  })
+}
+
 export function deleteImpulse(id: Id) {
   return mutate('Delete item', ['impulse'], (w) => w.delete('impulse', id))
 }

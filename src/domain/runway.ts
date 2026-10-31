@@ -25,11 +25,23 @@ export interface RunwayInput {
   daysLeft: number
   /** Spending over the 7 days before today. */
   spentLast7Days: Cents
+  /**
+   * Safe-to-spend with today's spending taken back out. Defaults to safeToSpend +
+   * spentToday, which only holds when every euro spent lowered safe-to-spend by a euro.
+   * With envelopes on, spending inside an envelope's room leaves safe-to-spend alone, so
+   * planToday recomputes the start of the day instead of guessing it.
+   */
+  startOfDaySafe?: Cents
 }
 
-export function runway({ safeToSpend, spentToday, daysLeft, spentLast7Days }: RunwayInput): Runway {
+export function runway({
+  safeToSpend,
+  spentToday,
+  daysLeft,
+  spentLast7Days,
+  startOfDaySafe = safeToSpend + spentToday,
+}: RunwayInput): Runway {
   const days = Math.max(1, Math.floor(daysLeft))
-  const startOfDaySafe = safeToSpend + spentToday
   // Rounding point (PLAN §3.1): floor, so seven days of perDay never exceed the total.
   const perDay = startOfDaySafe > 0 ? Math.floor(startOfDaySafe / days) : 0
   // safe − (spent7 / 7) × (days − 1) ≥ 0, multiplied through by 7 so nothing rounds.
@@ -65,12 +77,31 @@ export interface CanFit {
   perDayAfter: Cents
 }
 
+export interface CanFitInput {
+  total: Cents
+  daysLeft: number
+  /** Runway.startOfDaySafe; the purchase comes off this before it is spread over the days. */
+  startOfDaySafe: Cents
+  /**
+   * What is still free in the envelope it would come from (EnvelopeUsage.reserved). That
+   * part is already set aside, so only the rest comes off safe-to-spend.
+   */
+  room?: Cents
+}
+
 /** "Can this fit?": safe-to-spend and the per-day number, before and after buying x. */
 export function canFit(
   x: Cents,
-  { total, spentToday, daysLeft }: { total: Cents; spentToday: Cents; daysLeft: number },
+  { total, daysLeft, startOfDaySafe, room = 0 }: CanFitInput,
 ): CanFit {
-  const after = total - x
-  const { perDay } = runway({ safeToSpend: after, spentToday, daysLeft, spentLast7Days: 0 })
+  const cost = Math.max(0, x - Math.max(0, room))
+  const after = total - cost
+  const { perDay } = runway({
+    safeToSpend: after,
+    spentToday: 0,
+    daysLeft,
+    spentLast7Days: 0,
+    startOfDaySafe: startOfDaySafe - cost,
+  })
   return { fits: after >= 0, after, perDayAfter: perDay }
 }

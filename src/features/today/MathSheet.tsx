@@ -81,9 +81,9 @@ export function MathSheet({ open, onClose, safe, runway, today }: Props) {
           </dt>
           <dd className="font-semibold tabular-nums">{f.money(safe.total)}</dd>
         </div>
-        {runway.spentToday > 0 && (
+        {runway.startOfDaySafe !== safe.total && (
           <div className="flex justify-between gap-4 py-3">
-            <dt className="text-muted">Plus what you spent today, at the start of the day</dt>
+            <dt className="text-muted">At the start of today, before today’s spending</dt>
             <dd className="font-medium tabular-nums">{f.money(runway.startOfDaySafe)}</dd>
           </div>
         )}
