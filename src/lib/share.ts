@@ -4,6 +4,15 @@
 
 export type SaveResult = 'shared' | 'downloaded' | 'cancelled'
 
+/** Can this browser hand a file to the system share sheet? (iOS, Android; rarely desktop) */
+export function canShareFile(file: File): boolean {
+  try {
+    return globalThis.navigator?.canShare?.({ files: [file] }) === true
+  } catch {
+    return false
+  }
+}
+
 export async function shareOrDownload(file: File): Promise<SaveResult> {
   const nav = globalThis.navigator
   if (nav?.canShare?.({ files: [file] })) {

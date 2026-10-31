@@ -1,14 +1,19 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { useToast } from '../../ui/Toast'
+import { Link } from 'react-router'
 import { useUndoToast } from '../../app/useUndoToast'
+import { catchUp, type CatchUp } from '../../domain/catchUp'
 import { nextAction } from '../../domain/nextAction'
-import type { ISODate } from '../../domain/types'
+import type { Instant, ISODate } from '../../domain/types'
+import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon, type IconName } from '../../ui/Icon'
+import { BackupMomentSheet } from '../backup/BackupMomentSheet'
 import { useFormat } from '../bills/format'
+import { CatchUpCard } from '../catchup/CatchUpCard'
+import { useCatchUpSession } from '../catchup/CatchUpProvider'
+import { FreshStart } from '../catchup/FreshStart'
 import { QuickAddField } from '../quickadd/QuickAddField'
 import { useQuickAdd } from '../quickadd/QuickAddProvider'
 import { ActionCard } from './ActionCard'
@@ -17,13 +22,16 @@ import { CheckInSheet } from './CheckInSheet'
 import { MathSheet } from './MathSheet'
 import { useTodayModel, type TodayModel } from './useTodayModel'
 
-type Panel = 'math' | 'checkin' | 'fit' | null
+type Panel = 'math' | 'checkin' | 'fit' | 'backup' | null
 
 // One number, one action (PLAN §1): the hero, the action card and the quick-add field
 // are all that sits above the fold. Everything else is one tap away in a sheet.
 export function TodayScreen() {
   const today = useToday()
-  const model = useTodayModel(today)
+  // Ticks each minute and on return to the app, so a 24 h "Not now" ends on time.
+  const now = useNow()
+  const model = useTodayModel(today, now)
+  const { ready } = useCatchUpSession()
 
   return (
     <div className="space-y-5">
@@ -32,28 +40,42 @@ export function TodayScreen() {
       <p aria-hidden="true" className="text-sm font-medium tracking-wide text-muted md:hidden">
         Steady
       </p>
-      {!model.loaded || !model.plan ? (
+      {!model.loaded || !model.plan || !ready ? (
         <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
       ) : (
-        <TodayBody model={model} today={today} />
+        <TodayBody model={model} today={today} now={now} />
       )}
     </div>
   )
 }
 
-function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
+function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; now: Instant }) {
   const f = useFormat()
-  const navigate = useNavigate()
-  const toast = useToast()
   const undoToast = useUndoToast()
   const { fieldRef } = useQuickAdd()
+  const session = useCatchUpSession()
   const [panel, setPanel] = useState<Panel>(null)
   const [offerBackup, setOfferBackup] = useState(false)
   const { plan, actionState, snoozes } = model
 
   const action = useMemo(
-    () => actionState && nextAction(actionState, snoozes, today, new Date().toISOString()),
-    [actionState, snoozes, today],
+    () => actionState && nextAction(actionState, snoozes, today, now),
+    [actionState, snoozes, today, now],
+  )
+
+  const gap = useMemo<CatchUp>(
+    () =>
+      plan?.kind === 'ready' && session.since !== null
+        ? catchUp({
+            lastOpened: session.since,
+            today,
+            due: plan.safe.dueEntries,
+            periodStart: plan.period.start,
+            impulse: model.impulse,
+            now,
+          })
+        : { mode: 'none' },
+    [plan, session.since, today, model.impulse, now],
   )
 
   if (!plan) return null
@@ -83,18 +105,15 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
   const checkIn = (
     <CheckInSheet
       open={panel === 'checkin'}
-      onClose={() => setPanel(null)}
+      // Saving closes the sheet AFTER onSaved, which may have moved on to the backup moment.
+      onClose={() => setPanel((p) => (p === 'checkin' ? null : p))}
       today={today}
       due={plan.kind === 'ready' ? plan.safe.dueEntries : plan.due}
-      onSaved={(summary) =>
-        offerBackup
-          ? toast.show({
-              message: `${summary}. A good moment for a backup.`,
-              duration: 10_000,
-              action: { label: 'Back up', onAction: () => navigate('/more/backup') },
-            })
-          : undoToast(summary)
-      }
+      onSaved={(summary) => {
+        undoToast(summary)
+        // Payday is the backup moment (PLAN §6): the sheet prepares the file as it opens.
+        if (offerBackup) setPanel('backup')
+      }}
     />
   )
 
@@ -115,6 +134,10 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
         {checkIn}
       </>
     )
+  }
+
+  if (gap.mode === 'fresh') {
+    return <FreshStart gap={gap} today={today} onDone={session.dismiss} />
   }
 
   const { safe, runway, period } = plan
@@ -192,6 +215,8 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
         </div>
       </section>
 
+      {gap.mode === 'short' && <CatchUpCard gap={gap} onDismiss={session.dismiss} />}
+
       {action && (
         <ActionCard
           action={action}
@@ -229,6 +254,7 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
         runway={runway}
       />
       {checkIn}
+      <BackupMomentSheet open={panel === 'backup'} onClose={() => setPanel(null)} />
     </>
   )
 }

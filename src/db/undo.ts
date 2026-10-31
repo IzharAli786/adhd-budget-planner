@@ -3,7 +3,7 @@
 // write. Undo replays the before-images. Because the log lives in IndexedDB it survives a
 // reload and can never disagree with what useLiveQuery shows.
 import type { UndoEntry } from '../domain/types'
-import { db, PRIMARY_KEY, type DataTableName, type RowTypes } from './schema'
+import { db, PRIMARY_KEY, type DataTableName, type RowTypes, type TableName } from './schema'
 
 export const UNDO_LIMIT = 20
 
@@ -22,8 +22,9 @@ export async function mutate<R>(
   tables: readonly DataTableName[],
   fn: (w: Writer) => Promise<R>,
 ): Promise<R> {
-  const stores = [...new Set(tables)].map((t) => db.table(t))
-  return db.transaction('rw', [...stores, db.undo], async () => {
+  // meta always joins: an undoable change bumps the "changes since backup" counter.
+  const stores = [...new Set<TableName>([...tables, 'meta', 'undo'])].map((t) => db.table(t))
+  return db.transaction('rw', stores, async () => {
     const ops: UndoEntry['ops'] = []
     const seen = new Set<string>()
 
@@ -55,10 +56,20 @@ export async function mutate<R>(
     if (label !== null && ops.length > 0) {
       await db.undo.add({ at: new Date().toISOString(), label, ops })
       await trimUndo()
+      await countChange()
     }
     return result
   })
 }
+
+// Only user actions count (label !== null): settings and bookkeeping are not "your data
+// changed since the last backup". Written directly, never through the undo log.
+async function countChange() {
+  const row = await db.meta.get(CHANGES_KEY)
+  await db.meta.put({ key: CHANGES_KEY, value: ((row?.value as number | undefined) ?? 0) + 1 })
+}
+
+export const CHANGES_KEY = 'changesSinceBackup'
 
 async function trimUndo() {
   const count = await db.undo.count()
@@ -85,6 +96,7 @@ export async function undoLast(): Promise<string | null> {
       else await table.put(op.before)
     }
     await db.undo.delete(entry.seq!)
+    await countChange()
     return entry.label
   })
 }

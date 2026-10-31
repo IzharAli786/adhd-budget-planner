@@ -7,6 +7,7 @@ import {
   useCheckIns,
   useEnvelopes,
   useFunds,
+  useImpulse,
   useIncomes,
   usePaydayOverrides,
   useTransactions,
@@ -15,6 +16,7 @@ import { getMeta } from '../../db/repos'
 import { addedOnMap } from '../../domain/bills'
 import { daysBetween } from '../../domain/dates'
 import { type ActionState, type Snoozes } from '../../domain/nextAction'
+import { expiredImpulse } from '../../domain/impulse'
 import { overdueManual, planToday } from '../../domain/today'
 import type { Instant, ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
@@ -25,7 +27,7 @@ const localDate = (at: Instant) => todayISO(new Date(at))
  * Today's rows from IndexedDB, run through the pure planToday(). useLiveQuery re-runs
  * when any of these tables change, so logging "12 coffee" anywhere updates the hero.
  */
-export function useTodayModel(today: ISODate) {
+export function useTodayModel(today: ISODate, now: Instant) {
   const { settings } = useAppSettings()
   const incomes = useIncomes()
   const paydayOverrides = usePaydayOverrides()
@@ -35,6 +37,7 @@ export function useTodayModel(today: ISODate) {
   const checkIns = useCheckIns()
   const envelopes = useEnvelopes()
   const funds = useFunds()
+  const impulse = useImpulse()
   // `?? {}` inside the query: useLiveQuery's own undefined means "still loading".
   const snoozes = useLiveQuery(async () => (await getMeta<Snoozes>('snoozes')) ?? {})
   const lastBackupAt = useLiveQuery(async () => (await getMeta<Instant>('lastBackupAt')) ?? null)
@@ -48,6 +51,7 @@ export function useTodayModel(today: ISODate) {
     checkIns !== undefined &&
     envelopes !== undefined &&
     funds !== undefined &&
+    impulse !== undefined &&
     snoozes !== undefined &&
     lastBackupAt !== undefined
 
@@ -95,10 +99,11 @@ export function useTodayModel(today: ISODate) {
       balanceAgeDays: plan.safe.balanceAgeDays,
       paydaySinceCheckIn: plan.paydaySinceCheckIn,
       daysSinceBackup: daysBetween(since, today),
+      expiredImpulse: expiredImpulse(impulse ?? [], now).length,
       hasBills: (bills?.length ?? 0) > 0,
       loggedToday: (transactions ?? []).some((t) => t.date === today),
     }
-  }, [plan, checkIns, lastBackupAt, today, bills, transactions])
+  }, [plan, checkIns, lastBackupAt, today, now, impulse, bills, transactions])
 
   return {
     loaded,
@@ -108,6 +113,7 @@ export function useTodayModel(today: ISODate) {
     checkIn,
     transactions: transactions ?? [],
     envelopes: envelopes ?? [],
+    impulse: impulse ?? [],
   }
 }
 

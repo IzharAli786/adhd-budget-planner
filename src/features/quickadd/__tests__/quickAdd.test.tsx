@@ -89,4 +89,20 @@ describe('Quick add sheet', () => {
     await waitFor(async () => expect(await r.listTransactions()).toHaveLength(2))
     expect((await r.listTransactions()).at(-1)).toMatchObject({ date: '2026-11-04', amount: -320 })
   })
+
+  it('a sheet opened before midnight and saved after it logs on the new day', async () => {
+    vi.setSystemTime(new Date(2026, 10, 4, 23, 59))
+    window.history.replaceState(null, '', '/bills')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Quick add' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '5')
+    vi.setSystemTime(new Date(2026, 10, 5, 0, 1))
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
+    await waitFor(async () =>
+      expect(await r.listTransactions()).toEqual([
+        expect.objectContaining({ amount: -500, date: '2026-11-05' }),
+      ]),
+    )
+  })
 })

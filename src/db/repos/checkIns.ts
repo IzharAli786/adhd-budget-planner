@@ -7,7 +7,7 @@ import {
   type ISODate,
 } from '../../domain/types'
 import { db } from '../schema'
-import { mutate } from '../undo'
+import { mutate, type Writer } from '../undo'
 import { newId, nowInstant } from './util'
 
 export function addCheckIn(balance: Cents, date: ISODate, at = nowInstant()) {
@@ -35,21 +35,34 @@ export function reconcileCheckIn(input: {
   paid: readonly PaidAtCheckIn[]
 }) {
   const at = input.at ?? nowInstant()
-  return mutate('Check in balance', ['checkIns', 'billOccurrences'], async (w) => {
-    for (const p of input.paid) {
-      const id = occurrenceId(p.billId, p.originalDate)
-      const existing = await w.get('billOccurrences', id)
-      await w.put('billOccurrences', {
-        ...paidFields(existing, p.amount, at, p.auto),
-        id,
-        billId: p.billId,
-        originalDate: p.originalDate,
-      })
-    }
-    const row: BalanceCheckIn = { id: newId(), at, date: input.date, balance: input.balance }
-    await w.put('checkIns', row)
-    return row
-  })
+  return mutate('Check in balance', ['checkIns', 'billOccurrences'], (w) =>
+    writeCheckIn(w, { ...input, at }),
+  )
+}
+
+/** The check-in writes, for callers that bundle more into the same undo step. */
+export async function writeCheckIn(
+  w: Writer,
+  input: { balance: Cents; date: ISODate; at: string; paid: readonly PaidAtCheckIn[] },
+) {
+  for (const p of input.paid) {
+    const id = occurrenceId(p.billId, p.originalDate)
+    const existing = await w.get('billOccurrences', id)
+    await w.put('billOccurrences', {
+      ...paidFields(existing, p.amount, input.at, p.auto),
+      id,
+      billId: p.billId,
+      originalDate: p.originalDate,
+    })
+  }
+  const row: BalanceCheckIn = {
+    id: newId(),
+    at: input.at,
+    date: input.date,
+    balance: input.balance,
+  }
+  await w.put('checkIns', row)
+  return row
 }
 
 export const latestCheckIn = () => db.checkIns.orderBy('at').last()

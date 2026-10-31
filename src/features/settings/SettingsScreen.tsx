@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { THEMES, type ColorMode, type MotionPreference, type Theme } from '../../domain/settings'
+import { askBadgePermission, badgeEnabled, badgePlatform } from '../../lib/badge'
 import { formatBytes, requestPersist, storageStatus, type StorageStatus } from '../../lib/storage'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
@@ -120,6 +121,8 @@ export function SettingsScreen() {
           </div>
         </Section>
 
+        <BadgeSetting />
+
         <StorageCard />
       </div>
     </>
@@ -192,6 +195,48 @@ function ThemeSwatch({
   )
 }
 
+// Bills due within 2 days plus 48h items ready to decide, on the home-screen icon.
+// On by default in Chromium; iOS needs the notification permission, so it is opt-in.
+function BadgeSetting() {
+  const { settings, update } = useAppSettings()
+  const [denied, setDenied] = useState(false)
+  const platform = badgePlatform()
+  if (platform === 'none') return null
+  const on = badgeEnabled(platform, settings.appBadge)
+
+  async function toggle(next: boolean) {
+    setDenied(false)
+    if (next && platform === 'ios' && !(await askBadgePermission())) {
+      setDenied(true)
+      return
+    }
+    await update({ appBadge: next })
+  }
+
+  return (
+    <Section title="Reminders">
+      <div className="rounded-[1.5rem] bg-surface px-4 py-2 shadow-card ring-1 ring-line">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1 py-1.5">
+            <p className="font-medium">Number on the app icon</p>
+            <p className="text-sm text-muted">
+              Bills due in the next 2 days, plus 48h items ready to decide.
+              {platform === 'ios' &&
+                ' Your iPhone asks to allow notifications first; Steady only uses it for this number.'}
+            </p>
+          </div>
+          <Switch label="Number on the app icon" checked={on} onChange={(v) => void toggle(v)} />
+        </div>
+        {denied && (
+          <p className="pb-2 text-sm text-muted">
+            Notifications are off for Steady. You can allow them in your iPhone’s Settings.
+          </p>
+        )}
+      </div>
+    </Section>
+  )
+}
+
 function StorageCard() {
   const [status, setStatus] = useState<StorageStatus | null>(null)
   const [asked, setAsked] = useState(false)
@@ -227,7 +272,8 @@ function StorageCard() {
               {status.persisted
                 ? 'Your browser will not clear Steady’s data to free up space.'
                 : 'If your device runs low on space, the browser may clear it. Keep backups.'}
-              {status.usage !== undefined && ` Using ${formatBytes(status.usage)}.`}
+              {status.usage !== undefined &&
+                ` Using ${formatBytes(status.usage)}${status.quota ? ` of ${formatBytes(status.quota)} available` : ''}.`}
             </p>
           </div>
         </div>

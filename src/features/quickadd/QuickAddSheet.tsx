@@ -4,7 +4,8 @@ import { useEnvelopes, useRecentTransactions } from '../../db/hooks'
 import { addDays } from '../../domain/dates'
 import type { Cents } from '../../domain/money'
 import { frequentEntries, suggestEnvelope, type QuickAddKind } from '../../domain/quickAdd'
-import type { Id } from '../../domain/types'
+import type { Id, ISODate } from '../../domain/types'
+import { todayISO } from '../../lib/clock'
 import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { Chip } from '../../ui/Chip'
@@ -20,6 +21,11 @@ const KINDS = [
   { value: 'spend', label: 'Spent' },
   { value: 'income', label: 'Got money' },
 ] as const
+
+type Day = 'today' | 'yesterday' | ISODate
+
+const resolveDay = (day: Day, today: ISODate): ISODate =>
+  day === 'today' ? today : day === 'yesterday' ? addDays(today, -1) : day
 
 /** Floating + and the `n` key open this: amount first, everything else optional. */
 export function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -43,7 +49,9 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
   const [amount, setAmount] = useState<Cents | null>(null)
   const [kind, setKind] = useState<QuickAddKind>('spend')
   const [note, setNote] = useState('')
-  const [date, setDate] = useState(today)
+  // 'today' / 'yesterday' stay RELATIVE until save: a sheet opened at 23:58 and saved
+  // at 00:01 logs on the new day, like the chip it shows. Only a picked date is fixed.
+  const [day, setDay] = useState<Day>('today')
   const [pickDate, setPickDate] = useState(false)
   const [envelopeId, setEnvelopeId] = useState<Id | null>(null)
   const [tried, setTried] = useState(false)
@@ -59,15 +67,17 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
   const chosenEnvelope = envelopeId ?? suggested
   const chips = frequentEntries(recent ?? [], 4)
   const yesterday = addDays(today, -1)
-  const pickDay = (d: string) => {
-    setDate(d)
+  const date = resolveDay(day, today)
+  const pickDay = (d: Day) => {
+    setDay(d)
     setPickDate(false)
   }
 
   async function submit(entry: { amount: Cents; note: string; envelopeId?: Id }) {
     setSaving(true)
     try {
-      const done = await save({ ...entry, date })
+      // Read the clock at save time too: useToday's midnight tick can lag by a second.
+      const done = await save({ ...entry, date: resolveDay(day, todayISO()) })
       if (done) onDone()
     } finally {
       setSaving(false)
@@ -113,10 +123,10 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
       <fieldset className="space-y-2">
         <legend className="mb-1.5 text-sm font-medium">When</legend>
         <div className="flex flex-wrap gap-2">
-          <Chip selected={!pickDate && date === today} onClick={() => pickDay(today)}>
+          <Chip selected={!pickDate && date === today} onClick={() => pickDay('today')}>
             Today
           </Chip>
-          <Chip selected={!pickDate && date === yesterday} onClick={() => pickDay(yesterday)}>
+          <Chip selected={!pickDate && date === yesterday} onClick={() => pickDay('yesterday')}>
             Yesterday
           </Chip>
           <Chip selected={pickDate} onClick={() => setPickDate(true)}>
@@ -124,7 +134,7 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
           </Chip>
         </div>
         {pickDate && (
-          <DateInput label="Date" value={date} max={today} onChange={(d) => d && setDate(d)} />
+          <DateInput label="Date" value={date} max={today} onChange={(d) => d && setDay(d)} />
         )}
       </fieldset>
 

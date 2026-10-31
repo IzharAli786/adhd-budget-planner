@@ -47,6 +47,16 @@ export function deleteMeta(key: MetaKey) {
   return mutate(null, ['meta'], (w) => w.delete('meta', key))
 }
 
+/** A backup was saved: stamp it and start counting changes again, in one write. */
+export function recordBackup(at: string = new Date().toISOString()) {
+  return mutate(null, ['meta'], async (w) => {
+    await w.put('meta', { key: 'lastBackupAt', value: at })
+    await w.put('meta', { key: 'changesSinceBackup', value: 0 })
+  })
+}
+
+export const getChangesSinceBackup = async () => (await getMeta<number>('changesSinceBackup')) ?? 0
+
 export async function getSettings(): Promise<Settings> {
   return withDefaults(await getMeta<Partial<Settings>>('settings'))
 }

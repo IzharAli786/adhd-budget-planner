@@ -1,24 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  backupFileName,
-  exportBackup,
-  importBackup,
-  readBackupFile,
-  type RestoreError,
-  type ValidBackup,
-} from '../../db/backup'
-import { getMeta, setMeta } from '../../db/repos'
+import { useRef, useState } from 'react'
+import { importBackup, readBackupFile, type RestoreError, type ValidBackup } from '../../db/backup'
+import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import type { DataTableName } from '../../db/schema'
 import type { Instant } from '../../domain/types'
-import { todayISO } from '../../lib/clock'
-import { shareOrDownload } from '../../lib/share'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
 import { Icon } from '../../ui/Icon'
 import { PageHeader } from '../../ui/PageHeader'
 import { useToast } from '../../ui/Toast'
 import { relativeDays } from './relative'
+import { SaveBackupButton, useBackupFile } from './SaveBackup'
 
 const TABLE_LABELS: Partial<Record<DataTableName, string>> = {
   incomes: 'Income sources',
@@ -38,37 +30,13 @@ const formatDay = (iso: string) => dateFormat.format(new Date(`${iso.slice(0, 10
 export function BackupScreen() {
   const toast = useToast()
   const lastBackupAt = useLiveQuery(() => getMeta<Instant>('lastBackupAt'))
-  const [file, setFile] = useState<File | null>(null)
+  const changes = useLiveQuery(getChangesSinceBackup)
+  // Prepared as the screen opens, so Save runs inside the tap (see SaveBackup).
+  const file = useBackupFile()
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<ValidBackup | null>(null)
   const [error, setError] = useState<RestoreError | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  // Prepared up front, not on tap: iOS only lets navigator.share() run inside the tap's
-  // transient activation, and an await before it would use that up (PLAN §6).
-  const prepare = useCallback(async () => {
-    const backup = await exportBackup()
-    const json = JSON.stringify(backup, null, 2)
-    return new File([json], backupFileName(todayISO()), { type: 'application/json' })
-  }, [])
-
-  useEffect(() => {
-    let live = true
-    void prepare().then((f) => live && setFile(f))
-    return () => {
-      live = false
-    }
-  }, [prepare])
-
-  async function save() {
-    if (!file) return
-    const result = await shareOrDownload(file)
-    if (result === 'cancelled') return
-    await setMeta('lastBackupAt', new Date().toISOString())
-    toast.show({
-      message: result === 'shared' ? 'Backup saved.' : 'Backup downloaded. Keep it somewhere safe.',
-    })
-  }
 
   async function onPick(picked: File | undefined) {
     if (!picked) return
@@ -84,7 +52,6 @@ export function BackupScreen() {
     try {
       await importBackup(pending)
       setPending(null)
-      setFile(await prepare())
       toast.show({
         message: 'Restored. A safety copy of your previous data was kept.',
         duration: 8000,
@@ -115,16 +82,24 @@ export function BackupScreen() {
               <h2 className="text-lg font-semibold">Save a backup</h2>
               <p className="text-[0.9375rem] text-muted">
                 {lastBackupAt
-                  ? `Last saved ${relativeDays(lastBackupAt)}.`
+                  ? `Last saved ${relativeDays(lastBackupAt)}${changesNote(changes)}.`
                   : 'You haven’t saved one yet.'}{' '}
                 Save it to Files, iCloud Drive, Google Drive or email it to yourself.
               </p>
             </div>
           </div>
-          <Button block size="lg" className="mt-5" disabled={!file} onClick={() => void save()}>
-            <Icon name="download" size={20} />
-            {file ? 'Save backup' : 'Preparing…'}
-          </Button>
+          <SaveBackupButton
+            file={file}
+            className="mt-5"
+            onSaved={(result) =>
+              toast.show({
+                message:
+                  result === 'shared'
+                    ? 'Backup saved.'
+                    : 'Backup downloaded. Keep it somewhere safe.',
+              })
+            }
+          />
           {file && (
             <p className="mt-2 text-center text-sm text-muted">
               {file.name} · {Math.max(1, Math.round(file.size / 1024))} KB
@@ -204,6 +179,9 @@ export function BackupScreen() {
     </>
   )
 }
+
+const changesNote = (n: number | undefined) =>
+  !n ? '' : n === 1 ? ' · 1 change since' : ` · ${n} changes since`
 
 /** What a backup holds, shown before anything is replaced. Reused by setup's import. */
 export function BackupPreview({ backup }: { backup: ValidBackup }) {
