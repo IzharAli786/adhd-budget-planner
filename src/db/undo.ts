@@ -1,0 +1,94 @@
+// Persisted undo log (PLAN §8), a small command pattern: every repo write goes through
+// mutate(), which records each touched row's before-image in the same transaction as the
+// write. Undo replays the before-images. Because the log lives in IndexedDB it survives a
+// reload and can never disagree with what useLiveQuery shows.
+import type { UndoEntry } from '../domain/types'
+import { db, PRIMARY_KEY, type DataTableName, type RowTypes } from './schema'
+
+export const UNDO_LIMIT = 20
+
+export interface Writer {
+  get<T extends DataTableName>(table: T, key: string): Promise<RowTypes[T] | undefined>
+  put<T extends DataTableName>(table: T, row: RowTypes[T]): Promise<void>
+  delete(table: DataTableName, key: string): Promise<void>
+}
+
+/**
+ * Runs `fn` in one read-write transaction over `tables` (plus the undo log). With a label,
+ * the change becomes one undo step; with null it is not undoable (settings, purges).
+ */
+export async function mutate<R>(
+  label: string | null,
+  tables: readonly DataTableName[],
+  fn: (w: Writer) => Promise<R>,
+): Promise<R> {
+  const stores = [...new Set(tables)].map((t) => db.table(t))
+  return db.transaction('rw', [...stores, db.undo], async () => {
+    const ops: UndoEntry['ops'] = []
+    const seen = new Set<string>()
+
+    // Only the FIRST before-image per row counts: if one action writes a row twice,
+    // undo must return to the state before the action, not the middle step.
+    async function remember(table: DataTableName, key: string) {
+      const id = `${table}\u0000${key}`
+      if (label === null || seen.has(id)) return
+      seen.add(id)
+      ops.push({ table, key, before: (await db.table(table).get(key)) ?? null })
+    }
+
+    const writer: Writer = {
+      get: (table, key) => db.table(table).get(key),
+      async put(table, row) {
+        await remember(
+          table,
+          String((row as unknown as Record<string, unknown>)[PRIMARY_KEY[table]]),
+        )
+        await db.table(table).put(row)
+      },
+      async delete(table, key) {
+        await remember(table, key)
+        await db.table(table).delete(key)
+      },
+    }
+
+    const result = await fn(writer)
+    if (label !== null && ops.length > 0) {
+      await db.undo.add({ at: new Date().toISOString(), label, ops })
+      await trimUndo()
+    }
+    return result
+  })
+}
+
+async function trimUndo() {
+  const count = await db.undo.count()
+  if (count <= UNDO_LIMIT) return
+  const old = await db.undo
+    .orderBy('seq')
+    .limit(count - UNDO_LIMIT)
+    .primaryKeys()
+  await db.undo.bulkDelete(old)
+}
+
+export async function lastUndo(): Promise<UndoEntry | undefined> {
+  return db.undo.orderBy('seq').last()
+}
+
+/** Reverts the most recent undoable change. Returns its label, or null if the log is empty. */
+export async function undoLast(): Promise<string | null> {
+  return db.transaction('rw', db.tables, async () => {
+    const entry = await db.undo.orderBy('seq').last()
+    if (!entry) return null
+    for (const op of entry.ops) {
+      const table = db.table(op.table)
+      if (op.before === null) await table.delete(op.key)
+      else await table.put(op.before)
+    }
+    await db.undo.delete(entry.seq!)
+    return entry.label
+  })
+}
+
+export function clearUndo() {
+  return db.undo.clear()
+}

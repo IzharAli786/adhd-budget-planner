@@ -1,0 +1,69 @@
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
+import { fileURLToPath } from 'node:url'
+
+const pwaStub = fileURLToPath(new URL('./src/lib/pwaStub.ts', import.meta.url))
+
+export default defineConfig(({ mode }) => ({
+  resolve: {
+    // No service worker in the demo or in unit tests, so the register hook becomes a no-op.
+    alias:
+      mode === 'demo' || mode === 'test'
+        ? [{ find: 'virtual:pwa-register/react', replacement: pwaStub }]
+        : [],
+  },
+  plugins: [
+    react(),
+    tailwindcss(),
+    // The demo lives on its own origin with no service worker (PLAN §7): a cached demo
+    // would keep serving stale sample data long after the buyer moved to the full app.
+    mode !== 'demo' &&
+      mode !== 'test' &&
+      VitePWA({
+        // 'prompt': a new SW waits until the user taps "Refresh now", so a page never
+        // swaps code under someone mid-entry.
+        registerType: 'prompt',
+        strategies: 'generateSW',
+        injectRegister: false,
+        // The glob below already picks up the PNG/SVG icons; listing them here too would
+        // precache each one twice. Only .ico falls outside the glob.
+        includeAssets: ['favicon.ico'],
+        // Same reason: the glob already has the manifest icons.
+        includeManifestIcons: false,
+        manifest: {
+          name: 'Steady Payday Planner',
+          short_name: 'Steady',
+          description: 'How much can I spend today, and until payday?',
+          display: 'standalone',
+          start_url: '/?source=pwa',
+          scope: '/',
+          background_color: '#FAF7F2',
+          theme_color: '#FAF7F2',
+          icons: [
+            { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+            {
+              src: 'maskable-icon-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          // webmanifest is left out because the plugin precaches it itself (PLAN §6 lists it).
+          globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
+          navigateFallback: '/index.html',
+          // Everything is precached; there is no API to cache at runtime.
+          runtimeCaching: [],
+        },
+      }),
+  ],
+  test: {
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    setupFiles: ['src/test/setup.ts'],
+  },
+}))
