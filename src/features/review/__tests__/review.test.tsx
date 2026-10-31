@@ -290,4 +290,44 @@ describe('payday carry-over', () => {
       '2026-10-30': { carried: 5000, at: expect.any(String) },
     })
   })
+
+  it('each month of the chart is a button that reads its numbers, with a tip', async () => {
+    await seedHistory()
+    goto('/more/review')
+    render(<App />)
+    const group = await screen.findByRole('group', { name: 'Money in and out, month by month' })
+    const october = within(group).getByRole('button', {
+      name: 'October 2026: In €2,100.00, Out €20.00',
+    })
+    // One Tab stop for the whole chart: the latest month; arrows move between months.
+    expect(october.getAttribute('tabindex')).toBe('-1')
+    await userEvent.click(october)
+    expect(within(group).getByText('October 2026')).toBeTruthy()
+    expect(within(group).getByText('€2,100.00')).toBeTruthy()
+  })
+
+  it('on a phone the months are stacked cards instead of a sideways table', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('max-width: 39.99rem'),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    )
+    await seedHistory()
+    goto('/more/review')
+    render(<App />)
+    const months = await screen.findByRole('list', { name: 'Months' })
+    expect(screen.queryByRole('table', { name: /Month/ })).toBeNull()
+    const october = within(months)
+      .getAllByRole('listitem')
+      .find((li) => li.textContent?.includes('October 2026'))!
+    expect(within(october).getByText('Income')).toBeTruthy()
+    expect(within(october).getByText('€2,100.00')).toBeTruthy()
+    expect(within(october).getByText('Left over')).toBeTruthy()
+    const total = screen.getByRole('region', { name: 'Total' })
+    expect(within(total).getByText('€1,168.00')).toBeTruthy()
+  })
 })

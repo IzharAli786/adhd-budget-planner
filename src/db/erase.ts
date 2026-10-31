@@ -6,7 +6,7 @@ import { db } from './schema'
 import { snapshotDbName } from './snapshot'
 
 // Per-device conveniences that would otherwise survive and look like leftover data.
-const LOCAL_KEYS = ['steady:appearance', 'steady:starter-categories']
+const LOCAL_KEYS = ['steady:appearance', 'steady:starter-categories', 'steady:open-sections']
 
 export async function eraseEverything(): Promise<void> {
   await db.transaction('rw', db.tables, () => Promise.all(db.tables.map((t) => t.clear())))

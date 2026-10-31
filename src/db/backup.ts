@@ -328,6 +328,8 @@ function checkIntegrity(data: BackupData): RestoreError | null {
     ['transactions', 'envelopeId', 'envelopes'],
     ['transactions', 'fundId', 'funds'],
     ['transactions', 'debtId', 'debts'],
+    ['lifeGoals', 'fundId', 'funds'],
+    ['lifeGoals', 'debtId', 'debts'],
   ]
   for (const [table, field, target] of refs) {
     for (const [i, row] of (data[table] as unknown as Record<string, unknown>[]).entries()) {
@@ -389,6 +391,15 @@ function setupOnly(data: BackupData): BackupData {
   const debts = live(data.debts)
   const envelopeIds = new Set(envelopes.map((e) => e.id))
   const debtIds = new Set(debts.map((d) => d.id))
+  const fundIds = new Set(live(data.funds).map((f) => f.id))
+  // Life goals are part of a setup: the plan someone sketched. Links to anything left
+  // behind are dropped, the goal itself stays.
+  const lifeGoals = data.lifeGoals.map((g) => {
+    const copy = { ...g }
+    if (copy.fundId !== undefined && !fundIds.has(copy.fundId)) delete copy.fundId
+    if (copy.debtId !== undefined && !debtIds.has(copy.debtId)) delete copy.debtId
+    return copy
+  })
   const bills = live(data.bills)
     .filter((b) => b.debtId === undefined || debtIds.has(b.debtId))
     .map((b) => {
@@ -410,6 +421,7 @@ function setupOnly(data: BackupData): BackupData {
     impulse: [],
     noSpend: [],
     notes: [],
+    lifeGoals,
     meta: [],
   }
 }

@@ -10,12 +10,13 @@ import { DebtsSection } from '../debts/DebtsSection'
 import { ImpulseList } from '../impulse/ImpulseList'
 import { FundsSection } from './FundsSection'
 import { GardenCard } from './GardenCard'
+import { LifeGoalsCard } from './LifeGoals'
 import { NoSpendCard } from './NoSpendCard'
 import { useGarden } from './useGarden'
 
-// Goals (Full mode, PLAN §5): savings, debts, no-spend days, the 48-hour list and the
-// garden. Everything here only grows; nothing counts down or "breaks".
-// Desktop: two independent stacks (savings, no-spend, 48h | debts, garden), so a tall
+// Goals (Full mode, PLAN §5): life goals, savings, debts, no-spend days, the 48-hour list
+// and the garden. Everything here only grows; nothing counts down or "breaks".
+// Desktop: two independent stacks (savings, no-spend, 48h | life goals, debts, garden), so a tall
 // card on one side never leaves a hole on the other the way a shared-row grid does.
 export function GoalsScreen() {
   const today = useToday()
@@ -41,6 +42,7 @@ export function GoalsScreen() {
     </section>
   )
   const garden = <GardenCard />
+  const lifeGoals = <LifeGoalsCard today={today} />
 
   return (
     <>
@@ -55,12 +57,14 @@ export function GoalsScreen() {
               {impulse}
             </div>
             <div className="space-y-8">
+              {lifeGoals}
               {debts}
               {garden}
             </div>
           </div>
         ) : (
           <>
+            {lifeGoals}
             {funds}
             {debts}
             {noSpend}

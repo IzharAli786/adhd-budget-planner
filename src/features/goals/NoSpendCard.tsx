@@ -59,7 +59,9 @@ export function NoSpendCard({ today }: { today: ISODate }) {
             : `${count} this month. Each one counts, in any order.`}
         </p>
       </div>
-      <ol className="grid grid-cols-7 gap-1.5" aria-label="The last 7 days">
+      {/* Seven 44px targets need ~320px: on a phone the row borrows a little of the
+          card's padding and the gaps shrink, so each day stays a full tap target. */}
+      <ol className="-mx-2 grid grid-cols-7 gap-1 sm:mx-0 sm:gap-1.5" aria-label="The last 7 days">
         {strip.map((d) => (
           <li key={d.date}>
             <button
@@ -68,7 +70,7 @@ export function NoSpendCard({ today }: { today: ISODate }) {
               disabled={!d.marked && spent.has(d.date)}
               onClick={() => toggle(d.date)}
               className={cx(
-                'flex min-h-14 w-full flex-col items-center justify-center rounded-2xl text-xs transition-colors disabled:opacity-50',
+                'flex min-h-14 w-full min-w-11 flex-col items-center justify-center rounded-2xl text-xs transition-colors disabled:opacity-50',
                 d.marked
                   ? 'bg-accent text-accent-contrast'
                   : 'bg-bg text-muted ring-1 ring-line enabled:hover:bg-accent-soft/60',

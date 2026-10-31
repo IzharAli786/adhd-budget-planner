@@ -10,11 +10,13 @@ import {
   reviewYears,
   totalFlows,
   yearRange,
+  type Flows,
   type PeriodSummary,
   type ReviewMode,
 } from '../../domain/review'
 import type { ISODate } from '../../domain/types'
 import { debtsInRange, fundsInRange } from '../../domain/yearSummary'
+import { useMediaQuery } from '../../lib/useMediaQuery'
 import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
@@ -117,7 +119,7 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
     }
   }, [data, year, today])
 
-  const rowLabel = (r: PeriodSummary) =>
+  const rowLabel = (r: Pick<PeriodSummary, 'start' | 'end'>) =>
     mode === 'month' ? f.month(r.start) : `${f.day(r.start)} – ${f.day(addDays(r.end, -1))}`
 
   // Print once the report is in the DOM; afterprint puts the screen back.
@@ -139,11 +141,14 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
       return {
         key: range.start,
         label: axisLabel(settings.locale, mode, range.start),
+        title: rowLabel(range),
         incomeIn: r?.incomeIn ?? 0,
         moneyOut: r?.moneyOut ?? 0,
       }
     })
-  }, [rows, mode, year, settings.locale])
+    // rowLabel only reads mode and the formatters, both listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, mode, year, settings.locale, f])
 
   const thisYear = year === Number(today.slice(0, 4))
   const active = rows.some((r) => r.incomeIn || r.moneyOut || r.saved)
@@ -242,6 +247,9 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
               >
                 <IncomeOutChart
                   label={`Money in and out per ${unit}, ${year}. Every number is in the table below.`}
+                  columnsLabel={`Money in and out, ${unit} by ${unit}`}
+                  unit={unit}
+                  f={f}
                   points={points}
                 />
               </Suspense>
@@ -373,9 +381,14 @@ function PeriodTable({
   rowLabel: (r: PeriodSummary) => string
   payday: boolean
 }) {
+  // Phones get one small card per row instead of a table that scrolls sideways.
+  const narrow = useMediaQuery('(max-width: 39.99rem)')
+  if (narrow)
+    return <PeriodCards rows={rows} totals={totals} f={f} rowLabel={rowLabel} payday={payday} />
   const cell = 'py-2.5 pl-4 text-right whitespace-nowrap'
   return (
-    // Six columns don't fit a phone: the table scrolls inside its card, never the page.
+    // Between a phone and a wide card the table may still scroll inside its card, never
+    // the page.
     <div
       className="-mx-5 overflow-x-auto px-5 sm:-mx-6 sm:px-6"
       tabIndex={0}
@@ -439,6 +452,62 @@ function PeriodTable({
           </tr>
         </tfoot>
       </table>
+    </div>
+  )
+}
+
+/** The table as stacked cards for phones: every number, nothing sideways. */
+function PeriodCards({
+  rows,
+  totals,
+  f,
+  rowLabel,
+  payday,
+}: {
+  rows: PeriodSummary[]
+  totals: ReturnType<typeof totalFlows>
+  f: Formatters
+  rowLabel: (r: PeriodSummary) => string
+  payday: boolean
+}) {
+  const figures = (r: Flows & Pick<PeriodSummary, 'carried'>, carried: boolean) => (
+    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm tabular-nums">
+      {carried && <Figure label="Carried in" value={r.carried ? f.money(r.carried.amount) : '–'} />}
+      <Figure label="Income" value={f.money(r.incomeIn)} />
+      <Figure label="Out" value={f.money(r.moneyOut)} />
+      <Figure label="Saved" value={f.money(r.saved)} />
+      <Figure label="Debt" value={f.money(r.debtPaid)} />
+      <Figure label="Left over" value={f.money(r.net)} strong />
+    </dl>
+  )
+  return (
+    <>
+      <ul aria-label={payday ? 'Pay periods' : 'Months'} className="space-y-2.5">
+        {rows.map((r) => (
+          <li key={r.start} className="rounded-2xl bg-bg px-4 py-3">
+            <h3 className="font-semibold">{rowLabel(r)}</h3>
+            {figures(r, payday)}
+          </li>
+        ))}
+      </ul>
+      <section aria-label="Total" className="mt-2.5 rounded-2xl px-4 py-3 ring-1 ring-line">
+        <h3 className="font-semibold">Total</h3>
+        {figures(totals, false)}
+      </section>
+    </>
+  )
+}
+
+function Figure({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div
+      className={cx(
+        'flex justify-between gap-2',
+        strong && 'col-span-2 border-t border-line pt-1.5',
+      )}
+    >
+      <dt className="text-muted">{label}</dt>
+      <dd className={strong ? 'font-semibold' : 'font-medium'}>{value}</dd>
     </div>
   )
 }

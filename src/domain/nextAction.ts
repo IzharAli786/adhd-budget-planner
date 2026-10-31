@@ -1,6 +1,7 @@
 // The one card on Today (PLAN §4.5): a fixed priority list, first match wins. Each action
 // takes 30 seconds or less, and "Not now" snoozes it for 24 h without any guilt copy.
 // Snoozing one action lets the next one in line through, never an empty card.
+import { addDays } from './dates'
 import type { Cents } from './money'
 import type { Id, Instant, ISODate } from './types'
 
@@ -144,7 +145,12 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       id: 'setup-bills',
       kind: 'setup-bills',
       trigger: 'Add your rent',
-      detail: 'About 20 seconds. Bills before payday come off today’s number.',
+      // The day before payday hardly any bill is left before it, so "come off today's
+      // number" would ring hollow: the point is the pay period that starts tomorrow.
+      detail:
+        state.nextPayday !== null && state.nextPayday === addDays(today, 1)
+          ? 'About 20 seconds. Payday is tomorrow: add it now and your new plan has rent in it from day one.'
+          : 'About 20 seconds. Bills before payday come off today’s number.',
       cta: 'Add a bill',
       doneState: 'Bill added.',
     })

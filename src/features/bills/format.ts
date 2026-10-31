@@ -21,6 +21,8 @@ const utc = (date: ISODate) => {
 
 export interface Formatters {
   money: (cents: Cents) => string
+  /** "€1.2K", "€300": short amounts for chart axes, where a full "€1,234.56" won't fit. */
+  moneyShort: (cents: Cents) => string
   symbol: string
   decimals: number
   /** 0.219 -> "21.9%" (or "21,9 %"), up to two decimals. */
@@ -79,9 +81,16 @@ export function makeFormatters(
   const rel = relativeTimeFormat('en', { numeric: 'auto' })
   const plural = pluralRules('en', { type: 'ordinal' })
   const percent = numberFormat(locale, { style: 'percent', maximumFractionDigits: 2 })
+  const short = numberFormat(locale, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  })
   const suffix: Record<string, string> = { one: 'st', two: 'nd', few: 'rd', other: 'th' }
   return {
     money: (c) => formatMoney(c, currency, locale, decimals),
+    moneyShort: (c) => short.format(c / 10 ** decimals),
     symbol: currencySymbol(locale, currency),
     decimals,
     percent: (r) => percent.format(r),

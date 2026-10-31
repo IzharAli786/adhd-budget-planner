@@ -158,6 +158,31 @@ export type NoteTarget = { date: ISODate } | { periodStart: ISODate }
 export const noteId = (target: NoteTarget) =>
   'date' in target ? `day|${target.date}` : `period|${target.periodStart}`
 
+/** Where a life goal stands. Plain words, no deadline pressure (PLAN §1.3). */
+export const LIFE_GOAL_STATUSES = ['todo', 'doing', 'done'] as const
+export type LifeGoalStatus = (typeof LIFE_GOAL_STATUSES)[number]
+
+/**
+ * A free-form goal ("Move to Lisbon", "Learn to drive"): the why behind the numbers.
+ * Optionally linked to the savings fund or debt that gets it there.
+ */
+export interface LifeGoal {
+  id: Id
+  title: string
+  /** Why it matters, or any notes. */
+  why?: string
+  targetDate?: ISODate
+  status: LifeGoalStatus
+  fundId?: Id
+  debtId?: Id
+  createdAt: Instant
+  /** When it was marked done, for "Done in March". */
+  doneAt?: Instant
+}
+
+export const LIFE_GOAL_TITLE_MAX = 120
+export const LIFE_GOAL_WHY_MAX = 1000
+
 export interface UndoEntry {
   seq?: number
   at: Instant

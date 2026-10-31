@@ -203,4 +203,58 @@ describe('Just today', () => {
     )
     expect(await hero()).toBeTruthy()
   })
+
+  it('tapping an envelope lists its entries this period, with a link to the log', async () => {
+    await r.updateSettings({ envelopesEnabled: true })
+    const everyday = await r.ensureDefaultEnvelope()
+    const food = await r.addEnvelope({ name: 'Food', budget: 10000, color: 'sage' })
+    await r.addTransaction({
+      date: '2026-11-02',
+      amount: -1500,
+      note: 'market',
+      envelopeId: food.id,
+    })
+    await r.addTransaction({ date: '2026-11-03', amount: -2500, note: 'shop', envelopeId: food.id })
+    await r.addTransaction({ date: '2026-11-03', amount: -900, note: 'coffee' })
+    // Before this pay period (it started Fri 30 Oct): not listed.
+    await r.addTransaction({ date: '2026-10-20', amount: -4000, note: 'old', envelopeId: food.id })
+    goto('/plan')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Food' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Food' })
+    const list = within(sheet).getByRole('list', { name: 'Food entries' })
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([expect.stringMatching(/shop.*€25\.00/), expect.stringMatching(/market.*€15\.00/)])
+    expect(within(sheet).getByText('€40.00')).toBeTruthy()
+    expect(within(sheet).getByText(/€60\.00 left/)).toBeTruthy()
+    await userEvent.click(within(sheet).getByRole('link', { name: 'See all in log' }))
+    // The log opens filtered to Food.
+    const chips = await screen.findByRole('group', { name: /Envelope/ })
+    expect(within(chips).getByRole('button', { name: /Food/ }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    expect(await screen.findByText('market')).toBeTruthy()
+    expect(screen.queryByText('coffee')).toBeNull()
+    expect(everyday.isDefault).toBe(true)
+  })
+
+  it('folds Insights away and remembers it', async () => {
+    goto('/plan')
+    const { unmount } = render(<App />)
+    const insights = await screen.findByRole('region', { name: 'Insights' })
+    const toggle = within(insights).getByRole('button', { name: 'Insights' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    await userEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(within(insights).getByText(/Where this period’s money is going/)).toBeTruthy()
+    unmount()
+    render(<App />)
+    const again = await screen.findByRole('region', { name: 'Insights' })
+    expect(
+      within(again).getByRole('button', { name: 'Insights' }).getAttribute('aria-expanded'),
+    ).toBe('false')
+  })
 })
