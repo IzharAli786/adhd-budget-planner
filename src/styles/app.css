@@ -197,6 +197,37 @@ dialog.sheet[open] {
   animation: fade-in 240ms ease-out;
 }
 
+/* Garden (Goals): a slow sway. The motion rules below stop it, leaving a still picture. */
+.garden {
+  --leaf: color-mix(in oklab, #5f9658 84%, var(--bg));
+  --leaf-deep: color-mix(in oklab, #3f7440 84%, var(--bg));
+  --soil: color-mix(in oklab, var(--accent) 16%, var(--bg));
+  --soil-deep: color-mix(in oklab, var(--accent) 30%, var(--bg));
+}
+@keyframes garden-sway {
+  from {
+    transform: rotate(-1.6deg);
+  }
+  to {
+    transform: rotate(1.6deg);
+  }
+}
+.garden-sway {
+  transform-box: view-box;
+  animation: garden-sway 5.5s ease-in-out infinite alternate;
+}
+@keyframes garden-grow {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.garden-grow {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: garden-grow 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 /* Motion: 'auto' follows the OS, 'off' always stops it, 'on' overrides a reduce request. */
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion='on']) *,

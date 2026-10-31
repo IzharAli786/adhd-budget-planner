@@ -73,6 +73,22 @@ export interface SafeToSpend {
   dueEntries: BillEntry[]
   /** Transactions that moved the balance since the check-in. */
   counted: Transaction[]
+  /** One row per live envelope, in input order; empty while envelopes are off. */
+  envelopes: EnvelopeUsage[]
+}
+
+export interface EnvelopeUsage {
+  id: Id
+  name: string
+  budget: Cents
+  /** Spending this period plus linked bills already paid this period. */
+  spent: Cents
+  /** Linked bills still due before payday (they sit in billsDue). */
+  linkedDue: Cents
+  /** max(0, budget − spent − linkedDue), capped at the budget: the envelopeReserved term. */
+  reserved: Cents
+  /** How far past the budget it went, 0 if not. Shown as calm text, never red. */
+  over: Cents
 }
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0)
@@ -113,43 +129,11 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
   })
   const savingsPlanned = sum(savingsItems.map((i) => i.amount))
 
-  // Envelopes: what is still budgeted this period but not yet used. A bill linked to an
-  // envelope uses it up like spending does, so the bill is counted once: while unpaid it
-  // sits in billsDue and shrinks the reserve; once paid it counts as spent instead.
-  // Overdue linked bills from an earlier period belonged to that period's budget.
-  const billEnvelope = new Map(bills.map((b) => [b.id, b.envelopeId]))
-  const known = new Set(envelopes.map((e) => e.id))
-  const fallback = envelopes.find((e) => e.isDefault)?.id
-  const envelopeOf = (id: Id | undefined) => (id !== undefined && known.has(id) ? id : fallback)
-  const paidInPeriod =
-    envelopes.length === 0
-      ? []
-      : billEntriesBetween(bills, occurrences, period.start, period.end).filter(
-          (e) => e.status === 'paid',
-        )
-  const envelopeItems: BreakdownItem[] = envelopes.map((env) => {
-    const linkedTo = (e: BillEntry) =>
-      e.date >= period.start && billEnvelope.get(e.billId) === env.id
-    const spent =
-      -sum(
-        live
-          .filter(
-            (t) =>
-              t.fundId === undefined &&
-              t.billOccurrenceId === undefined &&
-              inPeriod(t.date, period.start, today) &&
-              envelopeOf(t.envelopeId) === env.id,
-          )
-          .map((t) => t.amount),
-      ) + sum(paidInPeriod.filter(linkedTo).map((e) => e.amount))
-    const linked = sum(dueEntries.filter(linkedTo).map((e) => e.amount))
-    // Clamped to [0, budget]: refunds can't push the reserve above the budget. (Flooring
-    // `spent` instead would make paying a linked bill move the total.)
-    return {
-      label: env.name,
-      amount: Math.min(env.budget, Math.max(0, env.budget - spent - linked)),
-    }
-  })
+  const envelopeUsage = envelopesUsage({ ...input, envelopes, live, dueEntries })
+  const envelopeItems: BreakdownItem[] = envelopeUsage.map((u) => ({
+    label: u.name,
+    amount: u.reserved,
+  }))
   const envelopeReserved = sum(envelopeItems.map((i) => i.amount))
 
   const total = currentBalance - billsDue - savingsPlanned - envelopeReserved - buffer
@@ -218,7 +202,72 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
     buffer,
     dueEntries,
     counted,
+    envelopes: envelopeUsage,
   }
+}
+
+/**
+ * Envelopes (PLAN §4.1): what is still budgeted this period but not yet used. A bill
+ * linked to an envelope uses it up like spending does, so the bill is counted once:
+ * while unpaid it sits in billsDue and shrinks the reserve; once paid it counts as spent
+ * instead. Overdue linked bills from an earlier period belonged to that period's budget.
+ * Untagged spending (or spending tagged with a deleted envelope) uses the default one;
+ * untagged income does not.
+ */
+function envelopesUsage({
+  today,
+  period,
+  bills,
+  occurrences,
+  envelopes,
+  live,
+  dueEntries,
+}: Pick<SafeToSpendInput, 'today' | 'period' | 'bills' | 'occurrences'> & {
+  envelopes: readonly Envelope[]
+  live: readonly Transaction[]
+  dueEntries: readonly BillEntry[]
+}): EnvelopeUsage[] {
+  if (envelopes.length === 0) return []
+  const billEnvelope = new Map(bills.map((b) => [b.id, b.envelopeId]))
+  const known = new Set(envelopes.map((e) => e.id))
+  const fallback = envelopes.find((e) => e.isDefault)?.id
+  const envelopeOf = (id: Id | undefined) => (id !== undefined && known.has(id) ? id : fallback)
+  const paidInPeriod = billEntriesBetween(bills, occurrences, period.start, period.end).filter(
+    (e) => e.status === 'paid',
+  )
+  return envelopes.map((env) => {
+    const linkedTo = (e: BillEntry) =>
+      e.date >= period.start && billEnvelope.get(e.billId) === env.id
+    const spent =
+      -sum(
+        live
+          .filter(
+            (t) =>
+              t.fundId === undefined &&
+              t.billOccurrenceId === undefined &&
+              inPeriod(t.date, period.start, today) &&
+              // Money in counts only when tagged (a refund back into Food). Untagged
+              // income like a salary is not Everyday's money; counting it would refill
+              // the reserve and make later spending come off safe-to-spend twice.
+              (t.amount < 0 || (t.envelopeId !== undefined && known.has(t.envelopeId))) &&
+              envelopeOf(t.envelopeId) === env.id,
+          )
+          .map((t) => t.amount),
+      ) + sum(paidInPeriod.filter(linkedTo).map((e) => e.amount))
+    const linkedDue = sum(dueEntries.filter(linkedTo).map((e) => e.amount))
+    // Clamped to [0, budget]: refunds can't push the reserve above the budget. (Flooring
+    // `spent` instead would make paying a linked bill move the total.)
+    const reserved = Math.min(env.budget, Math.max(0, env.budget - spent - linkedDue))
+    return {
+      id: env.id,
+      name: env.name,
+      budget: env.budget,
+      spent,
+      linkedDue,
+      reserved,
+      over: Math.max(0, spent + linkedDue - env.budget),
+    }
+  })
 }
 
 const SET_ASIDE: readonly LineId[] = ['savings', 'envelopes', 'buffer']

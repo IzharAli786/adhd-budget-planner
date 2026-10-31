@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { choiceFromRule, ruleFromChoice, type Repeat, type RepeatChoice } from '../../domain/bills'
 import { isValidISODate } from '../../domain/dates'
-import type { Bill, ISODate } from '../../domain/types'
+import type { Bill, Envelope, Id, ISODate } from '../../domain/types'
+import { Chip } from '../../ui/Chip'
 import { DateInput } from '../../ui/DateInput'
 import { Field, inputClass } from '../../ui/Field'
 import { MoneyInput } from '../../ui/MoneyInput'
@@ -46,13 +47,22 @@ interface BillFormProps {
   defaultDate: ISODate
   today: ISODate
   onSubmit: (changes: BillChanges) => void
+  /** Live envelopes to link the bill to; empty while envelopes are off or hidden. */
+  envelopes?: readonly Envelope[]
 }
 
 /**
  * The add/edit bill fields. Actions (Save, Delete) live in the sheet's footer and submit
  * this form through its id, so the keyboard's Go/Enter key saves too.
  */
-export function BillForm({ id, bill, defaultDate, today, onSubmit }: BillFormProps) {
+export function BillForm({
+  id,
+  bill,
+  defaultDate,
+  today,
+  onSubmit,
+  envelopes = [],
+}: BillFormProps) {
   const f = useFormat()
   const initial = bill
     ? choiceFromRule(bill.rule, today)
@@ -60,6 +70,7 @@ export function BillForm({ id, bill, defaultDate, today, onSubmit }: BillFormPro
   const [name, setName] = useState(bill?.name ?? '')
   const [amount, setAmount] = useState<number | null>(bill?.amount ?? null)
   const [autopay, setAutopay] = useState(bill?.autopay ?? false)
+  const [envelopeId, setEnvelopeId] = useState<Id | undefined>(bill?.envelopeId)
   const [choice, setChoice] = useState<RepeatChoice>(initial)
   // Rules the form can't show exactly (from a split or a backup) stay as stored unless
   // the user actually changes the repeat fields.
@@ -99,6 +110,8 @@ export function BillForm({ id, bill, defaultDate, today, onSubmit }: BillFormPro
       amount,
       autopay,
       rule: ruleTouched ? ruleFromChoice(choice) : null,
+      // Only when the picker was shown, so a hidden envelope link is never cleared.
+      ...(envelopes.length > 0 ? { envelopeId } : {}),
     })
   }
 
@@ -168,6 +181,25 @@ export function BillForm({ id, bill, defaultDate, today, onSubmit }: BillFormPro
             ? ', or the last day in shorter months.'
             : '.'}
         </p>
+      )}
+
+      {envelopes.length > 0 && (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium">Comes out of an envelope?</legend>
+          <div className="flex flex-wrap gap-2">
+            <Chip selected={envelopeId === undefined} onClick={() => setEnvelopeId(undefined)}>
+              No
+            </Chip>
+            {envelopes.map((e) => (
+              <Chip key={e.id} selected={envelopeId === e.id} onClick={() => setEnvelopeId(e.id)}>
+                {e.name}
+              </Chip>
+            ))}
+          </div>
+          <p className="mt-1.5 text-sm text-muted">
+            It’s counted once: it uses up that envelope instead of coming off twice.
+          </p>
+        </fieldset>
       )}
 
       <div className="flex items-center gap-3">

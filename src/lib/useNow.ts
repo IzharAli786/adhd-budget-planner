@@ -2,26 +2,26 @@ import { useEffect, useState } from 'react'
 import type { Instant } from '../domain/types'
 
 /**
- * The current instant, refreshed every minute and when the app comes back to the
- * foreground. For time-based state that isn't tied to midnight: a "Not now" snooze
- * ending after 24 h, a 48h item becoming ready to decide. Without a tick, a value
- * computed once on render would stay stale until something else re-rendered.
+ * The current instant, refreshed every `everyMs` and when the app returns to the
+ * foreground (phones freeze timers in the background). For countdowns like the 48h list:
+ * the domain stays pure and takes `now`; only this hook reads the clock.
  */
-export function useNow(intervalMs = 60_000): Instant {
+export function useNow(everyMs = 60_000): Instant {
   const [now, setNow] = useState(() => new Date().toISOString())
 
   useEffect(() => {
-    const refresh = () => setNow(new Date().toISOString())
-    const timer = setInterval(refresh, intervalMs)
+    const tick = () => setNow(new Date().toISOString())
+    const timer = setInterval(tick, everyMs)
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh()
+      if (document.visibilityState === 'visible') tick()
     }
     document.addEventListener('visibilitychange', onVisible)
+    // Cleanup matters: without it every re-mount would leave one more interval running.
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [intervalMs])
+  }, [everyMs])
 
   return now
 }

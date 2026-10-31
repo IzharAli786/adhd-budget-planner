@@ -3,6 +3,7 @@ import { BackupScreen } from '../features/backup/BackupScreen'
 import { BillsScreen } from '../features/bills/BillsScreen'
 import { RecentlyDeletedScreen } from '../features/deleted/RecentlyDeletedScreen'
 import { GoalsScreen } from '../features/goals/GoalsScreen'
+import { ImpulseScreen } from '../features/impulse/ImpulseScreen'
 import { InstallGate } from '../features/install/InstallGate'
 import { InstallScreen } from '../features/install/InstallScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
@@ -62,6 +63,7 @@ export function App() {
                     <Route path="more/backup" element={<BackupScreen />} />
                     <Route path="more/transactions" element={<TransactionsScreen />} />
                     <Route path="more/deleted" element={<RecentlyDeletedScreen />} />
+                    <Route path="more/wait" element={<ImpulseScreen />} />
                     <Route path="more/install" element={<InstallScreen embedded />} />
                     <Route path="start" element={<StartRoute />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

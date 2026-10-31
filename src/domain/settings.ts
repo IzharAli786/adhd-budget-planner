@@ -25,6 +25,8 @@ export interface Settings {
   envelopesEnabled: boolean
   /** App-icon badge; null = the platform default (on in Chromium, off on iOS). */
   appBadge: boolean | null
+  /** Low-energy Today (PLAN §5): the number and one card, nothing else. */
+  justToday: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Off by default (PLAN §10 M9): most people start with one number, not categories.
   envelopesEnabled: false,
   appBadge: null,
+  justToday: false,
 }
 
 /** Fills missing fields so rows written by older versions still read as full Settings. */

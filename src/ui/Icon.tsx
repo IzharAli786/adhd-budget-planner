@@ -36,6 +36,11 @@ const PATHS = {
   edit: 'M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4',
   skip: 'M6 5l8 7-8 7M18 5v14',
   list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  up: 'M6 15l6-6 6 6',
+  down: 'M6 9l6 6 6-6',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2',
+  leaf: 'M5 19c0-8 5-14 15-14 0 10-6 15-14 15M5 19l7-7',
+  envelope: 'M4 6h16v12H4zM4 7l8 6 8-6',
 } as const
 
 export type IconName = keyof typeof PATHS

@@ -1,6 +1,6 @@
 import { rebaseRule, sameRule } from '../../domain/bills'
 import type { Cents } from '../../domain/money'
-import type { Bill, ISODate, Recurrence } from '../../domain/types'
+import type { Bill, Id, ISODate, Recurrence } from '../../domain/types'
 import { editBill, editBillFrom, setOccurrenceAmount } from '../../db/repos'
 
 export type EditScope = 'one' | 'following' | 'all'
@@ -11,6 +11,8 @@ export interface BillChanges {
   amount: Cents
   autopay: boolean
   rule: Recurrence | null
+  /** The envelope this bill comes out of; undefined for none. Absent: left as it is. */
+  envelopeId?: Id | undefined
 }
 
 /** Did anything other than the amount change? Only an amount can differ for one bill. */
@@ -18,6 +20,7 @@ export function onlyAmountChanged(bill: Bill, changes: BillChanges): boolean {
   return (
     changes.name === bill.name &&
     changes.autopay === bill.autopay &&
+    (!('envelopeId' in changes) || changes.envelopeId === bill.envelopeId) &&
     (changes.rule === null || sameRule(changes.rule, bill.rule))
   )
 }
@@ -46,6 +49,7 @@ export async function applyBillEdit(
     amount: changes.amount,
     autopay: changes.autopay,
   }
+  if ('envelopeId' in changes) patch.envelopeId = changes.envelopeId
   if (scope === 'one' && originalDate) {
     await setOccurrenceAmount(bill.id, originalDate, changes.amount)
     return `Changed this ${changes.name} bill`

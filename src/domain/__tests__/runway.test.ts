@@ -75,7 +75,30 @@ describe('canFit', () => {
     [16100, 7, 16100, true, 0, 0],
     [16100, 7, 16101, false, -1, 0],
   ])('safe %i over %i days, buy %i', (total, daysLeft, x, fits, after, perDayAfter) => {
-    expect(canFit(x, { total, spentToday: 0, daysLeft })).toEqual({ fits, after, perDayAfter })
+    expect(canFit(x, { total, startOfDaySafe: total, daysLeft })).toEqual({
+      fits,
+      after,
+      perDayAfter,
+    })
+  })
+
+  it('spreads from the start of the day, not from after today’s spending', () => {
+    // 1000 already spent today: start of day 17100, buy 5000 -> 12100 / 7 = 1728
+    expect(canFit(5000, { total: 16100, startOfDaySafe: 17100, daysLeft: 7 })).toEqual({
+      fits: true,
+      after: 11100,
+      perDayAfter: 1728,
+    })
+  })
+
+  it.each([
+    // price, room in the envelope -> after
+    [3000, 5000, 16100], // all of it fits in the envelope's room
+    [3000, 1000, 14100], // 1000 from the envelope, 2000 from safe-to-spend
+    [3000, 0, 13100],
+    [3000, -50, 13100], // room is never negative
+  ])('buying %i from an envelope with %i room leaves %i', (x, room, after) => {
+    expect(canFit(x, { total: 16100, startOfDaySafe: 16100, daysLeft: 7, room }).after).toBe(after)
   })
 })
 

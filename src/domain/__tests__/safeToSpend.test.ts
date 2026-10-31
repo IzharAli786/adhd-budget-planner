@@ -150,9 +150,10 @@ describe('safeToSpend: worked example', () => {
     ]
     const bills = input.bills.map((b) => (b.id === 'gym' ? { ...b, envelopeId: 'gymEnv' } : b))
     const withEnv = safeToSpend({ ...input, bills, envelopes, envelopesEnabled: true })
-    // Everyday: 20000 − 1200 coffee + 2000 refund → spent floored at 0 → 20000 reserved.
+    // Everyday: 20000 − 500 − 1200 coffee = 18300. The untagged +2000 is money in, not
+    // Everyday's (only a tagged refund refills an envelope).
     // Gym: 5000 − 3000 linked unpaid = 2000.
-    expect(withEnv.envelopeReserved).toBe(20000 + 2000)
+    expect(withEnv.envelopeReserved).toBe(18300 + 2000)
     expect(sum(withEnv.lines.map((l) => l.amount))).toBe(withEnv.total)
     // Ignored while the feature is off.
     expect(safeToSpend({ ...input, bills, envelopes }).envelopeReserved).toBe(0)

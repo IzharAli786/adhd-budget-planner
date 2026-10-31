@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router'
+import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import { markPaid, setMeta } from '../../db/repos'
 import { addSnooze, type NextAction, type Snoozes } from '../../domain/nextAction'
@@ -19,6 +20,7 @@ export function ActionCard({ action, snoozes, onCheckIn, onLog }: Props) {
   const navigate = useNavigate()
   const undoToast = useUndoToast()
   const f = useFormat()
+  const { simpleMode } = useAppSettings().settings
 
   function run() {
     switch (action.kind) {
@@ -37,7 +39,7 @@ export function ActionCard({ action, snoozes, onCheckIn, onLog }: Props) {
       case 'backup':
         return navigate('/more/backup')
       case 'impulse':
-        return navigate('/more')
+        return navigate(simpleMode ? '/more/wait' : '/goals')
       case 'setup-bills':
         return navigate('/bills')
       case 'log-today':

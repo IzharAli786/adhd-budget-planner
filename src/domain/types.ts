@@ -103,6 +103,8 @@ export interface SavingsFund {
   id: Id
   name: string
   target?: Cents
+  /** Our addition to PLAN §3.3: lets Goals say "about €x per payday to reach it by then". */
+  targetDate?: ISODate
   perPeriod: Cents
   openingSaved: Cents
   challenge?: { kind: '52week' | 'fixed'; start: ISODate }
