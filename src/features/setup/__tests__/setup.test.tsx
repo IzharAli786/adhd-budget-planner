@@ -40,7 +40,7 @@ describe('first-run setup (PLAN §5)', () => {
   it('redirects to /setup after unlock and finishes on Today with a number', async () => {
     render(<App />)
     await waitFor(() => expect(window.location.pathname).toBe('/setup'))
-    expect(screen.getByRole('list', { name: 'Step 1 of 4' })).toBeTruthy()
+    expect(await screen.findByRole('list', { name: 'Step 1 of 4' })).toBeTruthy()
     await throughPayday()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Every 2 weeks' }))
@@ -65,6 +65,17 @@ describe('first-run setup (PLAN §5)', () => {
     expect(await r.listCheckIns()).toEqual([
       expect.objectContaining({ date: '2026-10-31', balance: 84250 }),
     ])
+
+    // M5+M6: Today runs on the answers (en-GB, so £). 842.50 over 6 days to Fri 6 Nov -> floor 140.41.
+    const hero = async () =>
+      (await screen.findByRole('region', { name: 'Today’s number' })).querySelector('[aria-live]')!
+    await waitFor(async () => expect((await hero()).textContent).toBe('£140.41'))
+    // No bills yet, so the deferred setup task is the one card.
+    expect(await screen.findByText('Add your rent')).toBeTruthy()
+    // Only spending logged after the check-in counts; the frozen test clock needs a nudge.
+    vi.setSystemTime(new Date(2026, 9, 31, 12, 1))
+    await userEvent.type(screen.getByRole('textbox', { name: /Quick add/ }), '12 coffee{Enter}')
+    await waitFor(async () => expect((await hero()).textContent).toBe('£128.41'))
   })
 
   it('detects locale and currency from the device, shown as one editable line', async () => {

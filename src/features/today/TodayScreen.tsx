@@ -59,7 +59,8 @@ function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
   if (!plan) return null
 
   if (plan.kind === 'no-income' || plan.kind === 'no-payday') {
-    // M6 adds /setup; until then the next step lives in Bills > Paydays.
+    // Only reachable after setup (RequireSetup), e.g. once the pay was deleted, and
+    // /setup sends a finished install straight back here, so the step is Bills > Paydays.
     return (
       <Welcome
         icon="payday"

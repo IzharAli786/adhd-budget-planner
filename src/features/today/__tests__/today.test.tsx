@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../../app/App'
-import { resetDb } from '../../../db/__tests__/helpers'
+import { resetDb, seedReadyInstall } from '../../../db/__tests__/helpers'
 import * as r from '../../../db/repos'
 import type { Recurrence } from '../../../domain/types'
 
@@ -14,6 +14,7 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   await resetDb()
+  await seedReadyInstall()
   localStorage.clear()
   window.history.replaceState(null, '', '/')
 })
