@@ -37,14 +37,54 @@ const hero = async () =>
   (await screen.findByRole('region', { name: 'Today’s number' })).querySelector('[aria-live]')!
 
 describe('Plan', () => {
-  it('shows this period: income, balance, and safe to spend', async () => {
+  it('first period: shows the expected pay, not a payday from before the first balance', async () => {
+    goto('/plan')
+    render(<App />)
+    const card = await screen.findByRole('region', { name: 'This period' })
+    // Fri 30 Oct started this period, but the first balance is from 4 Nov: that pay is
+    // already in it and was never entered here, so the line shows the next pay instead.
+    expect(await within(card).findByText(/Expected pay · Mon,? 30 Nov/)).toBeTruthy()
+    expect(within(card).queryByText(/Salary · Fri,? 30 Oct/)).toBeNull()
+    expect(within(card).getAllByText('€2,100.00').length).toBeGreaterThan(0)
+    expect(within(card).getAllByText('€842.50').length).toBe(2) // balance, safe to spend
+  })
+
+  it('a later period lists the payday that started it', async () => {
+    await r.addCheckIn(50000, '2026-10-01', new Date(2026, 9, 1, 8).toISOString())
     goto('/plan')
     render(<App />)
     const card = await screen.findByRole('region', { name: 'This period' })
     // Fri 30 Oct (31 Oct is a Saturday) started this period.
     expect(await within(card).findByText(/Salary · Fri,? 30 Oct/)).toBeTruthy()
-    expect(within(card).getAllByText('€2,100.00').length).toBeGreaterThan(0)
-    expect(within(card).getAllByText('€842.50').length).toBe(2) // balance, safe to spend
+    expect(within(card).getByText('Income this period')).toBeTruthy()
+  })
+
+  it('the strip shows income, set aside and safe to spend', async () => {
+    goto('/plan')
+    render(<App />)
+    const strip = await screen.findByRole('region', { name: 'This period at a glance' })
+    expect(within(strip).getByText('Expected pay')).toBeTruthy()
+    expect(within(strip).getByText('€2,100.00')).toBeTruthy()
+    expect(within(strip).getByText('Set aside')).toBeTruthy()
+    expect(within(strip).getByText('Safe to spend')).toBeTruthy()
+    expect(within(strip).getByText('€842.50')).toBeTruthy()
+  })
+
+  it('savings: totals, and the per-payday pace for a fund with a date', async () => {
+    await r.addFund({
+      name: 'Holiday',
+      target: 60000,
+      targetDate: '2027-01-31',
+      perPeriod: 0,
+      openingSaved: 0,
+    })
+    goto('/plan')
+    render(<App />)
+    const tiles = await screen.findByRole('region', { name: 'Savings totals' })
+    expect(within(tiles).getByText('€600.00')).toBeTruthy()
+    expect(within(tiles).getByText('0%')).toBeTruthy()
+    // Paydays left by 31 Jan: 30 Nov, 31 Dec, 29 Jan -> €200 each.
+    expect(screen.getByText(/About €200\.00 per payday to reach it by/)).toBeTruthy()
   })
 
   it('envelopes are off by default, explained, and turn on with Everyday', async () => {

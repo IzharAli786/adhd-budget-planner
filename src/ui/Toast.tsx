@@ -32,6 +32,7 @@ const ToastContext = createContext<ToastApi | null>(null)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const [atTop, setAtTop] = useState(false)
   const nextId = useRef(1)
 
   const dismiss = useCallback((id: number) => {
@@ -42,6 +43,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const id = nextId.current++
     // One at a time: stacked toasts pile up over the tab bar and nobody reads them.
     setToasts([{ duration: 5000, ...options, id }])
+    setAtTop(coversFocusedField())
     return id
   }, [])
 
@@ -50,10 +52,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
+      {/* Phones: above the tab bar AND the floating + (5.25rem + 3.5rem), so a toast never
+          sits on a control. Desktop: bottom centre, clear of the + in the corner. */}
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 px-4 md:bottom-6"
+        className={cx(
+          'pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 md:pl-28 lg:pl-60',
+          atTop
+            ? // Below the demo's sticky banner when there is one.
+              'top-[calc(var(--demo-banner-h,0px)+max(env(safe-area-inset-top),1rem))]'
+            : 'bottom-[calc(9.5rem+env(safe-area-inset-bottom))] md:bottom-6',
+        )}
       >
         {toasts.map((t) => (
           <Toast key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
@@ -61,6 +71,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   )
+}
+
+/**
+ * True when the focused text field (Today's quick-add, still focused after Enter) sits
+ * where the toast would appear: the toast then shows at the top instead of covering
+ * the next thing the person types.
+ */
+export function coversFocusedField(): boolean {
+  const el = document.activeElement
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return false
+  // A field in a modal: the save that shows the toast also closes the dialog, so the
+  // field is gone by the time anyone reads the toast. Moving up then just looks random.
+  if (el.closest('dialog')) return false
+  // An on-screen keyboard is open (the visual viewport shrank): a bottom toast, Undo
+  // included, would sit behind it.
+  const vv = window.visualViewport
+  if (vv && vv.height < window.innerHeight - 150) return true
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  // The bottom offsets used below, and about 4.5rem for one toast above that edge.
+  const wide = window.matchMedia?.('(min-width: 48rem)').matches ?? false
+  const bottom = window.innerHeight - (wide ? 1.5 : 9.5) * rem
+  const field = el.getBoundingClientRect()
+  return field.bottom > bottom - 4.5 * rem && field.top < bottom
 }
 
 function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {

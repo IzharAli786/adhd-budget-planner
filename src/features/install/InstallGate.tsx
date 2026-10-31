@@ -2,7 +2,9 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import {
   continuedInBrowser,
+  dismissInstallBanner,
   INSTALL_FLOW,
+  installBannerDismissed,
   promptInstall,
   setContinuedInBrowser,
 } from '../../lib/install'
@@ -37,7 +39,7 @@ export function InstallGate({ children }: { children: ReactNode }) {
 /** Persistent reminder in the shell for people who chose the browser, or can install. */
 export function InstallBanner() {
   const ctx = useInstallContext()
-  const [hidden, setHidden] = useState(false)
+  const [hidden, setHidden] = useState(installBannerDismissed)
 
   if (!INSTALL_FLOW || hidden || ctx === 'installed' || ctx === 'unsupported') return null
   if ((ctx === 'ios' || ctx === 'in-app') && !continuedInBrowser()) return null
@@ -67,7 +69,10 @@ export function InstallBanner() {
           <button
             type="button"
             aria-label="Not now"
-            onClick={() => setHidden(true)}
+            onClick={() => {
+              dismissInstallBanner()
+              setHidden(true)
+            }}
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-muted"
           >
             <Icon name="close" size={18} />

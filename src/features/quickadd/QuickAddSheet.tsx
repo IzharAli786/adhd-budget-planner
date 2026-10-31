@@ -134,7 +134,13 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
           </Chip>
         </div>
         {pickDate && (
-          <DateInput label="Date" value={date} max={today} onChange={(d) => d && setDay(d)} />
+          <DateInput
+            format={f.dayFull}
+            label="Date"
+            value={date}
+            max={today}
+            onChange={(d) => d && setDay(d)}
+          />
         )}
       </fieldset>
 

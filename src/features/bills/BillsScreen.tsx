@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import {
@@ -51,6 +51,8 @@ export function BillsScreen() {
   // In the URL, so a reload or the back button keeps the segment (and Today can link here).
   const [params, setParams] = useSearchParams()
   const view: View = params.get('view') === 'paydays' ? 'paydays' : 'bills'
+  // ?new=1 ("Add your rent" on Today) opens the bill form straight away: one tap, not two.
+  const startNew = params.get('new') === '1'
 
   return (
     <>
@@ -69,6 +71,9 @@ export function BillsScreen() {
         <BillsView
           data={data}
           today={today}
+          startNew={startNew}
+          // Dropped once the form is open, so Back or a reload doesn't open it again.
+          onStarted={() => setParams({}, { replace: true })}
           onShowPaydays={() => setParams({ view: 'paydays' }, { replace: true })}
         />
       ) : (
@@ -89,17 +94,26 @@ type Panel =
 function BillsView({
   data,
   today,
+  startNew = false,
+  onStarted,
   onShowPaydays,
 }: {
   data: BillsData
   today: ISODate
+  startNew?: boolean
+  onStarted?: () => void
   onShowPaydays: () => void
 }) {
   const f = useFormat()
   const { settings } = useAppSettings()
   const { bills, occurrences, incomes, paydayOverrides, period, laterEnd } = data
   const [month, setMonth] = useState(today)
-  const [panel, setPanel] = useState<Panel>(null)
+  const [panel, setPanel] = useState<Panel>(() =>
+    startNew ? { kind: 'editor', target: { defaultDate: today } } : null,
+  )
+  useEffect(() => {
+    if (startNew) onStarted?.()
+  }, [startNew, onStarted])
   const funds = useFunds()
   const transactions = useTransactions()
   const notes = useNotes()

@@ -136,16 +136,23 @@ describe('settings persist', () => {
 // axe-core on the rendered DOM (PLAN §10 M3 "axe passes"). happy-dom has no layout, so
 // colour contrast is checked by contrast.test.ts instead.
 describe('axe', () => {
-  it.each(['/', '/bills', '/more', '/more/settings', '/more/backup', '/more/install'])(
-    '%s has no violations',
-    async (path) => {
-      await updateSettings({ simpleMode: false })
-      await renderAt(path)
-      await screen.findByRole('heading', { level: 1 })
-      const result = await axe.run(document.body, {
-        rules: { 'color-contrast': { enabled: false } },
-      })
-      expect(result.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`)).toEqual([])
-    },
-  )
+  it.each([
+    '/',
+    '/bills',
+    '/plan',
+    '/goals',
+    '/more',
+    '/more/help',
+    '/more/settings',
+    '/more/backup',
+    '/more/install',
+  ])('%s has no violations', async (path) => {
+    await updateSettings({ simpleMode: false })
+    await renderAt(path)
+    await screen.findByRole('heading', { level: 1 })
+    const result = await axe.run(document.body, {
+      rules: { 'color-contrast': { enabled: false } },
+    })
+    expect(result.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`)).toEqual([])
+  })
 })

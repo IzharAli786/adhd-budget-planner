@@ -144,18 +144,19 @@ function StepFrame({
         <form
           noValidate
           onSubmit={submit}
-          className="animate-fade-in flex flex-1 flex-col pt-6 md:pt-12"
+          className="animate-fade-in flex flex-1 flex-col pt-6 md:flex-none md:pt-12"
         >
           <h1
             ref={headingRef}
             tabIndex={-1}
-            className="text-[2rem] leading-tight font-semibold tracking-tight outline-none md:text-[2.5rem]"
+            className="type-display text-[2rem] leading-tight outline-none md:text-[2.5rem]"
           >
             {title}
           </h1>
           {lead && <div className="mt-2 text-base text-muted">{lead}</div>}
           <div className="mt-8 space-y-5">{children}</div>
-          <div className="mt-auto pt-10">
+          {/* Thumb reach on phones (pinned low); on wider screens it sits under the card. */}
+          <div className="mt-auto pt-10 md:mt-0">
             <Button type="submit" size="lg" block disabled={busy}>
               {action}
             </Button>

@@ -465,6 +465,7 @@ function TransactionForm({ tx, onClose }: { tx: Transaction; onClose: () => void
         />
       </Field>
       <DateInput
+        format={f.dayFull}
         label="Date"
         value={date}
         max={today}

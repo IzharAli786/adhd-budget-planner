@@ -53,6 +53,13 @@ check(
   precached.some((u) => u.endsWith('.woff2')),
   'the font is not precached (offline text falls back)',
 )
+// Both faces: Inter for text, Fraunces for titles and hero numbers.
+for (const face of ['inter-latin-wght', 'fraunces-latin-opsz']) {
+  check(
+    precached.some((u) => u.includes(face) && u.endsWith('.woff2')),
+    `${face} is not precached (offline type falls back)`,
+  )
+}
 for (const url of new Set(precached)) check(existsSync(join(dist, url)), `precached ${url} 404s`)
 check(new Set(precached).size === precached.length, 'precache lists a file twice')
 check(sw.includes('createHandlerBoundToURL("/index.html")'), 'navigateFallback is not /index.html')

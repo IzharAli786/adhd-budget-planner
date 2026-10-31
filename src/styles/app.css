@@ -193,6 +193,21 @@
   --color-danger-soft: var(--danger-soft);
   --shadow-card: var(--shadow);
   --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', 'Fraunces Fallback', ui-serif, Georgia, serif;
+}
+
+/*
+ * Georgia stretched to Fraunces' measurements (title-weight advance widths and vertical
+ * metrics, read from the font files), so the swap on a first, uncached load doesn't
+ * rewrap a title or jolt the hero number. Devices without Georgia skip it.
+ */
+@font-face {
+  font-family: 'Fraunces Fallback';
+  src: local('Georgia');
+  size-adjust: 107%;
+  ascent-override: 91.4%;
+  descent-override: 23.8%;
+  line-gap-override: 0%;
 }
 
 /*
@@ -223,6 +238,23 @@
   --text-body--line-height: 1.5;
   --text-caption: 0.8125rem;
   --text-caption--line-height: 1.4;
+}
+
+/*
+ * Display face: Fraunces for hero numbers and page titles, Inter for everything else.
+ * Its digits are lining by default but it ships no tnum, so this face is only for single
+ * figures that stand alone; columns of amounts stay in Inter's tabular digits.
+ * opsz follows the size (font-optical-sizing), so big numbers get the finer cut.
+ */
+@utility type-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variant-numeric: lining-nums;
+  /* Through the --tw-* vars too, so text-title's own weight and tracking defer to these. */
+  --tw-font-weight: 560;
+  font-weight: 560;
+  --tw-tracking: -0.015em;
+  letter-spacing: -0.015em;
 }
 
 /* Small uppercase label above a group. One style for every section in the app. */

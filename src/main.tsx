@@ -1,6 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/inter/wght.css'
+// Display face for hero numbers and page titles only. The opsz build carries the optical
+// size axis, so the same file looks crisp at 28px titles and refined at 76px numbers.
+import '@fontsource-variable/fraunces/opsz.css'
 import './styles/app.css'
 import { App } from './app/App'
 import { applyCachedAppearance } from './app/theme'

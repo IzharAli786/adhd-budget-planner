@@ -51,7 +51,7 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
           height={64}
           className="rounded-[1.1rem] shadow-card"
         />
-        <h1 className="mt-6 text-[2rem] leading-tight font-semibold tracking-tight">
+        <h1 className="mt-6 type-display text-[2rem] leading-tight">
           {ctx === 'in-app'
             ? 'Open Steady in your browser'
             : 'Install first, so your data stays safe'}

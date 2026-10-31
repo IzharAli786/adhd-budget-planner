@@ -12,6 +12,7 @@ const SCREENS = [
   { path: '/more/transactions', heading: 'Transactions' },
   { path: '/more/backup', heading: 'Backup & restore' },
   { path: '/more/review', heading: 'Look back' },
+  { path: '/more/help', heading: 'How each part works' },
 ]
 
 async function seriousViolations(page: Page) {
@@ -25,7 +26,7 @@ async function seriousViolations(page: Page) {
 
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`no serious axe violations on each tab, Full mode, ${colorScheme}`, async ({ page }) => {
-    test.setTimeout(180_000) // ten full axe scans
+    test.setTimeout(200_000) // eleven full axe scans
     // Reduced motion, or axe can read colours halfway through a fade-in.
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' })
     await unlockAndSetup(page)
@@ -45,6 +46,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
       // Skeletons are aria-hidden placeholders; scan the real screen, not the loading one.
       await expect(page.locator('[aria-busy="true"], .animate-pulse')).toHaveCount(0)
       expect(await seriousViolations(page), `${screen.path} (${colorScheme})`).toEqual([])
+      // The desktop grids must collapse cleanly: nothing wider than a 390px phone.
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      )
+      expect(overflow, `${screen.path} scrolls sideways`).toBeLessThanOrEqual(0)
     }
 
     // The math breakdown is a sheet, not a route, but it is the core explanation. "Every

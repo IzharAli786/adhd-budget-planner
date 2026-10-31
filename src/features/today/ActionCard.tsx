@@ -41,7 +41,7 @@ export function ActionCard({ action, snoozes, onCheckIn, onLog }: Props) {
       case 'impulse':
         return navigate(simpleMode ? '/more/wait' : '/goals')
       case 'setup-bills':
-        return navigate('/bills')
+        return navigate('/bills?new=1')
       case 'log-today':
         return onLog()
       case 'all-done':

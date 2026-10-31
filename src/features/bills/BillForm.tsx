@@ -156,6 +156,7 @@ export function BillForm({
       </div>
 
       <DateInput
+        format={f.dayFull}
         label={choice.repeat === 'once' ? 'Due on' : 'First due on'}
         value={choice.start}
         onChange={(start) => change({ start })}
@@ -202,14 +203,24 @@ export function BillForm({
         </fieldset>
       )}
 
-      <div className="flex items-center gap-3">
-        <label htmlFor={autopayId} className="min-w-0 flex-1">
-          <span className="block text-body font-medium">Paid automatically</span>
-          <span className="block text-sm text-muted">
-            Autopay and direct debits get ticked off when you update your balance.
-          </span>
-        </label>
-        <Switch id={autopayId} checked={autopay} onChange={setAutopay} label="Paid automatically" />
+      {/* The helper sits under the whole row, not squeezed beside the switch, and is
+          read with it (aria-describedby). */}
+      <div>
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <label htmlFor={autopayId} className="text-body font-medium">
+            Paid automatically
+          </label>
+          <Switch
+            id={autopayId}
+            checked={autopay}
+            onChange={setAutopay}
+            label="Paid automatically"
+            describedBy={`${autopayId}-hint`}
+          />
+        </div>
+        <p id={`${autopayId}-hint`} className="text-sm text-muted">
+          Autopay and direct debits get ticked off when you update your balance.
+        </p>
       </div>
     </form>
   )

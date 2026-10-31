@@ -96,6 +96,27 @@ export async function promptInstall(): Promise<'accepted' | 'dismissed' | 'unava
 }
 
 const CONTINUE_KEY = 'steady:continue-in-browser'
+const BANNER_KEY = 'steady:install-banner-dismissed'
+
+/**
+ * "Not now" on the install banner, remembered on this device. Per device on purpose: it
+ * is about this browser, and a restored backup on a new phone should still offer it.
+ */
+export function installBannerDismissed(): boolean {
+  try {
+    return localStorage.getItem(BANNER_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function dismissInstallBanner() {
+  try {
+    localStorage.setItem(BANNER_KEY, '1')
+  } catch {
+    // Private mode: hidden for this visit only.
+  }
+}
 
 /** "Continue in browser" is a per-device choice about this tab, not user data. */
 export function continuedInBrowser(): boolean {

@@ -261,7 +261,7 @@ function MoveBody({ payday, onClose }: { payday: PaydayEntry; onClose: () => voi
         onClose()
       }}
     >
-      <DateInput label="Paid on" value={date} onChange={setDate} />
+      <DateInput format={f.dayFull} label="Paid on" value={date} onChange={setDate} />
       <Button type="submit" block size="lg" disabled={!valid}>
         Move payday
       </Button>

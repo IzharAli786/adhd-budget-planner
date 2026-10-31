@@ -85,9 +85,7 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
             height={56}
             className="mb-6 rounded-2xl shadow-card"
           />
-          <h1 className="text-[2rem] leading-tight font-semibold tracking-tight">
-            Welcome to Steady
-          </h1>
+          <h1 className="type-display text-[2rem] leading-tight">Welcome to Steady</h1>
           <p className="mt-2 text-base text-muted">
             Enter the code from your PDF to unlock the app. You only need to do this once.
           </p>
