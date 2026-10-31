@@ -310,6 +310,40 @@ export function sameRule(a: Recurrence, b: Recurrence): boolean {
   return [...keys].every((k) => ra[k] === rb[k])
 }
 
+/** Does the rule produce exactly this date (ignoring until and overrides)? */
+export function ruleHasDate(rule: Recurrence, date: ISODate): boolean {
+  return ruleDates(rule, date, addDays(date, 1)).length > 0
+}
+
+/**
+ * After a split at `from`, the old bill's override rows that belong to the new series:
+ * dates from the split on that the new series still produces. They must follow it, or a
+ * bill paid early, skipped or moved would turn back into a plain due bill on the new id.
+ */
+export function overridesToCarry(
+  overrides: readonly BillOccurrence[],
+  from: ISODate,
+  next: Pick<Bill, 'rule' | 'until'>,
+): BillOccurrence[] {
+  return overrides.filter(
+    (o) =>
+      o.originalDate >= from &&
+      (next.until === undefined || o.originalDate <= next.until) &&
+      ruleHasDate(next.rule, o.originalDate),
+  )
+}
+
+/**
+ * Would swapping in `rule` orphan a paid row? Rows are keyed by the date the rule made,
+ * so a paid Oct 15 under a new "20th" rule would vanish and Oct 20 would show as unpaid.
+ */
+export function ruleChangeHidesPaid(
+  overrides: readonly BillOccurrence[],
+  rule: Recurrence,
+): boolean {
+  return overrides.some((o) => o.status === 'paid' && !ruleHasDate(rule, o.originalDate))
+}
+
 /**
  * A rule edited for "this and following" must not reach back before the split date, or
  * the new series would repeat dates the old one already covers. Re-anchors the rule on

@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { monthGrid, weekdayOrder, isSameMonth } from '../../domain/calendar'
 import type { BillEntry, PaydayEntry } from '../../domain/bills'
+import { addDays, addMonths, dayOfWeek, mod } from '../../domain/dates'
 import type { ISODate } from '../../domain/types'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
+import { calendarDayLabel } from './describe'
 import { useFormat } from './format'
 
 interface MonthCalendarProps {
@@ -16,9 +19,13 @@ interface MonthCalendarProps {
   onSelectDay: (date: ISODate) => void
 }
 
+const ARROWS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+
 /**
  * Month view with a dot per day that has bills and a ring for paydays. Shape, not only
  * colour, tells them apart (PLAN §8), and every day button speaks its full content.
+ * Keyboard: one Tab stop for the whole month (roving tabindex), arrows move by day and
+ * week, Home/End to the week's ends, Page Up/Down by month, as in the ARIA date grid.
  */
 export function MonthCalendar({
   month,
@@ -32,6 +39,40 @@ export function MonthCalendar({
   const f = useFormat()
   const { weeks, month: first } = monthGrid(month, weekStart)
   const showingToday = isSameMonth(first, today)
+  const dates = weeks.flat()
+  const [focusDate, setFocusDate] = useState<ISODate | null>(null)
+  const pendingFocus = useRef(false)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const tabDate =
+    focusDate !== null && dates.includes(focusDate) ? focusDate : showingToday ? today : first
+
+  // Runs after the render that shows `focusDate`, which may be a new month.
+  useEffect(() => {
+    if (!pendingFocus.current || focusDate === null) return
+    pendingFocus.current = false
+    gridRef.current?.querySelector<HTMLElement>(`[data-date="${focusDate}"]`)?.focus()
+  }, [focusDate, first])
+
+  function onDayKey(e: KeyboardEvent, date: ISODate) {
+    const back = mod(dayOfWeek(date) - weekStart, 7)
+    const target =
+      e.key in ARROWS
+        ? addDays(date, ARROWS[e.key]!)
+        : e.key === 'Home'
+          ? addDays(date, -back)
+          : e.key === 'End'
+            ? addDays(date, 6 - back)
+            : e.key === 'PageUp'
+              ? addMonths(date, -1)
+              : e.key === 'PageDown'
+                ? addMonths(date, 1)
+                : null
+    if (target === null) return
+    e.preventDefault()
+    if (!dates.includes(target)) onMonthChange(target < first ? -1 : 1)
+    pendingFocus.current = true
+    setFocusDate(target)
+  }
 
   return (
     <section
@@ -75,8 +116,13 @@ export function MonthCalendar({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-y-0.5">
-        {weeks.flat().map((date) => {
+      <div
+        ref={gridRef}
+        role="group"
+        aria-label={f.month(first)}
+        className="grid grid-cols-7 gap-y-0.5"
+      >
+        {dates.map((date) => {
           const dayBills = (bills.get(date) ?? []).filter((b) => b.status !== 'skipped')
           const dayPaydays = paydays.get(date) ?? []
           const inMonth = isSameMonth(date, first)
@@ -86,13 +132,20 @@ export function MonthCalendar({
             <button
               key={date}
               type="button"
-              onClick={() => onSelectDay(date)}
-              aria-label={dayLabel(date, isToday, dayBills.length, dayPaydays.length, f)}
+              data-date={date}
+              tabIndex={date === tabDate ? 0 : -1}
+              onClick={() => {
+                setFocusDate(date)
+                onSelectDay(date)
+              }}
+              onKeyDown={(e) => onDayKey(e, date)}
+              aria-label={calendarDayLabel(date, today, dayBills, dayPaydays.length, f)}
               aria-current={isToday ? 'date' : undefined}
               className={cx(
                 'relative mx-auto flex h-12 w-full max-w-12 flex-col items-center justify-center rounded-2xl text-[0.9375rem] tabular-nums transition-colors',
                 'hover:bg-accent-soft/50',
-                !inMonth && 'text-muted/60',
+                // Not on today: two text colours on one element would fight in the cascade.
+                !inMonth && !isToday && 'text-muted/60',
                 isToday && 'bg-accent font-semibold text-accent-contrast hover:bg-accent',
               )}
             >
@@ -133,18 +186,4 @@ export function MonthCalendar({
       </div>
     </section>
   )
-}
-
-function dayLabel(
-  date: ISODate,
-  isToday: boolean,
-  bills: number,
-  paydays: number,
-  f: ReturnType<typeof useFormat>,
-) {
-  const parts = [f.dayLong(date)]
-  if (isToday) parts.unshift('Today')
-  if (bills) parts.push(bills === 1 ? '1 bill' : `${bills} bills`)
-  if (paydays) parts.push('payday')
-  return parts.join(', ')
 }

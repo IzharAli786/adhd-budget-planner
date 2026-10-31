@@ -1,7 +1,7 @@
 import { rebaseRule, sameRule } from '../../domain/bills'
 import type { Cents } from '../../domain/money'
 import type { Bill, ISODate, Recurrence } from '../../domain/types'
-import { editBillFrom, setOccurrenceAmount, updateBill } from '../../db/repos'
+import { editBill, editBillFrom, setOccurrenceAmount } from '../../db/repos'
 
 export type EditScope = 'one' | 'following' | 'all'
 
@@ -31,12 +31,14 @@ export function hasChanges(bill: Bill, changes: BillChanges): boolean {
  * - one: an amount override on that occurrence; the series is untouched.
  * - following: RFC 5545 split at the occurrence's original date.
  * - all: edits the series. Paid occurrences keep their stored paid amount, so history
- *   never changes; occurrences with their own override keep it.
+ *   never changes; occurrences with their own override keep it. A new rule that would
+ *   hide paid bills applies from `today` (see editBill).
  */
 export async function applyBillEdit(
   bill: Bill,
   changes: BillChanges,
   scope: EditScope,
+  today: ISODate,
   originalDate?: ISODate,
 ): Promise<string> {
   const patch: Partial<Bill> = {
@@ -54,6 +56,6 @@ export async function applyBillEdit(
     return `${changes.name} changed from here on`
   }
   if (changes.rule) patch.rule = changes.rule
-  await updateBill(bill.id, patch)
+  await editBill(bill.id, patch, today)
   return `Saved ${changes.name}`
 }

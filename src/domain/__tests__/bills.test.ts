@@ -8,18 +8,21 @@ import {
   groupByDate,
   groupUpcoming,
   movedFields,
+  overridesToCarry,
   paidFields,
   paydayEntriesBetween,
   rebaseRule,
   REPEATS,
+  ruleChangeHidesPaid,
   ruleFromChoice,
+  ruleHasDate,
   sameRule,
   skippedFields,
   totalsOf,
   type BillEntry,
 } from '../bills'
 import { fromDayNumber, toDayNumber } from '../dates'
-import { expandOccurrences } from '../recurrence'
+import { expandOccurrences, ruleDates } from '../recurrence'
 import type { Bill, BillOccurrence, IncomeSource, Recurrence } from '../types'
 
 const bill = (
@@ -435,3 +438,105 @@ describe('rebaseRule', () => {
     )
   })
 })
+
+describe('ruleHasDate', () => {
+  const monthly31: Recurrence = { freq: 'monthly', interval: 1, day: 31, anchor: '2026-01-31' }
+  it.each([
+    [monthly31, '2026-02-28', true], // clamped
+    [monthly31, '2026-03-31', true],
+    [monthly31, '2026-03-30', false],
+    [monthly31, '2025-12-31', false], // before the anchor
+    [{ freq: 'weekly', interval: 2, anchor: '2026-11-06' } as Recurrence, '2026-11-20', true],
+    [{ freq: 'weekly', interval: 2, anchor: '2026-11-06' } as Recurrence, '2026-11-13', false],
+    [{ freq: 'once', date: '2026-11-06' } as Recurrence, '2026-11-06', true],
+  ])('%j has %s: %s', (rule, date, expected) => {
+    expect(ruleHasDate(rule, date)).toBe(expected)
+  })
+})
+
+describe('overridesToCarry', () => {
+  const row = (
+    originalDate: string,
+    status: BillOccurrence['status'] = 'paid',
+  ): BillOccurrence => ({
+    id: `old|${originalDate}`,
+    billId: 'old',
+    originalDate,
+    status,
+    paidAmount: 1,
+  })
+  const rule: Recurrence = { freq: 'monthly', interval: 1, day: 1, anchor: '2026-11-01' }
+
+  it('carries rows from the split on that the new rule still produces', () => {
+    const rows = [
+      row('2026-10-01'),
+      row('2026-11-01'),
+      row('2026-12-01', 'skipped'),
+      row('2026-12-15'),
+    ]
+    expect(overridesToCarry(rows, '2026-11-01', { rule }).map((o) => o.originalDate)).toEqual([
+      '2026-11-01',
+      '2026-12-01',
+    ])
+  })
+
+  it('stops at the new series until', () => {
+    const rows = [row('2026-11-01'), row('2027-01-01')]
+    expect(
+      overridesToCarry(rows, '2026-11-01', { rule, until: '2026-12-31' }).map(
+        (o) => o.originalDate,
+      ),
+    ).toEqual(['2026-11-01'])
+  })
+
+  const isoDate = fc
+    .integer({ min: toDayNumber('2020-01-01'), max: toDayNumber('2030-12-31') })
+    .map(fromDayNumber)
+
+  it('never carries a row from before the split, and every carried date is real', () => {
+    fc.assert(
+      fc.property(
+        fc.array(isoDate, { maxLength: 12 }),
+        isoDate,
+        fc.integer({ min: 1, max: 31 }),
+        (dates, from, day) => {
+          const r: Recurrence = { freq: 'monthly', interval: 1, day, anchor: from }
+          for (const o of overridesToCarry(
+            dates.map((d) => row(d)),
+            from,
+            { rule: r },
+          )) {
+            expect(o.originalDate >= from).toBe(true)
+            expect(ruleDates(r, o.originalDate, addDays1(o.originalDate))).toEqual([o.originalDate])
+          }
+        },
+      ),
+    )
+  })
+})
+
+describe('ruleChangeHidesPaid', () => {
+  const paid: BillOccurrence = {
+    id: 'b|2026-10-15',
+    billId: 'b',
+    originalDate: '2026-10-15',
+    status: 'paid',
+    paidAmount: 5000,
+  }
+  const on = (day: number): Recurrence => ({
+    freq: 'monthly',
+    interval: 1,
+    day,
+    anchor: `2026-01-${String(day).padStart(2, '0')}`,
+  })
+  it.each([
+    ['same day keeps the paid row', [paid], on(15), false],
+    ['a new day orphans it', [paid], on(20), true],
+    ['a skipped row is not history', [{ ...paid, status: 'skipped' as const }], on(20), false],
+    ['no rows', [], on(20), false],
+  ])('%s', (_, rows, rule, expected) => {
+    expect(ruleChangeHidesPaid(rows, rule)).toBe(expected)
+  })
+})
+
+const addDays1 = (d: string) => fromDayNumber(toDayNumber(d) + 1)

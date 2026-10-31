@@ -107,6 +107,65 @@ describe('bills', () => {
   })
 })
 
+describe('bill edits keep paid history', () => {
+  it('a split carries later override rows to the new series, in one undo step', async () => {
+    const bill = await r.addBill(rentInput)
+    await r.markPaid(bill.id, '2026-10-01', 95000)
+    await r.markPaid(bill.id, '2026-11-01', 95000) // paid early
+    await r.skipOccurrence(bill.id, '2026-12-01')
+    await r.addTransaction({
+      date: '2026-10-31',
+      amount: -95000,
+      note: 'rent',
+      billOccurrenceId: `${bill.id}|2026-11-01`,
+    })
+    const next = await r.editBillFrom(bill.id, '2026-11-01', { amount: 99000 })
+    const old = await r.listOccurrences(bill.id)
+    const moved = await r.listOccurrences(next!.id)
+    expect(old.map((o) => o.originalDate)).toEqual(['2026-10-01'])
+    expect(moved).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `${next!.id}|2026-11-01`,
+          status: 'paid',
+          paidAmount: 95000,
+        }),
+        expect.objectContaining({ id: `${next!.id}|2026-12-01`, status: 'skipped' }),
+      ]),
+    )
+    expect((await r.listTransactions())[0]?.billOccurrenceId).toBe(`${next!.id}|2026-11-01`)
+
+    await undoLast()
+    expect((await r.listOccurrences(bill.id)).map((o) => o.originalDate).sort()).toEqual([
+      '2026-10-01',
+      '2026-11-01',
+      '2026-12-01',
+    ])
+    expect((await r.listTransactions())[0]?.billOccurrenceId).toBe(`${bill.id}|2026-11-01`)
+  })
+
+  it('a new rule for all bills splits at today when it would hide a paid one', async () => {
+    const bill = await r.addBill(rentInput)
+    await r.markPaid(bill.id, '2026-10-01', 95000)
+    const rule = { freq: 'monthly', interval: 1, day: 5, anchor: '2026-01-05' } as const
+    const next = await r.editBill(bill.id, { name: 'Flat', rule }, '2026-10-31')
+    expect(next?.id).not.toBe(bill.id)
+    expect(next).toMatchObject({ name: 'Flat', rule: { day: 5, anchor: '2026-11-05' } })
+    // The past keeps its dates, its paid row, and the new name.
+    expect(await r.getBill(bill.id)).toMatchObject({ name: 'Flat', until: '2026-10-30' })
+    expect((await r.listOccurrences(bill.id))[0]).toMatchObject({ paidAmount: 95000 })
+  })
+
+  it('a new rule with nothing paid edits in place', async () => {
+    const bill = await r.addBill(rentInput)
+    await r.skipOccurrence(bill.id, '2026-10-01')
+    const rule = { freq: 'monthly', interval: 1, day: 5, anchor: '2026-01-05' } as const
+    const next = await r.editBill(bill.id, { rule }, '2026-10-31')
+    expect(next?.id).toBe(bill.id)
+    expect(await r.listBills()).toHaveLength(1)
+  })
+})
+
 describe('debts', () => {
   const card = {
     name: 'Card',
@@ -116,6 +175,14 @@ describe('debts', () => {
     minPayment: 4000,
     dueDay: 20,
   }
+
+  it('a new minimum leaves the ended half of a split alone', async () => {
+    const { debt, bill } = await r.addDebt(card)
+    const next = await r.editBillFrom(bill.id, '2026-12-01', {})
+    await r.updateDebt(debt.id, { minPayment: 5000 })
+    expect((await r.getBill(bill.id))?.amount).toBe(4000)
+    expect((await r.getBill(next!.id))?.amount).toBe(5000)
+  })
 
   it('creates, syncs, deletes and restores the linked minimum bill', async () => {
     const { debt, bill } = await r.addDebt(card)

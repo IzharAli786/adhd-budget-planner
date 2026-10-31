@@ -40,6 +40,8 @@ export function addDebt(input: Omit<Debt, 'id'>) {
 
 async function syncBills(w: Writer, debt: Debt) {
   for (const bill of alive(await linkedBills(debt.id))) {
+    // The ended half of a split is history: a new minimum must not reprice it.
+    if (bill.until !== undefined) continue
     const rule = bill.rule.freq === 'monthly' ? { ...bill.rule, day: debt.dueDay } : bill.rule
     await bills.put(w, { ...bill, name: debt.name, amount: debt.minPayment, rule })
   }

@@ -77,7 +77,7 @@ function EditorBody({
     if (!hasChanges(bill, changes)) return onClose()
     // A repeating bill opened from one date asks which dates the edit covers.
     if (repeating && originalDate) return setPending(changes)
-    undoToast(await applyBillEdit(bill, changes, 'all'))
+    undoToast(await applyBillEdit(bill, changes, 'all', today))
     onClose()
   }
 
@@ -122,7 +122,7 @@ function EditorBody({
           canChangeOne={onlyAmountChanged(bill, pending)}
           onClose={() => setPending(null)}
           onChoose={async (scope) => {
-            undoToast(await applyBillEdit(bill, pending, scope, originalDate))
+            undoToast(await applyBillEdit(bill, pending, scope, today, originalDate))
             setPending(null)
             onClose()
           }}

@@ -11,7 +11,7 @@ import {
 } from '../../domain/bills'
 import { monthGrid } from '../../domain/calendar'
 import { addDays, addMonths } from '../../domain/dates'
-import { expandOccurrences } from '../../domain/recurrence'
+import { expandOccurrences, ruleDates } from '../../domain/recurrence'
 import type { ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
 import { useToday } from '../../lib/useToday'
@@ -124,8 +124,12 @@ function BillsView({
     return occ ? { ...occ, name: bill.name, autopay: bill.autopay } : null
   }, [panel, bills, occurrences])
 
-  // A series that ended (the old half of a "from here on" split) is history, not a bill.
-  const current = bills.filter((b) => b.until === undefined || b.until >= today)
+  // A series with nothing left from today on (the old half of a "from here on" split) is
+  // history, not a bill. Checking real dates, not until >= today: a split at tomorrow
+  // ends the old half today, and listing Rent twice for that day reads as a duplicate.
+  const current = bills.filter(
+    (b) => b.until === undefined || ruleDates(b.rule, today, addDays(b.until, 1)).length > 0,
+  )
   const dueSoon = totalsOf([...groups.overdue, ...groups.thisPeriod])
   const open = (e: BillEntry) =>
     setPanel({ kind: 'occurrence', billId: e.billId, originalDate: e.originalDate })

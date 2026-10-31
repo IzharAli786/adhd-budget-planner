@@ -2,7 +2,11 @@ import {
   amountFields,
   dueAgainFields,
   movedFields,
+  overridesToCarry,
   paidFields,
+  rebaseRule,
+  ruleChangeHidesPaid,
+  sameRule,
   skippedFields,
 } from '../../domain/bills'
 import { splitSeriesFrom } from '../../domain/recurrence'
@@ -14,9 +18,9 @@ import {
   type ISODate,
 } from '../../domain/types'
 import { db } from '../schema'
-import { mutate } from '../undo'
+import { mutate, type Writer } from '../undo'
 import { softRepo } from './softRepo'
-import { NotFoundError, newId, nowInstant } from './util'
+import { NotFoundError, newId, nowInstant, patchRow } from './util'
 
 const repo = softRepo<Bill>('bills', 'bill')
 
@@ -31,24 +35,79 @@ export function addBill(input: Omit<Bill, 'id' | 'createdAt'>) {
   return repo.add({ ...input, createdAt: nowInstant() })
 }
 
+type BillPatch = Partial<Omit<Bill, 'id'>>
+
 /**
  * "Change from this date on" (RFC 5545 split): the old bill ends the day before `date`,
- * a new bill with `changes` starts at `date`. Occurrence rows stay on the old id, so
- * history keeps its paid amounts. Returns the new bill, or null if nothing follows `date`.
+ * a new bill with `changes` starts at `date`. History before `date` stays on the old id
+ * with its paid amounts; override rows from `date` on that the new series still produces
+ * move with it. `earlier` patches the old half too (an "all" edit of name or amount).
+ * Returns the new bill, or null if nothing follows `date`.
  */
-export function editBillFrom(id: Id, date: ISODate, changes: Partial<Omit<Bill, 'id'>>) {
-  return mutate('Edit bill from date', ['bills'], async (w) => {
+export function editBillFrom(id: Id, date: ISODate, changes: BillPatch, earlier: BillPatch = {}) {
+  return mutate('Edit bill from date', SPLIT_TABLES, async (w) =>
+    splitBill(w, await repo.load(w, id), date, changes, earlier),
+  )
+}
+
+/**
+ * Edits the whole series. If a new rule would orphan paid rows (they are keyed by the
+ * old rule's dates), the edit becomes a split at today instead: the past keeps the old
+ * dates and what was paid, everything from today on follows the new rule.
+ */
+export function editBill(id: Id, changes: BillPatch, today: ISODate) {
+  return mutate('Edit bill', SPLIT_TABLES, async (w) => {
     const bill = await repo.load(w, id)
-    const { before, after } = splitSeriesFrom(bill, date, newId())
-    if (before) await repo.put(w, before)
-    else await repo.put(w, { ...bill, deletedAt: nowInstant() })
-    if (!after) return null
-    // createdAt is kept: it marks when the bill entered the app, which decides what can
-    // be overdue (groupUpcoming). Splitting at a past date must not hide an unpaid bill.
-    const next: Bill = { ...after, ...changes, id: after.id, createdAt: bill.createdAt }
+    const { rule } = changes
+    if (rule && !sameRule(rule, bill.rule)) {
+      const rows = await db.billOccurrences.where('billId').equals(id).toArray()
+      if (ruleChangeHidesPaid(rows, rule)) {
+        const earlier = { ...changes }
+        delete earlier.rule
+        return splitBill(w, bill, today, { ...changes, rule: rebaseRule(rule, today) }, earlier)
+      }
+    }
+    const next = patchRow(bill, changes)
     await repo.put(w, next)
     return next
   })
+}
+
+const SPLIT_TABLES = ['bills', 'billOccurrences', 'transactions'] as const
+
+async function splitBill(
+  w: Writer,
+  bill: Bill,
+  date: ISODate,
+  changes: BillPatch,
+  earlier: BillPatch,
+) {
+  const { before, after } = splitSeriesFrom(bill, date, newId())
+  if (before) await repo.put(w, patchRow(before, earlier))
+  else await repo.put(w, { ...bill, deletedAt: nowInstant() })
+  if (!after) return null
+  // createdAt is kept: it marks when the bill entered the app, which decides what can
+  // be overdue (groupUpcoming). Splitting at a past date must not hide an unpaid bill.
+  const next: Bill = { ...after, ...changes, id: after.id, createdAt: bill.createdAt }
+  await repo.put(w, next)
+
+  const rows = await db.billOccurrences.where('billId').equals(bill.id).toArray()
+  const carried = overridesToCarry(rows, date, next)
+  const rekey = new Map<string, string>()
+  for (const row of carried) {
+    const id = occurrenceId(next.id, row.originalDate)
+    rekey.set(row.id, id)
+    await w.delete('billOccurrences', row.id)
+    await w.put('billOccurrences', { ...row, id, billId: next.id })
+  }
+  if (rekey.size > 0) {
+    const linked = await db.transactions
+      .filter((t) => t.billOccurrenceId !== undefined && rekey.has(t.billOccurrenceId))
+      .toArray()
+    for (const t of linked)
+      await w.put('transactions', { ...t, billOccurrenceId: rekey.get(t.billOccurrenceId!)! })
+  }
+  return next
 }
 
 export function listOccurrences(billId?: Id) {

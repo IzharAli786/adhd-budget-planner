@@ -46,3 +46,26 @@ export function describeSchedule(schedule: PaySchedule, f: Formatters): string {
 
 /** Day number of a date, for "on the 31st" hints in the form. */
 export const dayNumber = (date: string) => parseISODate(date).day
+
+/** "Today, Saturday 31 October, 2 bills, 1 paid, payday": the dots, in words. */
+export function calendarDayLabel(
+  date: string,
+  today: string,
+  bills: readonly { status: 'due' | 'paid' | 'skipped' }[],
+  paydays: number,
+  f: Pick<Formatters, 'dayLong'>,
+) {
+  const parts = [f.dayLong(date)]
+  if (date === today) parts.unshift('Today')
+  const paid = bills.filter((b) => b.status === 'paid').length
+  if (bills.length > 0) {
+    parts.push(bills.length === 1 ? '1 bill' : `${bills.length} bills`)
+    if (paid === bills.length) parts.push(bills.length === 1 ? 'paid' : 'all paid')
+    // "unpaid", not "overdue": dates from before the bill was added are only history.
+    else if (date < today)
+      parts.push(bills.length === 1 ? 'unpaid' : `${bills.length - paid} unpaid`)
+    else if (paid > 0) parts.push(`${paid} paid`)
+  }
+  if (paydays) parts.push(paydays === 1 ? 'payday' : `${paydays} paydays`)
+  return parts.join(', ')
+}
