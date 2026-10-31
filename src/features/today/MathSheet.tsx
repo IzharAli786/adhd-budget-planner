@@ -48,30 +48,31 @@ export function MathSheet({ open, onClose, safe, runway, today }: Props) {
       </div>
       <dl className="divide-y divide-line">
         {lines.map((line) => (
-          <div key={line.id} className="py-3">
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted">
-                {line.label}
-                {line.date && line.id === 'balance' && (
-                  <span className="block text-sm">
-                    {f.day(line.date)} · {f.relative(line.date, today)}
-                  </span>
-                )}
-              </dt>
-              <dd className="font-medium tabular-nums">{f.money(line.amount)}</dd>
-            </div>
+          // One <div> per group, no deeper (axe definition-list): items are a second <dd>.
+          <div key={line.id} className="flex flex-wrap justify-between gap-x-4 py-3">
+            <dt className="text-muted">
+              {line.label}
+              {line.date && line.id === 'balance' && (
+                <span className="block text-sm">
+                  {f.day(line.date)} · {f.relative(line.date, today)}
+                </span>
+              )}
+            </dt>
+            <dd className="font-medium tabular-nums">{f.money(line.amount)}</dd>
             {view === 'full' && line.items && line.items.length > 0 && (
-              <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 text-sm text-muted">
-                {line.items.map((item, i) => (
-                  <li key={i} className="flex justify-between gap-4">
-                    <span className="min-w-0 truncate">
-                      {item.label}
-                      {item.date && <span> · {f.day(item.date)}</span>}
-                    </span>
-                    <span className="shrink-0 tabular-nums">{f.money(item.amount)}</span>
-                  </li>
-                ))}
-              </ul>
+              <dd className="w-full">
+                <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 text-sm text-muted">
+                  {line.items.map((item, i) => (
+                    <li key={i} className="flex justify-between gap-4">
+                      <span className="min-w-0 truncate">
+                        {item.label}
+                        {item.date && <span> · {f.day(item.date)}</span>}
+                      </span>
+                      <span className="shrink-0 tabular-nums">{f.money(item.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </dd>
             )}
           </div>
         ))}

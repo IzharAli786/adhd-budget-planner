@@ -62,3 +62,59 @@ After unlocking, `/setup` asks four quick things and stores progress in
 `meta.setupProgress`, so a reload resumes on the same step. A saved payday that is no
 longer after today is asked again. Setup counts as done when
 `setupProgress.step` is `done` or any income exists (an older backup was restored).
+
+## End-to-end tests (Playwright)
+
+    npx playwright install chromium webkit   # once
+    npm run e2e                              # everything
+    npm run e2e -- --project=chromium        # one browser
+    npm run e2e:ui                           # pick and watch tests
+
+`playwright.config.ts` starts two servers itself:
+
+- **Full app** on `:4173`: `npm run build && npm run preview`. The build gets the dev
+  hash through `webServer.env`, because a production build reads no hash from `.env` and
+  would lock the tests out (see Unlock code above).
+- **Demo** on `:4174`: built into `dist-demo/` (so it can't clobber `dist/`), checked
+  with `scripts/check-demo.mjs dist-demo`, then previewed. Only `e2e/demo.spec.ts` runs
+  against it.
+
+Locally a server that is already running on those ports is reused, so stop an old
+`preview` if you changed code. CI always builds fresh.
+
+Specs in `e2e/`, helpers in `e2e/helpers.ts` (`unlockAndSetup`, `answerSetup`,
+`heroCents`, `logExpense`, `addFirstBill`). `heroCents` is signed: "€5.00 short" reads
+as -500, so a "drops by exactly" check can't pass on a number that crossed zero. Each test gets a fresh browser context, so a fresh IndexedDB: every spec
+starts from the unlock screen and answers setup through the UI.
+
+Notes:
+
+- Projects use a 390 x 844 viewport with **desktop** user agents. A phone UA puts WebKit
+  behind the iOS install screen, which Playwright cannot get past like a real home-screen
+  install does.
+- Locale is `en-IE` in `Europe/Berlin`. Playwright's WebKit on macOS reports `en-GB`
+  anyway, so the app picks GBP there: specs match amounts, not the currency symbol.
+- The backup spec removes `navigator.canShare` so WebKit uses the download link instead of
+  the share sheet, which a test can't drive.
+- The offline spec is Chromium only (PLAN §9). The first load is never controlled by a new
+  service worker, so it reloads once before going offline.
+- The a11y spec emulates `prefers-reduced-motion: reduce`, or axe can measure colours
+  halfway through a fade-in. It logs an expense and adds a bill first, so rows, chips
+  and calendar dots are scanned, not just empty states.
+- The demo spec finishes setup before checking for a service worker: the full app only
+  registers one from the shell, so checking on the setup screen would prove nothing.
+- `midnight.spec.ts` uses `page.clock.install()` with an explicit `+01:00` offset, then
+  `runFor` past midnight, to check `useToday` rolls over while the app stays open.
+
+A failing test keeps a trace: `npx playwright show-trace test-results/<test>/trace.zip`.
+CI uploads `playwright-report/` as an artifact.
+
+## CI
+
+`.github/workflows/ci.yml` on Node 24: `npm ci`, typecheck, lint, prettier check, unit
+tests, `build`, `build:demo`, then Playwright (Chromium and the demo project). WebKit runs
+locally; add `webkit` to the CI step when it is stable on Linux runners.
+
+Before every commit:
+
+    npx prettier --write src e2e && npm test && npm run build && npm run lint && npm run build:demo

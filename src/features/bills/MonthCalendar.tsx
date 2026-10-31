@@ -142,7 +142,9 @@ export function MonthCalendar({
                 'relative mx-auto flex h-12 w-full max-w-12 flex-col items-center justify-center rounded-2xl text-body tabular-nums transition-colors',
                 'hover:bg-accent-soft/50',
                 // Not on today: two text colours on one element would fight in the cascade.
-                !inMonth && !isToday && 'text-muted/60',
+                // Full text-muted, not faded: these days are tappable, so they need AA
+                // contrast (axe caught /60). Lighter weight keeps them visually secondary.
+                !inMonth && !isToday && 'font-light text-muted',
                 isToday && 'bg-accent font-semibold text-accent-contrast hover:bg-accent',
               )}
             >

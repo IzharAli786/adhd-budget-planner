@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npx prettier --check src e2e
+      - run: npm test
+      # Without real hashes a production build fails closed and warns; that is expected
+      # here. The E2E build below gets the dev hash from playwright.config.ts.
+      - run: npm run build
+      # Also greps the demo bundle for hash-shaped strings (PLAN §7).
+      - run: npm run build:demo
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: E2E (Chromium + demo)
+        run: npx playwright test --project=chromium --project=demo
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

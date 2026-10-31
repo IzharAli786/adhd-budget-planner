@@ -136,14 +136,14 @@ function Row({
   children?: React.ReactNode
 }) {
   return (
-    <div className="py-2.5">
-      <div className="flex justify-between gap-4">
-        <dt className={strong ? 'font-semibold' : 'text-muted'}>{label}</dt>
-        <dd className={strong ? 'font-semibold tabular-nums' : 'font-medium tabular-nums'}>
-          {value}
-        </dd>
-      </div>
-      {children}
+    // A <dl> allows one <div> per group, no deeper (axe definition-list): the breakdown is
+    // a second <dd> that wraps to its own line, not a sibling of an inner row <div>.
+    <div className="flex flex-wrap justify-between gap-x-4 py-2.5">
+      <dt className={strong ? 'font-semibold' : 'text-muted'}>{label}</dt>
+      <dd className={strong ? 'font-semibold tabular-nums' : 'font-medium tabular-nums'}>
+        {value}
+      </dd>
+      {children && <dd className="w-full">{children}</dd>}
     </div>
   )
 }

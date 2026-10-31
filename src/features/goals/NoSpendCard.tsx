@@ -32,6 +32,16 @@ export function NoSpendCard({ today }: { today: ISODate }) {
   const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
   const count = noSpendCount(days, monthStart, today)
 
+  // "Sunday 25 October" around its day number, in the locale's own order.
+  const longDay = (date: ISODate) => {
+    const text = f.dayLong(date)
+    const n = String(parseISODate(date).day)
+    const at = text.search(new RegExp(`(?<!\\d)${n}(?!\\d)`))
+    return at < 0
+      ? { before: `${text}, `, after: '' }
+      : { before: text.slice(0, at), after: text.slice(at + n.length) }
+  }
+
   const toggle = (date: ISODate) =>
     void toggleNoSpend(date).then((on) =>
       undoToast(on ? 'Marked as a no-spend day' : 'No-spend mark removed'),
@@ -55,7 +65,6 @@ export function NoSpendCard({ today }: { today: ISODate }) {
             <button
               type="button"
               aria-pressed={d.marked}
-              aria-label={`${f.dayLong(d.date)}${d.marked ? ', no-spend day' : spent.has(d.date) ? ', spending logged' : ''}`}
               disabled={!d.marked && spent.has(d.date)}
               onClick={() => toggle(d.date)}
               className={cx(
@@ -66,9 +75,16 @@ export function NoSpendCard({ today }: { today: ISODate }) {
                 d.date === today && !d.marked && 'ring-accent/50',
               )}
             >
+              {/* The name comes from the content, so the visible day number is part of it
+                  (WCAG 2.5.3, label in name). "Sunday 25 October" is split around the 25. */}
+              <span className="sr-only">{longDay(d.date).before}</span>
               <span aria-hidden="true">{f.weekday(dayOfWeek(d.date), 'narrow')}</span>
-              <span aria-hidden="true" className="mt-0.5 text-sm font-semibold tabular-nums">
+              <span className="mt-0.5 text-sm font-semibold tabular-nums">
                 {parseISODate(d.date).day}
+              </span>
+              <span className="sr-only">
+                {longDay(d.date).after}
+                {d.marked ? ', no-spend day' : spent.has(d.date) ? ', spending logged' : ''}
               </span>
             </button>
           </li>

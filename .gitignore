@@ -1,6 +1,9 @@
 node_modules
 dist
 dist-demo
+playwright-report
+test-results
+blob-report
 .vitest
 *.tsbuildinfo
 .DS_Store
