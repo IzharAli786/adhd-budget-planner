@@ -1,26 +1,29 @@
-import { useState } from 'react'
-import { formatMoney } from '../../domain/money'
-import { Button } from '../../ui/Button'
-import { Sheet } from '../../ui/Sheet'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { useToast } from '../../ui/Toast'
+import { useUndoToast } from '../../app/useUndoToast'
+import { nextAction } from '../../domain/nextAction'
+import type { ISODate } from '../../domain/types'
+import { useToday } from '../../lib/useToday'
+import { Button, buttonClass } from '../../ui/Button'
+import { cx } from '../../ui/cx'
+import { Icon, type IconName } from '../../ui/Icon'
+import { useFormat } from '../bills/format'
+import { QuickAddField } from '../quickadd/QuickAddField'
+import { useQuickAdd } from '../quickadd/QuickAddProvider'
+import { ActionCard } from './ActionCard'
+import { CanFitSheet } from './CanFitSheet'
+import { CheckInSheet } from './CheckInSheet'
+import { MathSheet } from './MathSheet'
+import { useTodayModel, type TodayModel } from './useTodayModel'
 
-// Sample numbers until M5 wires real safe-to-spend. The layout is final: one number,
-// one action card, the quick-add field, nothing else above the fold (PLAN §1).
-const sample = {
-  perDay: 2300,
-  untilPayday: 16100,
-  daysLeft: 7,
-  payday: 'Fri 7 Nov',
-  balanceAge: '2 days ago',
-  math: [
-    { label: 'Balance (2 days ago)', amount: 84250 },
-    { label: 'Bills before payday', amount: -51200 },
-    { label: 'Set aside (savings, buffer)', amount: -16950 },
-    { label: 'Already spent since', amount: 0 },
-  ],
-}
+type Panel = 'math' | 'checkin' | 'fit' | null
 
+// One number, one action (PLAN §1): the hero, the action card and the quick-add field
+// are all that sits above the fold. Everything else is one tap away in a sheet.
 export function TodayScreen() {
-  const [mathOpen, setMathOpen] = useState(false)
+  const today = useToday()
+  const model = useTodayModel(today)
 
   return (
     <div className="space-y-5">
@@ -29,84 +32,225 @@ export function TodayScreen() {
       <p aria-hidden="true" className="text-sm font-medium tracking-wide text-muted md:hidden">
         Steady
       </p>
+      {!model.loaded || !model.plan ? (
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-[1.75rem] bg-surface" />
+      ) : (
+        <TodayBody model={model} today={today} />
+      )}
+    </div>
+  )
+}
 
-      <section className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line">
-        <p className="text-sm text-muted">You can spend today</p>
+function TodayBody({ model, today }: { model: TodayModel; today: ISODate }) {
+  const f = useFormat()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const undoToast = useUndoToast()
+  const { fieldRef } = useQuickAdd()
+  const [panel, setPanel] = useState<Panel>(null)
+  const [offerBackup, setOfferBackup] = useState(false)
+  const { plan, actionState, snoozes } = model
+
+  const action = useMemo(
+    () => actionState && nextAction(actionState, snoozes, today, new Date().toISOString()),
+    [actionState, snoozes, today],
+  )
+
+  if (!plan) return null
+
+  if (plan.kind === 'no-income' || plan.kind === 'no-payday') {
+    // M6 adds /setup; until then the next step lives in Bills > Paydays.
+    return (
+      <Welcome
+        icon="payday"
+        title={plan.kind === 'no-income' ? 'Let’s find your number' : 'When is your next pay?'}
+        body={
+          plan.kind === 'no-income'
+            ? 'Tell Steady when you get paid, then what’s in your account. That’s all it needs to work out what you can spend each day.'
+            : 'Your pay has no date coming up. Add the next one and today’s number counts down to it.'
+        }
+        cta={
+          <Link to="/bills?view=paydays" className={buttonClass()}>
+            <Icon name="plus" size={18} />
+            Add your payday
+          </Link>
+        }
+      />
+    )
+  }
+
+  const checkIn = (
+    <CheckInSheet
+      open={panel === 'checkin'}
+      onClose={() => setPanel(null)}
+      today={today}
+      due={plan.kind === 'ready' ? plan.safe.dueEntries : plan.due}
+      onSaved={(summary) =>
+        offerBackup
+          ? toast.show({
+              message: `${summary}. A good moment for a backup.`,
+              duration: 10_000,
+              action: { label: 'Back up', onAction: () => navigate('/more/backup') },
+            })
+          : undoToast(summary)
+      }
+    />
+  )
+
+  if (plan.kind === 'no-balance') {
+    return (
+      <>
+        <Welcome
+          icon="payday"
+          title="One number to go"
+          body={`Payday is ${f.dayLong(plan.period.end)}. What’s in your account right now? Then Steady shows what you can spend each day until then.`}
+          cta={
+            <Button onClick={() => setPanel('checkin')}>
+              <Icon name="plus" size={18} />
+              Add your balance
+            </Button>
+          }
+        />
+        {checkIn}
+      </>
+    )
+  }
+
+  const { safe, runway, period } = plan
+  const short = safe.status === 'short'
+  const over = !short && runway.leftToday < 0
+  const heroAmount = f.money(short ? -safe.total : over ? -runway.leftToday : runway.leftToday)
+  const heroSuffix = short ? 'short' : over ? 'over' : null
+
+  return (
+    <>
+      <section
+        aria-label="Today’s number"
+        className="rounded-[1.75rem] bg-surface p-6 shadow-card ring-1 ring-line"
+      >
+        <p className="text-sm text-muted">
+          {short ? 'Before payday' : over ? 'Today' : 'You can spend today'}
+        </p>
         <p
           aria-live="polite"
-          className="mt-1 text-[clamp(3rem,15vw,4.5rem)] leading-none font-semibold tracking-tight tabular-nums"
+          className={cx(
+            'mt-1 leading-none font-semibold tracking-tight tabular-nums',
+            // Long amounts ("€12,345.67") step down so they never overflow a 390px card.
+            heroAmount.length > 8
+              ? 'text-[clamp(2.25rem,11vw,3.75rem)]'
+              : 'text-[clamp(3rem,15vw,4.5rem)]',
+          )}
         >
-          {formatMoney(sample.perDay)}
+          {heroAmount}
+          {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
+          {heroSuffix && (
+            <span className="text-[0.4em] font-medium tracking-normal text-muted">
+              {' '}
+              {heroSuffix}
+            </span>
+          )}
         </p>
         <p className="mt-4 text-base">
-          <span className="font-medium tabular-nums">{formatMoney(sample.untilPayday)}</span> until
-          payday · {sample.payday}
+          {short ? (
+            // One calm suggestion, no red (PLAN §1.3).
+            'Bills before payday are more than your balance. Moving one past payday is often the quickest fix.'
+          ) : (
+            <>
+              <span className="font-medium tabular-nums">{f.money(safe.total)}</span> until payday ·{' '}
+              {f.day(period.end)}
+            </>
+          )}
         </p>
-        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-muted">
+        {over && (
+          <p className="mt-1 text-[0.9375rem] text-muted">
+            That’s fine. It spreads over the days left.
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 text-sm text-muted">
           <span>
-            {sample.daysLeft} days to go · balance from {sample.balanceAge}
+            {runway.daysLeft === 1 ? 'Payday tomorrow' : `${runway.daysLeft} days to payday`} ·
+            balance from {f.relative(model.checkIn!.date, today)}
           </span>
           <button
             type="button"
-            onClick={() => setMathOpen(true)}
-            className="min-h-11 shrink-0 rounded-full px-1 font-medium text-accent"
+            onClick={() => {
+              setOfferBackup(false)
+              setPanel('checkin')
+            }}
+            className="-mx-1 min-h-11 rounded-full px-1 font-medium text-accent"
+          >
+            Update
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel('math')}
+            className="-mx-1 ml-auto min-h-11 rounded-full px-1 font-medium text-accent"
           >
             See the math
           </button>
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] bg-accent-soft p-5">
-        <p className="text-xs font-semibold tracking-wider text-accent uppercase">One thing now</p>
-        <p className="mt-1 text-lg font-medium">Update your balance</p>
-        <p className="text-sm text-muted">Takes 20 seconds. Keeps today’s number honest.</p>
-        <div className="mt-4 flex gap-2">
-          <Button>Update</Button>
-          <Button variant="ghost" className="text-muted">
-            Not now
-          </Button>
-        </div>
-      </section>
-
-      <label className="block">
-        <span className="sr-only">Quick add</span>
-        <input
-          type="text"
-          inputMode="text"
-          enterKeyHint="done"
-          placeholder="Type “12 coffee” and press enter"
-          className="min-h-14 w-full rounded-2xl border border-line bg-surface px-4 text-base outline-none placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20"
+      {action && (
+        <ActionCard
+          action={action}
+          snoozes={snoozes}
+          onCheckIn={(backup) => {
+            setOfferBackup(backup)
+            setPanel('checkin')
+          }}
+          onLog={() => fieldRef.current?.focus()}
         />
-      </label>
+      )}
 
-      <Sheet
-        open={mathOpen}
-        onClose={() => setMathOpen(false)}
-        title="How this number works"
-        description="An estimate from what Steady knows. Update your balance to sharpen it."
-        actions={
-          <Button block onClick={() => setMathOpen(false)}>
-            Got it
-          </Button>
-        }
-      >
-        <dl className="divide-y divide-line">
-          {sample.math.map((line) => (
-            <div key={line.label} className="flex justify-between gap-4 py-3">
-              <dt className="text-muted">{line.label}</dt>
-              <dd className="font-medium tabular-nums">{formatMoney(line.amount)}</dd>
-            </div>
-          ))}
-          <div className="flex justify-between gap-4 py-3 text-base">
-            <dt className="font-semibold">Until payday</dt>
-            <dd className="font-semibold tabular-nums">{formatMoney(sample.untilPayday)}</dd>
-          </div>
-          <div className="flex justify-between gap-4 py-3">
-            <dt className="text-muted">÷ {sample.daysLeft} days, including today</dt>
-            <dd className="font-semibold text-accent tabular-nums">{formatMoney(sample.perDay)}</dd>
-          </div>
-        </dl>
-      </Sheet>
-    </div>
+      <QuickAddField today={today} transactions={model.transactions} envelopes={model.envelopes} />
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button variant="secondary" onClick={() => setPanel('fit')}>
+          Can this fit?
+        </Button>
+        <Link to="/more/transactions" className={buttonClass('ghost')}>
+          All entries
+        </Link>
+      </div>
+
+      <MathSheet
+        open={panel === 'math'}
+        onClose={() => setPanel(null)}
+        safe={safe}
+        runway={runway}
+        today={today}
+      />
+      <CanFitSheet
+        open={panel === 'fit'}
+        onClose={() => setPanel(null)}
+        total={safe.total}
+        runway={runway}
+      />
+      {checkIn}
+    </>
+  )
+}
+
+function Welcome({
+  icon,
+  title,
+  body,
+  cta,
+}: {
+  icon: IconName
+  title: string
+  body: string
+  cta: React.ReactNode
+}) {
+  return (
+    <section className="animate-fade-in rounded-[1.75rem] bg-surface px-6 py-10 text-center shadow-card ring-1 ring-line">
+      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+        <Icon name={icon} size={26} />
+      </span>
+      <h2 className="mt-4 text-xl font-semibold">{title}</h2>
+      <p className="mx-auto mt-1 max-w-xs text-[0.9375rem] text-muted">{body}</p>
+      <div className="mt-5">{cta}</div>
+    </section>
   )
 }

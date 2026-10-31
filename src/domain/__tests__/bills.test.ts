@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  addedOnMap,
   amountFields,
   billEntriesBetween,
   choiceFromRule,
@@ -154,6 +155,25 @@ describe('groupUpcoming: bills added after their dates', () => {
     )
     expect(g.overdue.map((e) => e.date)).toEqual(['2026-10-28'])
     expect(g.thisPeriod).toEqual([])
+  })
+})
+
+describe('addedOnMap', () => {
+  it('maps recurring bills to the day they were added, and leaves one-offs out', () => {
+    const at = '2026-10-31T09:00:00.000Z'
+    const map = addedOnMap(
+      [
+        {
+          id: 'rent',
+          createdAt: at,
+          rule: { freq: 'monthly', interval: 1, day: 1, anchor: '2026-01-01' },
+        },
+        // Typed in today with last week's date: that's an overdue bill, not history.
+        { id: 'fine', createdAt: at, rule: { freq: 'once', date: '2026-10-24' } },
+      ],
+      (i) => i.slice(0, 10),
+    )
+    expect([...map]).toEqual([['rent', '2026-10-31']])
   })
 })
 

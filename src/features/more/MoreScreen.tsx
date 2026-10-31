@@ -32,6 +32,15 @@ export function MoreScreen() {
           />
         </ListGroup>
 
+        <ListGroup title="Your money">
+          <ListRow
+            icon="list"
+            label="Transactions"
+            detail="Everything you’ve logged, by day"
+            to="/more/transactions"
+          />
+        </ListGroup>
+
         <ListGroup title="Your data">
           <ListRow
             icon="shield"

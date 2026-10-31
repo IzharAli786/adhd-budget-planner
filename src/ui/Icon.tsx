@@ -35,6 +35,7 @@ const PATHS = {
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   edit: 'M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4',
   skip: 'M6 5l8 7-8 7M18 5v14',
+  list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
 } as const
 
 export type IconName = keyof typeof PATHS
