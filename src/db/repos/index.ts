@@ -1,4 +1,5 @@
 export * from './bills'
+export * from './catchUp'
 export * from './checkIns'
 export * from './debts'
 export * from './deleted'

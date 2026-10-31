@@ -159,6 +159,7 @@ export const settingsSchema = z.object({
   reducedMotion: z.optional(z.enum(['auto', 'on', 'off'])),
   buffer: z.optional(amount),
   envelopesEnabled: z.optional(z.boolean()),
+  appBadge: z.optional(z.nullable(z.boolean())),
 })
 
 // domain/setup.ts SetupProgress. A bad row would send a restored device back into setup

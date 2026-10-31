@@ -1,16 +1,23 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { getMeta } from '../../db/repos'
+import { useRecentlyDeleted, useUndoLabel } from '../../db/hooks'
+import { getChangesSinceBackup, getMeta } from '../../db/repos'
+import { undoLast } from '../../db/undo'
 import type { Instant } from '../../domain/types'
 import { INSTALL_FLOW, isStandalone } from '../../lib/install'
 import { ListGroup, ListRow } from '../../ui/List'
 import { PageHeader } from '../../ui/PageHeader'
 import { Switch } from '../../ui/Switch'
+import { useToast } from '../../ui/Toast'
 import { relativeDays } from '../backup/relative'
 
 export function MoreScreen() {
   const { settings, update } = useAppSettings()
   const lastBackupAt = useLiveQuery(() => getMeta<Instant>('lastBackupAt'))
+  const changes = useLiveQuery(getChangesSinceBackup)
+  const undoLabel = useUndoLabel()
+  const deleted = useRecentlyDeleted()
+  const toast = useToast()
   const showInstall = INSTALL_FLOW && !isStandalone()
 
   return (
@@ -39,13 +46,42 @@ export function MoreScreen() {
             detail="Everything you’ve logged, by day"
             to="/more/transactions"
           />
+          <ListRow
+            icon="trash"
+            label="Recently deleted"
+            detail={
+              deleted?.length
+                ? `${deleted.length} ${deleted.length === 1 ? 'item' : 'items'}, kept for 30 days`
+                : 'Nothing deleted'
+            }
+            to="/more/deleted"
+          />
+          {/* The persisted undo log (PLAN §8): survives a reload, so it lives here too,
+              not only in the 10 s toast. */}
+          {undoLabel ? (
+            <ListRow
+              icon="refresh"
+              label="Undo last change"
+              detail={undoLabel}
+              onClick={async () => {
+                const label = await undoLast()
+                if (label) toast.show({ message: `Undone: ${label}` })
+              }}
+            />
+          ) : (
+            <ListRow icon="refresh" label="Undo last change" detail="Nothing to undo" />
+          )}
         </ListGroup>
 
         <ListGroup title="Your data">
           <ListRow
             icon="shield"
             label="Backup & restore"
-            detail={lastBackupAt ? `Last backup ${relativeDays(lastBackupAt)}` : 'No backup yet'}
+            detail={
+              lastBackupAt
+                ? `Last backup ${relativeDays(lastBackupAt)}${changes ? ` · ${changes} ${changes === 1 ? 'change' : 'changes'} since` : ''}`
+                : 'No backup yet'
+            }
             to="/more/backup"
           />
           {showInstall && (

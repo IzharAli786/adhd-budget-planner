@@ -22,6 +22,7 @@ import {
   type RowTypes,
 } from './schema'
 import { writeSnapshot } from './snapshot'
+import { todayISO } from '../lib/clock'
 
 export type BackupSource = 'full' | 'demo'
 export type BackupData = { [K in DataTableName]: RowTypes[K][] }
@@ -51,6 +52,16 @@ export const SETUP_TABLES = [
 export const defaultSource = (): BackupSource => (import.meta.env.MODE === 'demo' ? 'demo' : 'full')
 
 export const backupFileName = (today: ISODate) => `steady-backup-${today}.json`
+
+/**
+ * The backup as a ready File. Built BEFORE the user taps Save: iOS only lets
+ * navigator.share() run inside the tap's transient activation, and awaiting IndexedDB
+ * in the click handler would use it up (PLAN §6). Named by the LOCAL date.
+ */
+export async function prepareBackupFile(now: Date = new Date()): Promise<File> {
+  const json = JSON.stringify(await exportBackup(now), null, 2)
+  return new File([json], backupFileName(todayISO(now)), { type: 'application/json' })
+}
 
 export async function exportBackup(
   now: Date = new Date(),
@@ -405,7 +416,10 @@ function previewOf(file: BackupFile): RestorePreview {
 export async function importBackup({ file }: ValidBackup, now: Date = new Date()): Promise<void> {
   await writeSnapshot(db, 'import', now)
   await db.transaction('rw', db.tables, async () => {
-    const internal = (await db.meta.toArray()).filter((m) => isInternalMetaKey(m.key))
+    // The change counter restarts: right after a restore, the data IS a backup file.
+    const internal = (await db.meta.toArray()).filter(
+      (m) => isInternalMetaKey(m.key) && m.key !== 'changesSinceBackup',
+    )
     const settings = withDefaults((await db.meta.get('settings'))?.value as Partial<Settings>)
 
     for (const table of DATA_TABLES) {
