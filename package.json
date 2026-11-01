@@ -16,7 +16,9 @@
     "e2e:ui": "playwright test --ui",
     "icons": "pwa-assets-generator",
     "dev:phone": "STEADY_HTTPS=1 vite --host",
-    "demo:phone": "npm run build:demo && STEADY_HTTPS=1 vite preview --mode demo --host --port 5174 --strictPort"
+    "demo:phone": "npm run build:demo && STEADY_HTTPS=1 vite preview --mode demo --host --port 5174 --strictPort",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name steady-planner --branch main",
+    "deploy:demo": "npm run build:demo && wrangler pages deploy dist-demo --project-name steady-planner-demo --branch main"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
@@ -54,6 +56,7 @@
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5",
     "vite-plugin-pwa": "^2.0.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.156.0"
   }
 }

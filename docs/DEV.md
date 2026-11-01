@@ -188,3 +188,17 @@ dev it points at port 5174 on the same host, served by:
 ```bash
 npm run demo:phone   # builds the demo and serves it on https://<your-ip>:5174
 ```
+
+## Deploying (Cloudflare Pages)
+
+Two projects: `steady-planner` (full app) and `steady-planner-demo`.
+
+```bash
+npx wrangler login     # once, opens the browser
+npm run deploy         # full app  → https://steady-planner.pages.dev
+npm run deploy:demo    # free demo → https://steady-planner-demo.pages.dev
+```
+
+`npm run deploy` needs `.env.production.local` (git-ignored) with the real
+`VITE_UNLOCK_HASHES` — make one with `node scripts/make-code.mjs`. Without it the build warns
+and no code unlocks the app. Caching lives in `public/_headers`.
