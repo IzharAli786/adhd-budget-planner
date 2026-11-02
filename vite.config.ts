@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 const pwaStub = fileURLToPath(new URL('./src/lib/pwaStub.ts', import.meta.url))
 const unlockStub = fileURLToPath(new URL('./src/unlock/unlock.stub.ts', import.meta.url))
+const pdfUnused = fileURLToPath(new URL('./src/lib/pdfUnused.ts', import.meta.url))
 
 export default defineConfig(({ command, mode }) => {
   // Hashes are not in the shared .env (PLAN §7): a production build without them from
@@ -27,6 +28,14 @@ export default defineConfig(({ command, mode }) => {
         // The demo has no lock and must not carry a single hash (PLAN §7): every import of
         // src/unlock/unlock resolves to the stub, so the real module is never bundled.
         ...(mode === 'demo' ? [{ find: /^.*\/unlock\/unlock$/, replacement: unlockStub }] : []),
+        // jsPDF's optional extras (HTML and SVG rendering): Reports draws text, tables and
+        // rects only, so they never load. Unit tests use jsPDF's Node build, unaffected.
+        ...(mode !== 'test'
+          ? [/^html2canvas$/, /^dompurify$/, /^canvg$/].map((find) => ({
+              find,
+              replacement: pdfUnused,
+            }))
+          : []),
       ],
     },
     plugins: [

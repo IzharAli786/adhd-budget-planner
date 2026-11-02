@@ -47,6 +47,7 @@ Steady takes the opposite approach:
 | Debts              | A payoff table, if any        | Snowball vs avalanche: interest saved and debt-free date                                 |
 | Impulse buys       | None                          | 48-hour list with batch decisions                                                        |
 | Looking back       | A yearly tab you fill in      | Look back by month or payday, carry-over per payday, spending donut, a printable report  |
+| Reports            | Print the sheet yourself      | A PDF of any date range: summary, categories, bills, every entry, made on the device    |
 | Motivation         | Streaks                       | A garden that only grows, from outcomes, not log volume                                  |
 | Time away          | A wall of overdue items       | "Welcome back. Let's just update one number."                                            |
 | Accessibility      | Not considered                | 44 px targets, keyboard paths, axe-checked in light and dark, large text, reduced motion |

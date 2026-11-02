@@ -101,6 +101,21 @@ in backups); otherwise it is worked out from check-ins. Chart colours are the
 `--chart-1..6` tokens, checked for contrast in `contrast.test.ts`. "Print this period /
 year" renders a `.print-report` that only the `@media print` rules in `app.css` show.
 
+## Reports (PDF)
+
+More > Reports (`/more/reports`, also linked from Look back) makes a PDF of any date
+range, both days included. `src/domain/report.ts` (`buildReport`) is pure and reuses
+Look back's `flowsIn`, Insights' category rows, `debtsInRange` and `isSpend`, so its
+numbers agree with the rest of the app; lists start at the history start, like Look back.
+`src/features/reports/reportPdf.ts` draws it with jsPDF + jspdf-autotable, both loaded
+with `import()` on the first "Create PDF" (a separate chunk the service worker precaches;
+`check-pwa.mjs` fails the build if it isn't). jsPDF's optional html2canvas, dompurify and
+canvg are aliased to `src/lib/pdfUnused.ts` in `vite.config.ts`: Reports never draws HTML
+or SVG. Helvetica only covers WinAnsi, so every string goes through `toWinAnsi`, and money
+whose symbol doesn't fit (₹, ₩, zł, ₺) prints as "INR 1,234.00" (`pdfMoney`). The PDF tests
+run jsPDF's Node build with `compress: false` so they can read the text back. Reports
+writes nothing, so it works in the demo without touching the 25-entry cap.
+
 ## Charts, folding and phone layouts
 
 Chart values are readable without the table: `ui/ChartTips.tsx` lays one button per column

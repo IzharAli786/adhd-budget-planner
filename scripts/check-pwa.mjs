@@ -60,6 +60,13 @@ for (const face of ['inter-latin-wght', 'fraunces-latin-opsz']) {
     `${face} is not precached (offline type falls back)`,
   )
 }
+// Reports load jsPDF on demand; it must be precached or "Create PDF" fails offline.
+for (const lib of ['jspdf.es', 'jspdf.plugin.autotable']) {
+  check(
+    precached.some((u) => u.includes(lib) && u.endsWith('.js')),
+    `${lib} is not precached (Reports would fail offline)`,
+  )
+}
 for (const url of new Set(precached)) check(existsSync(join(dist, url)), `precached ${url} 404s`)
 check(new Set(precached).size === precached.length, 'precache lists a file twice')
 check(sw.includes('createHandlerBoundToURL("/index.html")'), 'navigateFallback is not /index.html')

@@ -58,6 +58,12 @@ export function MoreScreen() {
             to="/more/review"
           />
           <ListRow
+            icon="report"
+            label="Reports"
+            detail="A PDF of everything between two dates"
+            to="/more/reports"
+          />
+          <ListRow
             icon="trash"
             label="Recently deleted"
             detail={

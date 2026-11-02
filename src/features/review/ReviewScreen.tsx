@@ -18,7 +18,8 @@ import type { ISODate } from '../../domain/types'
 import { debtsInRange, fundsInRange } from '../../domain/yearSummary'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { useToday } from '../../lib/useToday'
-import { Button } from '../../ui/Button'
+import { Link } from 'react-router'
+import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
@@ -319,6 +320,10 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                 <Icon name="print" size={18} />
                 Print this year
               </Button>
+              <Link to="/more/reports" className={buttonClass('secondary')}>
+                <Icon name="report" size={18} />
+                Make a PDF report
+              </Link>
             </div>
           </>
         )}
