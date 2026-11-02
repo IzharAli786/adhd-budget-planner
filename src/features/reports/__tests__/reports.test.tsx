@@ -103,6 +103,35 @@ describe('Reports', () => {
     await waitFor(() => expect(createButton().hasAttribute('disabled')).toBe(false))
   })
 
+  it('marks the field that is wrong and announces it', async () => {
+    await seed()
+    goto('/more/reports')
+    render(<App />)
+    await screen.findByRole('group', { name: 'Quick ranges' })
+    fireEvent.change(from(), { target: { value: '' } })
+    expect(await screen.findByText('Pick a start date.')).toBeTruthy()
+    expect(from().getAttribute('aria-invalid')).toBe('true')
+    expect(from().getAttribute('aria-describedby')).toBe(screen.getByText('Pick a start date.').id)
+    expect(to().getAttribute('aria-invalid')).toBeNull()
+    const live = document.querySelector('[aria-live="polite"]')
+    expect(live?.textContent).toMatch(/Pick a start date\. Fix the dates above/)
+    expect(createButton().hasAttribute('disabled')).toBe(true)
+    // The end can't be picked before the start in the native picker either.
+    fireEvent.change(from(), { target: { value: '2026-10-01' } })
+    await waitFor(() => expect(to().getAttribute('min')).toBe('2026-10-01'))
+    expect(live?.textContent).toBe('')
+  })
+
+  it('moves focus to the ready report, since the button pressed is gone', async () => {
+    await seed()
+    goto('/more/reports')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Last month' }))
+    await userEvent.click(createButton())
+    const ready = await screen.findByText('Your report is ready.')
+    await waitFor(() => expect(document.activeElement).toBe(ready))
+  })
+
   it('previews the same numbers as the report it will make', async () => {
     await seed()
     goto('/more/reports')

@@ -334,6 +334,22 @@ describe('buildReport', () => {
     expect(r.byCategory).toEqual([])
   })
 
+  it('names the bill of an old bill payment even after the bill is deleted', () => {
+    const oldBill: Bill = {
+      ...gym,
+      id: 'tv',
+      name: 'TV licence',
+      deletedAt: '2026-10-30T00:00:00.000Z',
+    }
+    const input: ReportInput = {
+      ...base,
+      transactions: [tx('2026-10-09', -1500, { billOccurrenceId: 'tv|2026-10-09' })],
+      allBills: [...base.bills, oldBill],
+    }
+    const [row] = buildReport(input, '2026-10-01', '2026-10-31').transactions
+    expect(row).toMatchObject({ kind: 'Bill payment', category: 'TV licence', amount: -1500 })
+  })
+
   it('names the file after the range', () => {
     expect(reportFileName('2026-10-01', '2026-10-31')).toBe(
       'steady-report-2026-10-01_to_2026-10-31.pdf',

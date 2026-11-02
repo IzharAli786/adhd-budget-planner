@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { csvNames } from '../../db/csv'
+import { db } from '../../db/schema'
 import { useImpulse, useLifeGoals, useNoSpend, useNotes } from '../../db/hooks'
 import type { ReportInput } from '../../domain/report'
 import type { ISODate } from '../../domain/types'
@@ -17,19 +18,22 @@ export function useReportInput(today: ISODate): ReportInput | null {
   const review = useReviewData(today)
   const { settings } = useAppSettings()
   const names = useLiveQuery(csvNames)
+  // Deleted bills too, so an old bill payment in the list still names its bill.
+  const allBills = useLiveQuery(() => db.bills.toArray())
   const notes = useNotes()
   const noSpend = useNoSpend()
   const impulse = useImpulse()
   const lifeGoals = useLifeGoals()
 
   return useMemo(() => {
-    if (!review || !names || !notes || !noSpend || !impulse || !lifeGoals) return null
+    if (!review || !names || !allBills || !notes || !noSpend || !impulse || !lifeGoals) return null
     return {
       ...review.input,
       envelopes: names.envelopes,
       envelopesEnabled: settings.envelopesEnabled,
       funds: names.funds,
       debts: names.debts,
+      allBills,
       notes,
       noSpend,
       impulse,
@@ -41,5 +45,5 @@ export function useReportInput(today: ISODate): ReportInput | null {
       generatedOn: today,
       localDate: (at) => todayISO(new Date(at)),
     }
-  }, [review, names, notes, noSpend, impulse, lifeGoals, settings, today])
+  }, [review, names, allBills, notes, noSpend, impulse, lifeGoals, settings, today])
 }

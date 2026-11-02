@@ -150,6 +150,36 @@ describe('renderReportPdf', () => {
     expect(pdf).toContain('Nothing was logged between these dates')
   })
 
+  it('prints £ and the punctuation WinAnsi has as themselves, not as codes', async () => {
+    const report = buildReport(
+      input([tx(1, '2026-10-03', -4500, 'Café “brunch”')], { currency: 'GBP', locale: 'en-GB' }),
+      '2026-10-01',
+      '2026-10-31',
+    )
+    const pdf = await text(await renderReportPdf(report, { compress: false }))
+    expect(pdf).toContain('£45.00')
+    expect(pdf).not.toContain('GBP ')
+    expect(pdf).toContain('Café “brunch”')
+    expect(pdf).toContain('Steady Payday Planner — Report')
+    expect(pdf).toContain('1 October 2026 – 31 October 2026')
+  })
+
+  it.each([
+    ['KRW', 'ko-KR', 0, /KRW 4,500/],
+    ['PLN', 'pl-PL', 2, /PLN 45,00/],
+    // Kuwaiti dinar: three decimals, and its code is what Intl prints anyway.
+    ['KWD', 'en-KW', 3, /KWD[ \u00a0]4\.500/],
+  ])('prints %s amounts with the right digits', async (currency, locale, decimals, expected) => {
+    const report = buildReport(
+      input([tx(1, '2026-10-03', -4500, 'Lunch')], { currency, locale, decimals }),
+      '2026-10-01',
+      '2026-10-31',
+    )
+    const pdf = await text(await renderReportPdf(report, { compress: false }))
+    expect(pdf).toMatch(expected)
+    expect(pdf).not.toMatch(/[₩₹ł₺]/)
+  })
+
   it('prints rupees with the code, not a broken glyph', async () => {
     const report = buildReport(
       input([tx(1, '2026-10-03', -4500, 'Chai')], { currency: 'INR', locale: 'en-IN' }),

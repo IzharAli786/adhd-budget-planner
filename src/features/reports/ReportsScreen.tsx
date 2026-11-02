@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { isValidISODate } from '../../domain/dates'
 import { buildReport, reportCounts, type Report } from '../../domain/report'
 import type { ISODate } from '../../domain/types'
@@ -43,12 +43,14 @@ export function ReportsScreen() {
 
   const from = range?.from ?? ''
   const to = range?.to ?? ''
-  const error =
-    !isValidISODate(from) || !isValidISODate(to)
-      ? 'Pick a start and an end date.'
-      : from > to
-        ? 'The end date is before the start date.'
-        : null
+  // Each field says what is wrong with it, so a screen reader hears it on that field.
+  const fromError = isValidISODate(from) ? null : 'Pick a start date.'
+  const toError = !isValidISODate(to)
+    ? 'Pick an end date.'
+    : !fromError && from > to
+      ? 'The end date is before the start date.'
+      : null
+  const error = fromError ?? toError
 
   const report = useMemo<Report | null>(
     () => (input && !error ? buildReport(input, from, to) : null),
@@ -107,13 +109,15 @@ export function ReportsScreen() {
                 value={from}
                 onChange={(v) => edit('from', v)}
                 format={f.dayFull}
+                error={fromError ?? undefined}
               />
               <DateInput
                 label="To"
                 value={to}
+                min={isValidISODate(from) ? from : undefined}
                 onChange={(v) => edit('to', v)}
                 format={f.dayFull}
-                error={error ?? undefined}
+                error={toError ?? undefined}
                 hint={
                   !error && to > today ? 'Days after today have nothing logged yet.' : undefined
                 }
@@ -143,7 +147,10 @@ export function ReportsScreen() {
                 The PDF couldn’t be made this time. Please try again.
               </p>
             )}
-            {error && <p className="text-sm text-muted">Fix the dates above to make a report.</p>}
+            {/* Always in the page, so the change is announced as it happens. */}
+            <p aria-live="polite" className="text-sm text-muted empty:hidden">
+              {error ? `${error} Fix the dates above to make a report.` : ''}
+            </p>
           </section>
 
           <p className="px-1 text-center text-sm text-muted">
@@ -204,9 +211,15 @@ function Preview({ report, f }: { report: Report; f: Formatters }) {
  */
 function Ready({ file }: { file: File }) {
   const share = canShareFile(file)
+  // The Create button the person pressed is gone; put focus (and the screen reader) on
+  // the result instead of letting it fall back to the top of the page.
+  const title = useRef<HTMLParagraphElement>(null)
+  useEffect(() => title.current?.focus(), [])
   return (
     <div className="card space-y-3 p-5" role="status">
-      <p className="text-body font-medium">Your report is ready.</p>
+      <p ref={title} tabIndex={-1} className="text-body font-medium outline-none">
+        Your report is ready.
+      </p>
       <p className="text-sm text-muted break-all">{file.name}</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         {share && (

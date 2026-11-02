@@ -23,6 +23,7 @@ import type { Cents } from './money'
 import { isSpend } from './reconcile'
 import { flowsIn, historyStart, payPeriodRanges, type ReviewInput } from './review'
 import type {
+  Bill,
   Debt,
   Envelope,
   ImpulseItem,
@@ -41,6 +42,8 @@ export interface ReportInput extends ReviewInput {
   envelopesEnabled: boolean
   funds: readonly SavingsFund[]
   debts: readonly Debt[]
+  /** Every bill, deleted ones too, so an old bill payment still says which bill it was. */
+  allBills?: readonly Bill[]
   notes: readonly Note[]
   noSpend: readonly NoSpendDay[]
   impulse: readonly ImpulseItem[]
@@ -296,7 +299,7 @@ export function buildReport(input: ReportInput, from: ISODate, to: ISODate): Rep
   const envelopeName = new Map(input.envelopes.map((e) => [e.id, e.name]))
   const fundName = new Map(input.funds.map((f) => [f.id, f.name]))
   const debtName = new Map(input.debts.map((d) => [d.id, d.name]))
-  const billById = new Map(input.bills.map((b) => [b.id, b]))
+  const billById = new Map([...(input.allBills ?? []), ...input.bills].map((b) => [b.id, b]))
 
   // --- Summary (Look back's numbers) ---
   const flows = flowsIn(input, { start: from, end })
@@ -416,9 +419,18 @@ export function buildReport(input: ReportInput, from: ISODate, to: ISODate): Rep
     })
 
   // --- Debts (the same rows as Look back's debt card) ---
+  // A debt deleted since keeps its row when it was paid in the range, so the table adds
+  // up to "Debt paid" above it (debtsInRange itself lists live debts only).
+  const paidDebtIds = new Set([
+    ...countedTxs.filter(isDebtPayment).map((t) => t.debtId),
+    ...entries.filter((e) => e.status === 'paid').map((e) => e.debtId),
+  ])
+  const reportDebts = input.debts
+    .filter((d) => d.deletedAt === undefined || paidDebtIds.has(d.id))
+    .map((d): Debt => (d.deletedAt === undefined ? d : { ...d, deletedAt: undefined }))
   const debtRows = hasCounted
     ? debtsInRange(
-        input.debts,
+        reportDebts,
         input.bills,
         input.occurrences,
         input.transactions,
