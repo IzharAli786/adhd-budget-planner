@@ -122,6 +122,29 @@ describe('renderReportPdf', () => {
     expect(pdf).toContain('€1,234.56') // byte 0x80 in the file
   })
 
+  it('names a debt bill once, and shows a tiny share as <1%, not 0%', async () => {
+    const report = buildReport(
+      input([tx(1, '2026-10-03', -4500, 'Groceries')]),
+      '2026-10-01',
+      '2026-10-31',
+    )
+    report.bills.paid.push({
+      date: '2026-10-10',
+      name: 'Credit card',
+      amount: 9500,
+      autopay: false,
+      debt: 'Credit card',
+    })
+    report.byCategory = [
+      { ...report.byCategory[0]!, name: 'Big', amount: 100000, share: 100 },
+      { ...report.byCategory[0]!, name: 'Tiny', amount: 5, share: 0 },
+    ]
+    const pdf = await text(await renderReportPdf(report, { compress: false }))
+    expect(pdf).not.toContain('Credit card (Credit card)')
+    expect(pdf).toContain('Debt minimum')
+    expect(pdf).toContain('<1%')
+  })
+
   it('spreads thousands of entries over many pages', async () => {
     const many = Array.from({ length: 2000 }, (_, i) =>
       tx(

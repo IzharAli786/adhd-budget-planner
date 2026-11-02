@@ -300,7 +300,13 @@ export async function renderReportPdf(report: Report, options: PdfOptions = {}):
     const BAR_COL = 1
     table({
       head: [['Category', '', 'Amount', 'Share']],
-      body: report.byCategory.map((r) => [t(r.name), '', money(r.amount), `${r.share}%`]),
+      body: report.byCategory.map((r) => [
+        t(r.name),
+        '',
+        money(r.amount),
+        // Largest-remainder rounding can give a real amount 0%; that reads as "nothing".
+        r.share === 0 && r.amount > 0 ? '<1%' : `${r.share}%`,
+      ]),
       columnStyles: {
         0: { cellWidth: 150 },
         1: { cellWidth: 'auto' },
@@ -338,8 +344,13 @@ export async function renderReportPdf(report: Report, options: PdfOptions = {}):
     const billRows = (rows: ReportBill[]) =>
       rows.map((b) => [
         dateShort(b.date),
-        t(b.name + (b.debt ? ` (${b.debt})` : '')),
-        t([b.autopay ? 'Autopay' : '', b.envelope ?? ''].filter(Boolean).join(' · ')),
+        // "Credit card (Credit card)" read as a typo: name the debt only when it differs.
+        t(b.name + (b.debt && b.debt !== b.name ? ` (${b.debt})` : '')),
+        t(
+          [b.debt ? 'Debt minimum' : '', b.autopay ? 'Autopay' : '', b.envelope ?? '']
+            .filter(Boolean)
+            .join(' · '),
+        ),
         money(b.amount),
       ])
     const group = (title: string, rows: ReportBill[], total: Cents) => {

@@ -422,3 +422,30 @@ describe('buildReport properties', () => {
     )
   })
 })
+
+describe('untagged everyday spending', () => {
+  // The category table counts it under the default envelope (or the Everyday slice);
+  // the transaction list must say the same instead of leaving the cell blank.
+  const snack = tx('2026-10-05', -520, { note: 'Snacks' })
+  const category = (r: ReturnType<typeof buildReport>) =>
+    r.transactions.find((t) => t.note === 'Snacks')?.category
+
+  it('is "Everyday spending" when envelopes are off', () => {
+    const r = buildReport({ ...base, transactions: [snack] }, '2026-10-01', '2026-10-31')
+    expect(category(r)).toBe('Everyday spending')
+  })
+
+  it('takes the default envelope name when envelopes are on', () => {
+    const r = buildReport(
+      {
+        ...base,
+        transactions: [snack],
+        envelopesEnabled: true,
+        envelopes: [env('e1', 'Everyday', { isDefault: true }), env('e2', 'Groceries')],
+      },
+      '2026-10-01',
+      '2026-10-31',
+    )
+    expect(category(r)).toBe('Everyday')
+  })
+})

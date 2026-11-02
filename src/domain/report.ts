@@ -12,7 +12,9 @@ import { addedOnMap, billEntriesBetween, paydayEntriesBetween, type BillEntry } 
 import { addDays, addMonths, daysBetween, isValidISODate, maxDate, minDate } from './dates'
 import { debtsInRange } from './yearSummary'
 import {
+  CATEGORY_NAMES,
   isDebtPayment,
+  isEverydaySpend,
   spendByCategory,
   spendByEnvelope,
   spendOutsideEnvelopes,
@@ -386,6 +388,10 @@ export function buildReport(input: ReportInput, from: ISODate, to: ISODate): Rep
             ? 1
             : 0,
     )
+  const byEnvelope = input.envelopesEnabled && live(input.envelopes).length > 0
+  const untaggedLabel = byEnvelope
+    ? (live(input.envelopes).find((e) => e.isDefault)?.name ?? '')
+    : CATEGORY_NAMES.everyday
   const transactions: ReportTransaction[] = inRangeTxs.map((t) => {
     const kind = transactionKind(t)
     let category = ''
@@ -394,6 +400,9 @@ export function buildReport(input: ReportInput, from: ISODate, to: ISODate): Rep
       category = billById.get(t.billOccurrenceId.split('|')[0]!)?.name ?? ''
     else if (t.debtId !== undefined) category = debtName.get(t.debtId) ?? ''
     else if (t.envelopeId !== undefined) category = envelopeName.get(t.envelopeId) ?? ''
+    // Untagged everyday spending is counted under the default envelope (or the Everyday
+    // slice) in "Where the money went", so the row says so too instead of staying blank.
+    else if (isEverydaySpend(t)) category = untaggedLabel
     return { date: t.date, kind, category, note: t.note, amount: t.amount }
   })
 
