@@ -4,7 +4,7 @@
 //
 // It carries about nine months of history (paydays, paid bills, tagged spending, savings
 // and debt payments, a check-in every payday), so Insights, Look back and the carry-over
-// have something real to show. None of it counts toward the demo's 25 entries: seedDemo
+// have something real to show. None of it counts toward the demo's free entries (DEMO_CAP): seedDemo
 // writes the rows directly, never through the capped repos.
 import { billEntriesBetween } from '../../domain/bills'
 import { STARTER_CATEGORIES } from '../../domain/categories'

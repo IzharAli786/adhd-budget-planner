@@ -6,7 +6,7 @@ import { Icon } from '../../ui/Icon'
 import { Sheet } from '../../ui/Sheet'
 
 /**
- * Shown when the 25th entry is used up. Calm on purpose: nothing was lost, nothing is
+ * Shown when the last free entry (DEMO_CAP) is used up. Calm on purpose: nothing was lost, nothing is
  * locked, and the only ask is a link. The entry that hit the cap was not saved.
  */
 export function DemoLimitSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

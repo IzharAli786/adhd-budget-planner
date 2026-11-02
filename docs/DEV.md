@@ -47,7 +47,7 @@ any hash-shaped string, or a service worker/manifest is in `dist-demo`. Never se
 variable on the demo project.
 
 The demo stores everything in the `steady-demo` database. Its first screen offers sample
-data (`src/db/seed/demo.ts`, built relative to today) or the normal setup. It holds 25
+data (`src/db/seed/demo.ts`, built relative to today) or the normal setup. It holds 10
 entries (a write guard in `db/undo.ts`, installed by `src/db/demo.ts`), resets itself 7
 days after it was started, and More has "Reset demo" and "Bring your setup into the full
 app" (a `source: 'demo'` backup; the full app restores only the setup from it). The
@@ -114,7 +114,7 @@ canvg are aliased to `src/lib/pdfUnused.ts` in `vite.config.ts`: Reports never d
 or SVG. Helvetica only covers WinAnsi, so every string goes through `toWinAnsi`, and money
 whose symbol doesn't fit (₹, ₩, zł, ₺) prints as "INR 1,234.00" (`pdfMoney`). The PDF tests
 run jsPDF's Node build with `compress: false` so they can read the text back. Reports
-writes nothing, so it works in the demo without touching the 25-entry cap.
+writes nothing, so it works in the demo without touching the 10-entry cap.
 
 ## Charts, folding and phone layouts
 

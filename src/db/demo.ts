@@ -1,12 +1,12 @@
 // Demo state (PLAN §7). The demo keeps its data on its own origin, in the fixed
 // 'steady-demo' database, so a buyer coming back from Etsy finds their setup again.
-// It is capped (25 entries) and resets itself 7 days after it was started.
+// It is capped (DEMO_CAP entries) and resets itself 7 days after it was started.
 import type { Instant } from '../domain/types'
 import { getMeta, setMeta } from './repos/meta'
 import { db, type DataTableName } from './schema'
 import { setCreateGuard, type CreateGuard } from './undo'
 
-export const DEMO_CAP = 25
+export const DEMO_CAP = 10
 export const DEMO_DAYS = 7
 const DAY_MS = 86_400_000
 
@@ -41,7 +41,7 @@ const countsAsEntry = (tables: DataTableName[], label: string) =>
 
 export class DemoLimitError extends Error {
   constructor() {
-    super('The demo holds 25 entries.')
+    super(`The demo holds ${DEMO_CAP} entries.`)
     this.name = 'DemoLimitError'
   }
 }
