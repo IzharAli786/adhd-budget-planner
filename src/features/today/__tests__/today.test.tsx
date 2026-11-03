@@ -7,7 +7,7 @@ import { resetDb, seedReadyInstall } from '../../../db/__tests__/helpers'
 import * as r from '../../../db/repos'
 import type { Recurrence } from '../../../domain/types'
 
-// Wed 4 Nov 2026. Planning by calendar month: 27 days left in November, today included.
+// Wed 4 Nov 2026, noon. Planning by calendar month: 27 days left in November, today included.
 const NOW = new Date(2026, 10, 4, 12, 0)
 
 beforeEach(async () => {
@@ -51,65 +51,73 @@ async function oldBill(name: string, amount: number, day: number, autopay: boole
 const start = (balance: number, date = '2026-11-04') =>
   r.updateSettings({ planBy: 'month', startDate: date, startingBalance: balance })
 
-/** The big number: the live region inside the hero card. */
-const hero = async () =>
-  (await screen.findByRole('region', { name: 'Today’s number' })).querySelector('[aria-live]')!
+const overview = async () => within(await screen.findByRole('region', { name: 'Savings and debt' }))
+
+/** A glance tile's big number, found by its label. */
+async function tile(label: string | RegExp) {
+  const tiles = within(await screen.findByRole('list', { name: 'At a glance' }))
+  const item = tiles.getByText(label).closest('li')!
+  return item.querySelector('p:last-child')!.textContent
+}
+const safeTile = () => tile('November safe to spend')
 
 describe('Today', () => {
-  it('by payday, starts with an empty state that names the next step', async () => {
-    await r.updateSettings({ planBy: 'payday' })
-    render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Let’s find your number' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Add your payday' }).getAttribute('href')).toBe(
-      '/bills?view=paydays',
-    )
-  })
-
-  it('by month, shows a number straight away from the starting balance', async () => {
+  it('greets by name in the page title, with one quiet line under it', async () => {
+    await r.updateSettings({ displayName: 'Sam' })
     await start(84250)
     render(<App />)
-    // 84250 / 27 days = 3120.4 -> floor 3120
-    expect((await hero()).textContent).toBe('€31.20')
-    expect(screen.getByText(/safe to\s+spend in November/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Money basics' }).getAttribute('href')).toBe(
-      '/more/basics',
-    )
+    const h1 = await screen.findByRole('heading', { level: 1 })
+    expect(h1.textContent).toBe('Good afternoon, Sam')
+    expect(screen.getByText('Your money at a glance.')).toBeTruthy()
+    // One title on the page: the greeting is it.
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   })
 
-  it('this month’s pay counts as money in (pay-based)', async () => {
+  it('is a dashboard now: no per-day hero, quick-add field or extra buttons', async () => {
+    await start(84250)
+    render(<App />)
+    await screen.findByRole('region', { name: 'Savings and debt' })
+    expect(screen.queryByText('You can spend today')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: /Quick add/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Can this fit?' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'See the math' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Just today' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'All entries' })).toBeNull()
+    // Logging lives on the floating button, the same as every other screen.
+    expect(screen.getByRole('button', { name: 'Track spending' })).toBeTruthy()
+  })
+
+  it('by month, the three tiles show safe to spend, debt minimums and goals in progress', async () => {
+    await start(84250)
+    render(<App />)
+    // No bills, no spending: the whole starting balance is safe to spend in November.
+    await waitFor(async () => expect(await safeTile()).toBe('€842.50'))
+    expect(await tile('Debt minimums due monthly')).toBe('€0.00')
+    expect(await tile('Goals in progress')).toBe('0')
+  })
+
+  it('this month’s pay counts as money in', async () => {
     await start(0)
     await salary()
     render(<App />)
-    // 210000 / 27 = 7777.7 -> 7777
-    expect((await hero()).textContent).toBe('€77.77')
+    await waitFor(async () => expect(await safeTile()).toBe('€2,100.00'))
   })
 
-  it('acceptance: "12 coffee" logs €12.00 and leftToday drops by exactly €12', async () => {
-    await start(84250)
+  it('a short month reads "short by", never a minus sign', async () => {
+    await start(50000)
+    await oldBill('Rent', 95000, 20, false)
     render(<App />)
-    expect((await hero()).textContent).toBe('€31.20')
-
-    const field = screen.getByRole('textbox', { name: /Quick add/ })
-    await userEvent.type(field, '12 coffee')
-    // The preview chip says how it was read before anything is saved.
-    expect(screen.getByText('Spend €12.00')).toBeTruthy()
-    await userEvent.keyboard('{Enter}')
-
-    await waitFor(async () =>
-      expect(await r.listTransactions()).toEqual([
-        expect.objectContaining({ amount: -1200, note: 'coffee', date: '2026-11-04' }),
-      ]),
-    )
-    await waitFor(async () => expect((await hero()).textContent).toBe('€19.20'))
-    expect((field as HTMLInputElement).value).toBe('')
-    expect(await screen.findByText('Logged €12.00 · coffee')).toBeTruthy()
-    // ...and the one-tap chip is there for next time.
-    expect(screen.getByRole('button', { name: 'Log coffee €12.00 again' })).toBeTruthy()
+    await waitFor(async () => expect(await tile('November short by')).toBe('€450.00'))
   })
 
-  it('savings and debt payments never move the number', async () => {
+  it('saved and still owed follow savings and debt payments; safe to spend does not', async () => {
     await start(84250)
-    const fund = await r.addFund({ name: 'Trip', perPeriod: 0, openingSaved: 10000 })
+    const fund = await r.addFund({
+      name: 'Trip',
+      perPeriod: 0,
+      openingSaved: 10000,
+      target: 100000,
+    })
     const debt = await r.addDebt({
       name: 'Card',
       balance: 50000,
@@ -119,97 +127,99 @@ describe('Today', () => {
       dueDay: 20,
     })
     render(<App />)
-    expect((await hero()).textContent).toBe('€31.20')
+    const card = await overview()
+    await waitFor(() => {
+      expect(card.getByText('€100.00')).toBeTruthy()
+      expect(card.getByText('€500.00')).toBeTruthy()
+    })
+    expect(card.getByText('across 1 fund, toward €1,000.00')).toBeTruthy()
+    expect(card.getByText('across 1 debt')).toBeTruthy()
+    expect(await safeTile()).toBe('€842.50')
+
     await r.addToFund(fund, 20000, '2026-11-04')
     await r.addTransaction({ date: '2026-11-04', amount: -15000, note: '', debtId: debt.debt.id })
-    const overview = within(await screen.findByRole('region', { name: 'Savings and debt' }))
     // Two separate writes: wait for both totals, not just the first.
     await waitFor(() => {
-      expect(overview.getByText('€300.00')).toBeTruthy()
-      expect(overview.getByText('€350.00')).toBeTruthy()
+      expect(card.getByText('€300.00')).toBeTruthy()
+      expect(card.getByText('€350.00')).toBeTruthy()
     })
-    expect((await hero()).textContent).toBe('€31.20')
-    const tiles = within(screen.getByRole('list', { name: 'At a glance' }))
-    expect(tiles.getByText('€25.00')).toBeTruthy()
+    expect(await safeTile()).toBe('€842.50')
+    expect(await tile('Debt minimums due monthly')).toBe('€25.00')
   })
 
-  it('explains bad input instead of saving it', async () => {
+  it('shows the cents smaller, but reads the amount whole', async () => {
+    await start(84250)
+    await r.addFund({ name: 'Trip', perPeriod: 0, openingSaved: 900000 })
+    render(<App />)
+    const card = await overview()
+    const whole = await card.findByText('€9,000.00')
+    // The visible copy is split, so the cents can be set small; it's hidden from readers.
+    const visible = whole.previousElementSibling!
+    expect(visible.getAttribute('aria-hidden')).toBe('true')
+    expect(visible.textContent).toBe('€9,000.00')
+    expect(visible.querySelector('span')!.textContent).toBe('.00')
+    expect(card.getByText('Nothing owed right now.')).toBeTruthy()
+  })
+
+  it('logging spending with "Track spending" lowers safe to spend by exactly that much', async () => {
     await start(84250)
     render(<App />)
-    const field = await screen.findByRole('textbox', { name: /Quick add/ })
-    await userEvent.type(field, '1.250 rent{Enter}')
-    expect(screen.getByText(/too many decimals/)).toBeTruthy()
-    expect(await r.listTransactions()).toEqual([])
+    await waitFor(async () => expect(await safeTile()).toBe('€842.50'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: /What for/ }), 'coffee')
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
+
+    await waitFor(async () =>
+      expect(await r.listTransactions()).toEqual([
+        expect.objectContaining({ amount: -1200, note: 'coffee', date: '2026-11-04' }),
+      ]),
+    )
+    await waitFor(async () => expect(await safeTile()).toBe('€830.50'))
   })
 
-  it('"See the math": simple lines that sum, ending with the walled-off note', async () => {
-    await r.updateSettings({ simpleMode: true })
-    await start(84250)
-    await oldBill('Phone', 2500, 15, true)
+  it('by payday, starts with an empty state that names the next step', async () => {
+    await r.updateSettings({ planBy: 'payday' })
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'See the math' }))
-    const sheet = await screen.findByRole('dialog', { name: 'How this number works' })
-    const text = sheet.textContent ?? ''
-    expect(text).toContain('Money for this period€842.50')
-    expect(text).toContain('Bills-€25.00')
-    expect(text).toContain('Spending and cushion€0.00')
-    expect(text).toContain('Safe to spend this period€817.50')
-    expect(text).toContain('never change this number')
-
-    await userEvent.click(within(sheet).getByRole('radio', { name: 'Every line' }))
-    expect(within(sheet).getByText('Starting balance')).toBeTruthy()
-    expect(within(sheet).getByText(/Phone/)).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Let’s find your number' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Add your payday' }).getAttribute('href')).toBe(
+      '/bills?view=paydays',
+    )
+    expect(screen.queryByRole('region', { name: 'Savings and debt' })).toBeNull()
   })
 
-  it('"Not now" snoozes the action card for 24h', async () => {
-    await start(200000, '2026-11-01')
-    await oldBill('Rent', 95000, 1, false)
+  it('by payday, the first tile names the pay period', async () => {
+    await r.updateSettings({ planBy: 'payday' })
+    await salary()
     render(<App />)
-    expect(await screen.findByText('Did Rent go out?')).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: 'Not now' }))
-    // Next in line: by month a payday is optional, so it waits behind the overdue bill.
-    expect(await screen.findByText('When is your next pay?')).toBeTruthy()
+    expect(await tile('This pay period safe to spend')).toMatch(/^€/)
+  })
+
+  it('asks for a backup below the goals once two weeks pass without one', async () => {
+    await start(84250, '2026-10-01')
+    render(<App />)
+    const card = await screen.findByRole('region', { name: 'Save a backup' })
+    const goals = await screen.findByRole('region', { name: 'Goals in motion' })
+    expect(goals.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(card).getByRole('button', { name: 'Back up' })).toBeTruthy()
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Not now' }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Save a backup' })).toBeNull())
     const snoozes = await r.getMeta<Record<string, string>>('snoozes')
     expect(Object.values(snoozes ?? {})).toEqual([
       new Date(NOW.getTime() + 24 * 3_600_000).toISOString(),
     ])
   })
 
-  it('"Can this fit?" shows before and after', async () => {
-    await start(26000)
+  it('no other action card: an overdue bill waits in Coming up instead', async () => {
+    await start(200000, '2026-11-01')
+    await oldBill('Rent', 95000, 1, false)
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Can this fit?' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Can this fit?' })
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Price' }), '60')
-    expect(await within(sheet).findByText('Yes, it fits this period.')).toBeTruthy()
-    expect(sheet.textContent).toContain('€260.00 → €200.00')
-    expect(sheet.textContent).toContain('€9.62 → €7.40')
-    await userEvent.clear(within(sheet).getByRole('textbox', { name: 'Price' }))
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Price' }), '300')
-    expect(await within(sheet).findByText('Not this period.')).toBeTruthy()
-    expect(sheet.textContent).toContain('€40.00 short')
-  })
-
-  it('a short total reads "€… short", never a minus sign', async () => {
-    await start(50000)
-    await oldBill('Rent', 95000, 20, false)
-    render(<App />)
-    expect((await hero()).textContent).toBe('€450.00 short')
-  })
-
-  it('a one-off bill typed in with a past date counts and is asked about', async () => {
-    await start(84250, '2026-11-01')
-    // Added today (NOW), dated two days ago: still owed.
-    await r.addBill({
-      name: 'Parking fine',
-      amount: 4000,
-      rule: { freq: 'once', date: '2026-11-02' },
-      autopay: false,
-    })
-    render(<App />)
-    expect(await screen.findByText('Did Parking fine go out?')).toBeTruthy()
-    // (84250 − 4000) / 27 = 2972.2 -> floor 2972
-    expect((await hero()).textContent).toBe('€29.72')
+    const list = within(await screen.findByRole('region', { name: 'Coming up' }))
+    expect(list.getAllByRole('listitem')[0]!.textContent).toContain('Rent')
+    expect(screen.queryByText('Did Rent go out?')).toBeNull()
   })
 })
 
@@ -227,27 +237,53 @@ describe('Coming up', () => {
     const rows = list.getAllByRole('listitem').map((li) => li.textContent)
     // The next five within 45 days: December's Phone joins after Salary.
     expect(rows).toHaveLength(5)
+    expect(rows[0]).toContain('8 Nov')
     expect(rows[0]).toContain('Phone')
     expect(rows[0]).toContain('Autopay')
+    expect(rows[0]).toContain('€25.00')
     expect(rows[1]).toContain('Gym')
     expect(rows[2]).toContain('Rent')
+    expect(rows[3]).toContain('Salary')
     expect(rows[3]).toContain('Payday')
+    expect(rows[4]).toContain('8 Dec')
     expect(list.getAllByRole('checkbox')).toHaveLength(4)
-    expect(list.getByRole('link', { name: /Open calendar/ }).getAttribute('href')).toBe('/bills')
+    expect(list.getByRole('link', { name: 'Open calendar' }).getAttribute('href')).toBe('/bills')
   })
 
-  it('ticking a bill marks it paid and leaves the number alone', async () => {
+  it('ticking a bill marks it paid and leaves safe to spend alone', async () => {
     await start(200000)
     const gym = await r.addBill({ name: 'Gym', amount: 3000, rule: monthly(12), autopay: false })
     render(<App />)
-    const before = (await hero()).textContent
-    await userEvent.click((await comingUp()).getAllByRole('checkbox', { name: /Gym/ })[0]!)
+    await waitFor(async () => expect(await safeTile()).toBe('€1,970.00'))
+    // November's Gym first; December's is further down.
+    const box = (await comingUp()).getAllByRole('checkbox', { name: /Gym/ })[0]!
+    await userEvent.click(box)
     await waitFor(async () =>
       expect((await r.listOccurrences()).find((o) => o.billId === gym.id)).toMatchObject({
         status: 'paid',
       }),
     )
-    expect((await hero()).textContent).toBe(before)
+    await waitFor(() => expect((box as HTMLInputElement).checked).toBe(true))
+    expect(await safeTile()).toBe('€1,970.00')
+
+    // And back again.
+    await userEvent.click(box)
+    await waitFor(async () =>
+      expect((await r.listOccurrences()).find((o) => o.billId === gym.id)?.status).not.toBe('paid'),
+    )
+    expect(await safeTile()).toBe('€1,970.00')
+  })
+
+  it('a note for today says "Today", has no amount and ticks off', async () => {
+    await start(200000)
+    await r.saveNote({ date: '2026-11-04' }, 'Dentist at 3')
+    render(<App />)
+    const row = (await comingUp()).getByRole('listitem')
+    expect(row.textContent).toContain('Today')
+    expect(row.textContent).toContain('Dentist at 3')
+    expect(row.textContent).not.toContain('€')
+    await userEvent.click(within(row).getByRole('checkbox'))
+    await waitFor(async () => expect((await r.listNotes())[0]?.doneAt).toBeTruthy())
   })
 
   it('shows a payday as money in', async () => {
@@ -257,14 +293,36 @@ describe('Coming up', () => {
     const row = (await comingUp()).getByRole('listitem')
     expect(row.textContent).toContain('Payday')
     expect(row.textContent).toContain('+€2,100.00')
+    // Nothing to tick on a payday.
+    expect(within(row).queryByRole('checkbox')).toBeNull()
+  })
+})
+
+describe('Goals in motion', () => {
+  it('lists open goals with their date; the pill moves a goal along', async () => {
+    await start(84250)
+    await r.addLifeGoal({ title: 'Learn to swim', status: 'todo', targetDate: '2026-12-31' })
+    render(<App />)
+    const section = within(await screen.findByRole('region', { name: 'Goals in motion' }))
+    expect(section.getByRole('link', { name: 'Open goals' }).getAttribute('href')).toBe('/goals')
+    expect(section.getByRole('listitem').textContent).toContain('31 Dec')
+    expect(await tile('Goals in progress')).toBe('0')
+
+    await userEvent.click(
+      await section.findByRole('button', { name: 'Learn to swim: Not started. Change status' }),
+    )
+    expect(
+      await section.findByRole('button', { name: 'Learn to swim: In progress. Change status' }),
+    ).toBeTruthy()
+    expect((await r.listLifeGoals())[0]?.status).toBe('doing')
+    await waitFor(async () => expect(await tile('Goals in progress')).toBe('1'))
   })
 
-  it('stays out of Just today', async () => {
-    await start(200000)
-    await salary()
+  it('stays off Today in Simple mode, where Goals is hidden', async () => {
+    await r.updateSettings({ simpleMode: true })
+    await start(84250)
     render(<App />)
-    await comingUp()
-    await userEvent.click(screen.getByRole('button', { name: 'Just today' }))
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Coming up' })).toBeNull())
+    await screen.findByRole('region', { name: 'Coming up' })
+    expect(screen.queryByRole('region', { name: 'Goals in motion' })).toBeNull()
   })
 })

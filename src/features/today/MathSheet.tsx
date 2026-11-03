@@ -17,7 +17,8 @@ interface Props {
   open: boolean
   onClose: () => void
   safe: SafeToSpend
-  runway: Runway
+  /** Today's per-day split. Left out on Home, which looks at a whole period, not a day. */
+  runway?: Runway
   today: ISODate
   /** Shown, never summed: pay that hasn't landed isn't money you can spend yet. */
   nextPay?: { date: ISODate; amount: Cents }
@@ -86,19 +87,23 @@ export function MathSheet({ open, onClose, safe, runway, nextPay }: Props) {
           </dt>
           <dd className="font-semibold tabular-nums">{f.money(safe.total)}</dd>
         </div>
-        {runway.startOfDaySafe !== safe.total && (
+        {runway && runway.startOfDaySafe !== safe.total && (
           <div className="flex justify-between gap-4 py-3">
             <dt className="text-muted">At the start of today, before today’s spending</dt>
             <dd className="font-medium tabular-nums">{f.money(runway.startOfDaySafe)}</dd>
           </div>
         )}
-        <div className="flex justify-between gap-4 py-3">
-          <dt className="text-muted">
-            ÷ {runway.daysLeft} {runway.daysLeft === 1 ? 'day' : 'days'}, including today
-          </dt>
-          <dd className="font-semibold text-accent tabular-nums">{f.money(runway.perDay)} a day</dd>
-        </div>
-        {runway.spentToday > 0 && (
+        {runway && (
+          <div className="flex justify-between gap-4 py-3">
+            <dt className="text-muted">
+              ÷ {runway.daysLeft} {runway.daysLeft === 1 ? 'day' : 'days'}, including today
+            </dt>
+            <dd className="font-semibold text-accent tabular-nums">
+              {f.money(runway.perDay)} a day
+            </dd>
+          </div>
+        )}
+        {runway && runway.spentToday > 0 && (
           <div className="flex justify-between gap-4 py-3">
             <dt className="text-muted">Spent today</dt>
             <dd className="font-medium tabular-nums">{f.money(-runway.spentToday)}</dd>

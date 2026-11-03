@@ -1,81 +1,42 @@
 import { useNavigate } from 'react-router'
-import { useAppSettings } from '../../app/SettingsProvider'
-import { useUndoToast } from '../../app/useUndoToast'
-import { markPaid, setMeta } from '../../db/repos'
+import { setMeta } from '../../db/repos'
 import { addSnooze, type NextAction, type Snoozes } from '../../domain/nextAction'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
-import { useFormat } from '../bills/format'
 
 interface Props {
+  /** The data-safety nudge ('backup'): the one action card Today still carries. */
   action: NextAction
   snoozes: Snoozes
-  /** Opens the balance sheet (stale balance, payday). */
-  onCheckIn: (offerBackup: boolean) => void
-  onLog: () => void
 }
 
-/** The single "one thing now" card (PLAN §4.5). "Not now" snoozes it for 24 h. */
-export function ActionCard({ action, snoozes, onCheckIn, onLog }: Props) {
+/**
+ * A quiet card under Today's lists when a backup is overdue: everything lives on this
+ * device, so one file keeps it safe. "Not now" snoozes it for 24 h, no guilt.
+ */
+export function ActionCard({ action, snoozes }: Props) {
   const navigate = useNavigate()
-  const undoToast = useUndoToast()
-  const f = useFormat()
-  const { simpleMode } = useAppSettings().settings
-
-  function run() {
-    switch (action.kind) {
-      case 'payday-unknown':
-        return navigate('/bills?view=paydays')
-      case 'overdue-bill': {
-        const b = action.bill!
-        return void markPaid(b.billId, b.originalDate, b.amount).then(() =>
-          undoToast(action.doneState),
-        )
-      }
-      case 'stale-balance':
-        return onCheckIn(false)
-      case 'payday-checkin':
-        return onCheckIn(true)
-      case 'backup':
-        return navigate('/more/backup')
-      case 'impulse':
-        return navigate(simpleMode ? '/more/wait' : '/goals')
-      case 'setup-bills':
-        return navigate('/bills?new=1')
-      case 'log-today':
-      case 'demo-try':
-        return onLog()
-      case 'all-done':
-        return
-    }
-  }
-
-  const done = action.kind === 'all-done'
   return (
     <section
       aria-labelledby="next-action"
-      className="animate-fade-in rounded-[1.75rem] bg-accent-soft p-5"
+      className="card-quiet animate-fade-in flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center"
     >
-      <p className="eyebrow text-accent">{done ? 'Today' : 'One thing now'}</p>
-      <h2 id="next-action" className="mt-1 flex items-center gap-2 text-lg font-medium">
-        {done && <Icon name="check" size={20} className="text-accent" />}
-        {action.trigger}
-      </h2>
-      <p className="text-body text-muted">
-        {action.bill ? (
-          <>
-            <span className="font-medium text-text tabular-nums">
-              {f.money(action.bill.amount)}
-            </span>{' '}
-            · due {f.day(action.bill.date)}
-          </>
-        ) : (
-          action.detail
-        )}
-      </p>
+      <span
+        aria-hidden="true"
+        className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent sm:inline-flex"
+      >
+        <Icon name="shield" size={20} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="eyebrow text-accent">Keep your data safe</p>
+        <h2 id="next-action" className="mt-1 text-heading">
+          {action.trigger}
+        </h2>
+        <p className="text-body text-muted">{action.detail}</p>
+      </div>
       {action.cta && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={run}>{action.cta}</Button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button onClick={() => navigate('/more/backup')}>{action.cta}</Button>
           {action.snoozable && (
             <Button
               variant="ghost"

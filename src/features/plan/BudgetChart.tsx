@@ -1,12 +1,11 @@
 import type { EnvelopeUsage } from '../../domain/safeToSpend'
-import { cx } from '../../ui/cx'
 import { envelopeColor } from '../../ui/EnvelopeDot'
 import type { Formatters } from '../bills/format'
 
 /**
- * Budget vs actual (planned vs spent), one pair of bars per envelope. The planned bar is
- * an outline, the actual bar is filled in the envelope's colour, and anything still coming
- * this period sits on top of it, lighter. Over budget is said in words, never in red.
+ * Budget vs actuals (planned vs spent), one pair of bars per envelope, on one shared
+ * scale. The planned bar is a light outline, the actual bar is filled in the envelope's
+ * colour; columns wrap to new rows and centre. Over budget is said in words, never in red.
  *
  * The bars are decorative: every number is also written under them, and each column has a
  * full sentence for screen readers.
@@ -19,79 +18,66 @@ export function BudgetChart({
 }: {
   rows: readonly EnvelopeUsage[]
   f: Formatters
-  /** Fewer columns and shorter bars, for Today. */
+  /** One row per envelope instead of columns, for Today. */
   compact?: boolean
   label: string
 }) {
   const shown = rows.filter((r) => r.budget > 0 || r.spent + r.linkedDue > 0)
   if (shown.length === 0) return null
   if (compact) return <BudgetBars rows={shown} f={f} label={label} />
-  const max = Math.max(1, ...shown.map((r) => Math.max(r.budget, r.spent + r.linkedDue)))
-  const height = compact ? 96 : 160
-  const px = (c: number) => (c <= 0 ? 0 : Math.max(3, Math.round((c / max) * height)))
+  const max = Math.max(1, ...shown.map((r) => Math.max(r.budget, r.spent)))
+  // A share of the plot's height, so the plot can be shorter on a phone. Zero still shows
+  // a small stub, so a column never looks like it is missing a bar.
+  const pct = (c: number) => `${Math.max(0, (c / max) * 100)}%`
 
   return (
     <figure className="m-0">
       <ul
         aria-label={label}
-        className={cx(
-          'grid gap-x-2 gap-y-6',
-          compact
-            ? 'grid-cols-3 sm:grid-cols-4'
-            : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8',
-        )}
+        className="flex flex-wrap items-end justify-center gap-x-1 gap-y-10 sm:gap-x-2"
       >
         {shown.map((r) => {
           const color = envelopeColor(r.color)
-          const used = r.spent + r.linkedDue
           return (
-            <li key={r.id} className="flex min-w-0 flex-col items-center text-center">
+            <li
+              key={r.id}
+              className="flex w-[6.25rem] min-w-0 flex-col items-center text-center sm:w-[8.5rem]"
+            >
               <span className="sr-only">
                 {r.name}: planned {f.money(r.budget)}, actual {f.money(r.spent)}
                 {r.linkedDue > 0 ? `, ${f.money(r.linkedDue)} still coming` : ''}
                 {r.over > 0 ? `, over by ${f.money(r.over)}` : ''}.
               </span>
-              <div aria-hidden="true" className="flex items-end gap-1.5" style={{ height }}>
+              <div aria-hidden="true" className="flex h-36 items-end gap-1.5 sm:h-52">
                 <div
-                  className="w-4 rounded-t-md border-2 sm:w-5"
+                  className="min-h-1.5 w-5 rounded-t-lg border-[1.5px] border-b-0 sm:w-6"
                   style={{
-                    height: px(r.budget),
+                    height: pct(r.budget),
                     borderColor: color,
-                    backgroundColor: `color-mix(in oklab, ${color} 14%, var(--surface))`,
+                    backgroundColor: `color-mix(in oklab, ${color} 12%, var(--surface))`,
                   }}
                 />
-                <div className="flex w-4 flex-col justify-end sm:w-5">
-                  {r.linkedDue > 0 && (
-                    <div
-                      className="rounded-t-md"
-                      style={{
-                        height: px(used) - px(r.spent),
-                        backgroundColor: `color-mix(in oklab, ${color} 40%, var(--surface))`,
-                      }}
-                    />
-                  )}
-                  <div
-                    className={cx(r.linkedDue > 0 ? '' : 'rounded-t-md')}
-                    style={{ height: px(r.spent), backgroundColor: color }}
-                  />
-                </div>
+                <div
+                  className="min-h-1.5 w-5 rounded-t-lg sm:w-6"
+                  style={{ height: pct(r.spent), backgroundColor: color }}
+                />
               </div>
               <span
                 aria-hidden="true"
-                className="mt-2 line-clamp-2 text-caption leading-tight font-semibold"
+                className="mt-2.5 line-clamp-2 text-body leading-tight font-semibold"
               >
                 {r.name}
               </span>
-              <span aria-hidden="true" className="text-[0.75rem] text-muted tabular-nums">
+              <span aria-hidden="true" className="mt-1 text-caption text-muted tabular-nums">
                 {f.money(r.budget)} / {f.money(r.spent)}
               </span>
               {r.linkedDue > 0 && (
-                <span aria-hidden="true" className="text-[0.75rem] text-muted">
+                <span aria-hidden="true" className="text-caption text-muted tabular-nums">
                   +{f.money(r.linkedDue)} coming
                 </span>
               )}
               {r.over > 0 && (
-                <span aria-hidden="true" className="text-[0.75rem] text-muted">
+                <span aria-hidden="true" className="text-caption text-muted tabular-nums">
                   {f.money(r.over)} over plan
                 </span>
               )}
@@ -99,18 +85,17 @@ export function BudgetChart({
           )
         })}
       </ul>
-      <figcaption className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-1 text-caption text-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-muted" />
+      <figcaption className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-1 text-body text-muted">
+        <span className="inline-flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="h-3.5 w-3.5 rounded-[3px] border-[1.5px] border-muted"
+          />
           Planned
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="h-3 w-3 rounded-sm bg-muted" />
+        <span className="inline-flex items-center gap-2">
+          <span aria-hidden="true" className="h-3.5 w-3.5 rounded-[3px] bg-muted" />
           Actual
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="h-3 w-3 rounded-sm bg-muted/40" />
-          Still coming
         </span>
       </figcaption>
     </figure>
