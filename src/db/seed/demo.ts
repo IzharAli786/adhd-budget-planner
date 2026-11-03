@@ -617,6 +617,7 @@ export async function seedDemo(now: Date = new Date()): Promise<void> {
       key: 'settings',
       value: {
         ...previous,
+        displayName: previous.displayName || 'Sam',
         simpleMode: false,
         envelopesEnabled: true,
         // Pay-based safe to spend (PLAN-v2): the sample tracks from the start of this month,

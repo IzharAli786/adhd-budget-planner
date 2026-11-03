@@ -1,6 +1,6 @@
 import { useId, useState, type FormEvent } from 'react'
 import { useUndoToast } from '../../app/useUndoToast'
-import { useDebts, useFunds, useLifeGoals, useTransactions } from '../../db/hooks'
+import { useFunds, useLifeGoals, useTransactions } from '../../db/hooks'
 import {
   addLifeGoal,
   deleteLifeGoal,
@@ -28,6 +28,7 @@ import { ProgressBar } from '../../ui/Progress'
 import { Segmented } from '../../ui/Segmented'
 import { Sheet } from '../../ui/Sheet'
 import { useFormat, type Formatters } from '../bills/format'
+import { useDebtsOwed, type OwedDebt } from '../debts/useDebtsOwed'
 
 export const STATUS_LABEL: Record<LifeGoalStatus, string> = {
   todo: 'Not started',
@@ -68,7 +69,8 @@ const STATUS_PILL: Record<LifeGoalStatus, string> = {
 export function LifeGoalsCard({ today }: { today: ISODate }) {
   const goals = useLifeGoals()
   const funds = useFunds()
-  const debts = useDebts()
+  // What is owed today (payments since the balance count), the same as Today and Debt show.
+  const debts = useDebtsOwed()
   const transactions = useTransactions()
   const [editing, setEditing] = useState<LifeGoal | 'new' | null>(null)
 
@@ -162,7 +164,7 @@ function GoalRow({
 }: {
   goal: LifeGoal
   fund: SavingsFund | undefined
-  debt: Debt | undefined
+  debt: OwedDebt | undefined
   transactions: readonly Transaction[]
   today: ISODate
   onEdit: () => void
@@ -257,7 +259,7 @@ function GoalLink({
   f,
 }: {
   fund: SavingsFund | undefined
-  debt: Debt | undefined
+  debt: OwedDebt | undefined
   transactions: readonly Transaction[]
   f: Formatters
 }) {
@@ -285,13 +287,13 @@ function GoalLink({
     )
   }
   if (!debt) return null
-  const paid = Math.max(0, debt.originalBalance - debt.balance)
+  const paid = Math.max(0, debt.originalBalance - debt.owed)
   return (
     <div className="mt-3 rounded-2xl bg-bg px-3.5 py-2.5 text-sm">
       <div className="flex justify-between gap-3">
         <span className="truncate text-muted">Debt · {debt.name}</span>
         <span className="shrink-0 tabular-nums">
-          {debt.balance <= 0 ? 'Paid off' : `${f.money(debt.balance)} left`}
+          {debt.owed <= 0 ? 'Paid off' : `${f.money(debt.owed)} left`}
         </span>
       </div>
       {debt.originalBalance > 0 && (

@@ -17,6 +17,7 @@ import { Icon } from '../../ui/Icon'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { Segmented } from '../../ui/Segmented'
 import { useFormat, type Formatters } from '../bills/format'
+import type { OwedDebt } from './useDebtsOwed'
 
 const PayoffChart = lazy(() => import('./PayoffChart'))
 
@@ -31,9 +32,16 @@ const STRATEGY_OPTIONS = [
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-/** Snowball vs avalanche for a monthly budget (PLAN §4.3), with the order and a chart. */
-export function PayoffPlan({ debts, today }: { debts: Debt[]; today: ISODate }) {
+/**
+ * Snowball vs avalanche for a monthly budget (PLAN §4.3), with the order and a chart. The
+ * simulation starts from what is owed today, so payments since a balance was entered count.
+ */
+export function PayoffPlan({ debts: owedDebts, today }: { debts: OwedDebt[]; today: ISODate }) {
   const f = useFormat()
+  const debts = useMemo<Debt[]>(
+    () => owedDebts.map(({ owed, ...d }) => ({ ...d, balance: owed })),
+    [owedDebts],
+  )
   const sliderId = useId()
   const minimums = sumMinimums(debts)
   // €50 (or 50 of any currency) on top of the minimums: noticeable, but doable.
