@@ -12,6 +12,12 @@ const phone = { viewport: { width: 390, height: 844 } }
 // EU-first app: run in an EU locale and zone so money is € and "today" is CET/CEST.
 const eu = { locale: 'en-IE', timezoneId: 'Europe/Berlin' }
 
+// Parallel worktrees each pass their own E2E_PORT / E2E_DEMO_PORT. Reusing a server is then
+// off: on a shared port it could be another checkout's build, and tests would pass against it.
+const PORT = Number(process.env.E2E_PORT ?? 4173)
+const DEMO_PORT = Number(process.env.E2E_DEMO_PORT ?? 4174)
+const reuse = !process.env.CI && !process.env.E2E_PORT
+
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
@@ -26,34 +32,33 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore: /demo\.spec\.ts/,
-      use: { ...devices['Desktop Chrome'], ...phone, baseURL: 'http://localhost:4173' },
+      use: { ...devices['Desktop Chrome'], ...phone, baseURL: `http://localhost:${PORT}` },
     },
     {
       name: 'webkit',
       testIgnore: /demo\.spec\.ts/,
-      use: { ...devices['Desktop Safari'], ...phone, baseURL: 'http://localhost:4173' },
+      use: { ...devices['Desktop Safari'], ...phone, baseURL: `http://localhost:${PORT}` },
     },
     {
       // The demo build is its own origin and bundle (PLAN §7): no lock, no service worker.
       name: 'demo',
       testMatch: /demo\.spec\.ts/,
-      use: { ...devices['Desktop Chrome'], ...phone, baseURL: 'http://localhost:4174' },
+      use: { ...devices['Desktop Chrome'], ...phone, baseURL: `http://localhost:${DEMO_PORT}` },
     },
   ],
   webServer: [
     {
-      command: 'npm run build && npm run preview -- --port 4173 --strictPort',
-      url: 'http://localhost:4173',
+      command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
+      url: `http://localhost:${PORT}`,
       env: { VITE_UNLOCK_HASHES: DEV_UNLOCK_HASH },
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuse,
       timeout: 180_000,
     },
     {
       // Its own outDir so it can build next to the full app without clobbering dist/.
-      command:
-        'npx vite build --mode demo --outDir dist-demo && node scripts/check-demo.mjs dist-demo && npx vite preview --mode demo --outDir dist-demo --port 4174 --strictPort',
-      url: 'http://localhost:4174',
-      reuseExistingServer: !process.env.CI,
+      command: `npx vite build --mode demo --outDir dist-demo && node scripts/check-demo.mjs dist-demo && npx vite preview --mode demo --outDir dist-demo --port ${DEMO_PORT} --strictPort`,
+      url: `http://localhost:${DEMO_PORT}`,
+      reuseExistingServer: reuse,
       timeout: 180_000,
     },
   ],
