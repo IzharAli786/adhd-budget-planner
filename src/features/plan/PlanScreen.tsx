@@ -21,12 +21,9 @@ import { paceText, SavingsTiles, usePaydays } from '../goals/FundsSection'
 import { CanFitForm } from '../today/CanFitSheet'
 import { monthName } from '../today/Dashboard'
 import { useTodayModel } from '../today/useTodayModel'
-import { InsightsSection } from '../review/InsightsSection'
-import { useReviewData } from '../review/useReviewData'
 import { BudgetChart } from './BudgetChart'
 import { EnvelopesSection } from './EnvelopesSection'
 import { LeftToSpendBar, SpendingDonut } from './MoneyShape'
-import type { DateRange } from '../../domain/insights'
 
 const navButton =
   'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-accent hover:bg-accent-soft/60 disabled:text-muted disabled:opacity-40 disabled:hover:bg-transparent'
@@ -37,7 +34,6 @@ export function PlanScreen() {
   const today = useToday()
   const now = useNow()
   const model = useTodayModel(today, now)
-  const data = useReviewData(today)
   const { settings } = useAppSettings()
   const f = useFormat()
   // The period being looked at, by any date inside it; null is the current one.
@@ -184,14 +180,6 @@ export function PlanScreen() {
             />
             <SavingsSummary today={today} />
           </div>
-          {data && (
-            <InsightsSection
-              data={data}
-              range={span as DateRange}
-              past={span.end <= today}
-              foldId="plan-insights"
-            />
-          )}
         </div>
       )}
     </>

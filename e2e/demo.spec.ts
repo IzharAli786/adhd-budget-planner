@@ -54,29 +54,18 @@ test('sample data opens a filled-in Today', async ({ page }) => {
   expect(await seriousViolations(page)).toEqual([])
 })
 
-test('sample data fills Insights and Look back', async ({ page }) => {
+test('sample data fills Plan’s charts and Look back', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   await page.getByRole('button', { name: /Look around with sample data/ }).click()
   await expect(hero(page)).toHaveText(/\d/)
 
-  // Insights on Plan: the envelopes plus the debt payments, rent included (in its envelope).
+  // Plan: budget vs actual, where the money went and what's left, from one engine.
   await page.getByRole('link', { name: 'Plan' }).first().click()
-  // On a phone Insights starts folded, so the period and the envelopes come first.
-  const insights = page.getByRole('region', { name: 'Insights' })
-  const fold = insights.getByRole('button', { name: 'Insights', exact: true })
-  await expect(fold).toHaveAttribute('aria-expanded', 'false')
-  await fold.click()
-  await expect(insights.getByText('Planned and actual')).toBeVisible()
-  // Each bar names its numbers; a tap shows them in a tip.
-  await insights.getByRole('button', { name: /^Groceries: actual/ }).click()
-  await expect(
-    insights.getByText('Still free').or(insights.getByText('Past the plan')),
-  ).toBeVisible()
-  await insights.getByRole('button', { name: 'Show as a table' }).click()
-  const table = insights.getByRole('table')
-  for (const name of ['Rent & housing', 'Groceries', 'Eating out', 'Debt'])
-    await expect(table.getByRole('rowheader', { name, exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: /^Budget vs actual/ })).toBeVisible()
+  const dist = page.getByRole('list', { name: 'Spending distribution' })
+  await expect(dist.getByText('Rent & housing')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Left to spend' })).toBeVisible()
   expect(await seriousViolations(page)).toEqual([])
 
   // Look back: months of money in and out, carry-over per payday, savings and debt.

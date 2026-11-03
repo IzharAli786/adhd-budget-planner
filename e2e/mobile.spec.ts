@@ -17,7 +17,7 @@ test('Plan stays short on a phone: secondary sections fold, and remember it', as
   await fullMode(page)
   await page.goto('/plan')
   await expect(page.getByRole('region', { name: 'This period at a glance' })).toBeVisible()
-  for (const name of ['Insights', 'Can this fit?']) {
+  for (const name of ['Can this fit?']) {
     const fold = page.getByRole('region', { name }).getByRole('button', { name, exact: true })
     await expect(fold).toHaveAttribute('aria-expanded', 'false')
   }
@@ -34,9 +34,6 @@ test('Plan stays short on a phone: secondary sections fold, and remember it', as
   await expect(
     page.getByRole('region', { name: 'Can this fit?' }).getByRole('textbox', { name: 'Price' }),
   ).toBeVisible()
-  await expect(
-    page.getByRole('region', { name: 'Insights' }).getByRole('button', { name: 'Insights' }),
-  ).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('an envelope opens its entries this period, and the log filtered to it', async ({ page }) => {

@@ -85,6 +85,11 @@ export function BudgetChart({
               <span aria-hidden="true" className="text-[0.75rem] text-muted tabular-nums">
                 {f.money(r.budget)} / {f.money(r.spent)}
               </span>
+              {r.linkedDue > 0 && (
+                <span aria-hidden="true" className="text-[0.75rem] text-muted">
+                  +{f.money(r.linkedDue)} coming
+                </span>
+              )}
               {r.over > 0 && (
                 <span aria-hidden="true" className="text-[0.75rem] text-muted">
                   {f.money(r.over)} over plan

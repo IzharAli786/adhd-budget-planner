@@ -240,21 +240,4 @@ describe('Just today', () => {
     expect(screen.queryByText('coffee')).toBeNull()
     expect(everyday.isDefault).toBe(true)
   })
-
-  it('folds Insights away and remembers it', async () => {
-    goto('/plan')
-    const { unmount } = render(<App />)
-    const insights = await screen.findByRole('region', { name: 'Insights' })
-    const toggle = within(insights).getByRole('button', { name: 'Insights' })
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    await userEvent.click(toggle)
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(within(insights).getByText(/Where this period’s money is going/)).toBeTruthy()
-    unmount()
-    render(<App />)
-    const again = await screen.findByRole('region', { name: 'Insights' })
-    expect(
-      within(again).getByRole('button', { name: 'Insights' }).getAttribute('aria-expanded'),
-    ).toBe('false')
-  })
 })

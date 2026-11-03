@@ -123,8 +123,11 @@ describe('Today', () => {
     await r.addToFund(fund, 20000, '2026-11-04')
     await r.addTransaction({ date: '2026-11-04', amount: -15000, note: '', debtId: debt.debt.id })
     const overview = within(await screen.findByRole('region', { name: 'Savings and debt' }))
-    await waitFor(() => expect(overview.getByText('€300.00')).toBeTruthy())
-    expect(overview.getByText('€350.00')).toBeTruthy()
+    // Two separate writes: wait for both totals, not just the first.
+    await waitFor(() => {
+      expect(overview.getByText('€300.00')).toBeTruthy()
+      expect(overview.getByText('€350.00')).toBeTruthy()
+    })
     expect((await hero()).textContent).toBe('€31.20')
     const tiles = within(screen.getByRole('list', { name: 'At a glance' }))
     expect(tiles.getByText('€25.00')).toBeTruthy()
