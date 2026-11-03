@@ -16,13 +16,13 @@ test('Plan stays short on a phone: secondary sections fold, and remember it', as
   await unlockAndSetup(page)
   await fullMode(page)
   await page.goto('/plan')
-  await expect(page.getByRole('region', { name: 'This period', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'This period at a glance' })).toBeVisible()
   for (const name of ['Insights', 'Can this fit?']) {
     const fold = page.getByRole('region', { name }).getByRole('button', { name, exact: true })
     await expect(fold).toHaveAttribute('aria-expanded', 'false')
   }
-  const note = page.getByRole('region', { name: 'Note for this payday' })
-  await expect(note.getByRole('button', { name: 'Note for this payday' })).toHaveAttribute(
+  const note = page.getByRole('region', { name: 'Note for this month' })
+  await expect(note.getByRole('button', { name: 'Note for this month' })).toHaveAttribute(
     'aria-expanded',
     'false',
   )
@@ -43,7 +43,7 @@ test('an envelope opens its entries this period, and the log filtered to it', as
   await unlockAndSetup(page)
   await fullMode(page)
   await page.goto('/plan')
-  await page.getByRole('switch', { name: 'Use envelopes' }).click()
+  // Envelopes are on from setup, with Everyday ready: the starter offer is right there.
   await page.getByRole('button', { name: 'Start with common categories' }).click()
   await expect(page.getByRole('heading', { name: 'Groceries' })).toBeVisible()
 

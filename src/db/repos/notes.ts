@@ -26,3 +26,16 @@ export function saveNote(target: NoteTarget, text: string) {
     return note
   })
 }
+
+/** Ticks a day note off (or back on) in Coming up. One undo step. */
+export function setNoteDone(id: string, done: boolean) {
+  return mutate(done ? 'Tick off note' : 'Untick note', ['notes'], async (w) => {
+    const existing = await w.get('notes', id)
+    if (!existing) return null
+    const note: Note = { ...existing }
+    if (done) note.doneAt = nowInstant()
+    else delete note.doneAt
+    await w.put('notes', note)
+    return note
+  })
+}

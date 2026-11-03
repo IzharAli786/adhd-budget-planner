@@ -66,16 +66,17 @@ describe('first-run setup (PLAN §5)', () => {
       expect.objectContaining({ date: '2026-10-31', balance: 84250 }),
     ])
 
-    // M5+M6: Today runs on the answers (en-GB, so £). 842.50 over 6 days to Fri 6 Nov -> floor 140.41.
+    // The balance answered is the starting balance, added once to the first month.
+    expect(await r.getSettings()).toMatchObject({ startDate: '2026-10-31', startingBalance: 84250 })
+    // Today runs on the answers (en-GB, so £). Sat 31 Oct is the last day of the month,
+    // so the whole starting balance is today's (the first pay lands in November).
     const hero = async () =>
       (await screen.findByRole('region', { name: 'Today’s number' })).querySelector('[aria-live]')!
-    await waitFor(async () => expect((await hero()).textContent).toBe('£140.41'))
+    await waitFor(async () => expect((await hero()).textContent).toBe('£842.50'))
     // No bills yet, so the deferred setup task is the one card.
     expect(await screen.findByText('Add your rent')).toBeTruthy()
-    // Only spending logged after the check-in counts; the frozen test clock needs a nudge.
-    vi.setSystemTime(new Date(2026, 9, 31, 12, 1))
     await userEvent.type(screen.getByRole('textbox', { name: /Quick add/ }), '12 coffee{Enter}')
-    await waitFor(async () => expect((await hero()).textContent).toBe('£128.41'))
+    await waitFor(async () => expect((await hero()).textContent).toBe('£830.50'))
   })
 
   it('detects locale and currency from the device, shown as one editable line', async () => {

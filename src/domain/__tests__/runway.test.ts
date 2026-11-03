@@ -103,9 +103,15 @@ describe('canFit', () => {
 })
 
 describe('acceptance: "12 coffee" (PLAN §10 M5)', () => {
-  const checkIn = { at: '2026-11-04T08:00:00.000Z', date: '2026-11-04', balance: 84250 }
+  const money = {
+    planBy: 'month' as const,
+    startingBalance: 84250,
+    startDate: '2026-11-01',
+    rollover: false,
+  }
   const world: TodayInput = {
     today: '2026-11-04',
+    money,
     incomes: [
       {
         id: 'pay',
@@ -121,7 +127,6 @@ describe('acceptance: "12 coffee" (PLAN §10 M5)', () => {
     bills: [],
     occurrences: [],
     transactions: [],
-    checkIn,
   }
 
   it('logs €12.00 and leftToday drops by exactly €12', () => {
@@ -142,8 +147,8 @@ describe('acceptance: "12 coffee" (PLAN §10 M5)', () => {
       fc.property(
         fc.integer({ min: -50000, max: 200000 }),
         fc.integer({ min: 1, max: 100000 }),
-        (balance, x) => {
-          const w = { ...world, checkIn: { ...checkIn, balance } }
+        (startingBalance, x) => {
+          const w = { ...world, money: { ...money, startingBalance } }
           const before = planToday(w)
           const after = planToday({ ...w, transactions: [tx({ amount: -x })] })
           if (before.kind !== 'ready' || after.kind !== 'ready') throw new Error('not ready')
@@ -153,38 +158,42 @@ describe('acceptance: "12 coffee" (PLAN §10 M5)', () => {
     )
   })
 
-  // Pay that hasn't landed isn't money yet: a new amount must not move today's number,
-  // but a different payday must, because the money has to last a different number of days.
-  it('the pay amount never moves today; the payday date does', () => {
+  // Pay-based (PLAN-v2 locked decision A): editing pay changes the number at once, by
+  // exactly the change, because this month's payday counts as money in.
+  it('editing the pay moves safe to spend by exactly the difference', () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 1_000_000 }), (amount) => {
         const before = planToday(world)
         const after = planToday({ ...world, incomes: [{ ...world.incomes[0]!, amount }] })
         if (before.kind !== 'ready' || after.kind !== 'ready') throw new Error('not ready')
-        expect(after.safe.total).toBe(before.safe.total)
-        expect(after.runway.perDay).toBe(before.runway.perDay)
+        expect(after.safe.total - before.safe.total).toBe(amount - 210000)
       }),
     )
-    const sooner = planToday({
-      ...world,
-      incomes: [{ ...world.incomes[0]!, schedule: { kind: 'monthly', day: 10 } }],
-    })
-    const later = planToday(world)
-    if (sooner.kind !== 'ready' || later.kind !== 'ready') throw new Error('not ready')
-    expect(sooner.runway.daysLeft).toBeLessThan(later.runway.daysLeft)
-    expect(sooner.runway.perDay).toBeGreaterThan(later.runway.perDay)
   })
 
-  it('reports what is missing before there is a number', () => {
-    expect(planToday({ ...world, incomes: [] }).kind).toBe('no-income')
+  it('by payday, an earlier payday means fewer days and more per day', () => {
+    const byPayday = { ...world, money: { ...money, planBy: 'payday' as const } }
+    const sooner = planToday({
+      ...byPayday,
+      incomes: [{ ...world.incomes[0]!, schedule: { kind: 'monthly', day: 10 } }],
+    })
+    const later = planToday(byPayday)
+    if (sooner.kind !== 'ready' || later.kind !== 'ready') throw new Error('not ready')
+    expect(sooner.runway.daysLeft).toBeLessThan(later.runway.daysLeft)
+  })
+
+  it('by payday, reports what is missing before there is a number', () => {
+    const byPayday = { ...world, money: { ...money, planBy: 'payday' as const } }
+    expect(planToday({ ...byPayday, incomes: [] }).kind).toBe('no-income')
     expect(
       planToday({
-        ...world,
+        ...byPayday,
         incomes: [
           { ...world.incomes[0]!, schedule: { kind: 'irregular', expected: ['2026-10-01'] } },
         ],
       }).kind,
     ).toBe('no-payday')
-    expect(planToday({ ...world, checkIn: undefined }).kind).toBe('no-balance')
+    // By month there is always a number, even with no pay set up yet.
+    expect(planToday({ ...world, incomes: [] }).kind).toBe('ready')
   })
 })

@@ -536,7 +536,7 @@ function Summary({
   )
 }
 
-function TransactionSheet({ tx, onClose }: { tx: Transaction | null; onClose: () => void }) {
+export function TransactionSheet({ tx, onClose }: { tx: Transaction | null; onClose: () => void }) {
   return (
     <Sheet open={tx !== null} onClose={onClose} title="Edit entry">
       {tx && <TransactionForm key={tx.id} tx={tx} onClose={onClose} />}
@@ -546,7 +546,6 @@ function TransactionSheet({ tx, onClose }: { tx: Transaction | null; onClose: ()
 
 function TransactionForm({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
   const f = useFormat()
-  const today = useToday()
   const { settings } = useAppSettings()
   const envelopes = useEnvelopes()
   const undoToast = useUndoToast()
@@ -599,7 +598,6 @@ function TransactionForm({ tx, onClose }: { tx: Transaction; onClose: () => void
         format={f.dayFull}
         label="Date"
         value={date}
-        max={today}
         onChange={setDate}
         error={tried && !isValidISODate(date) ? 'Pick a date' : undefined}
       />

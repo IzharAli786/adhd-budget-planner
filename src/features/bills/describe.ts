@@ -51,6 +51,8 @@ export interface DayExtras {
   /** Total set aside for savings on this payday. */
   saving?: number
   note?: boolean
+  /** Entries logged on the day. */
+  logged?: number
 }
 
 /** "Today, Saturday 31 October, 2 bills, 1 paid, payday": the dots, in words. */
@@ -80,6 +82,7 @@ export function calendarDayLabel(
   else if (debts) parts.push(debts === 1 ? '1 debt minimum' : `${debts} debt minimums`)
   if (paydays) parts.push(paydays === 1 ? 'payday' : `${paydays} paydays`)
   if (extras.saving) parts.push(`set aside ${f.money(extras.saving)}`)
+  if (extras.logged) parts.push(extras.logged === 1 ? '1 entry' : `${extras.logged} entries`)
   if (extras.note) parts.push('note')
   return parts.join(', ')
 }

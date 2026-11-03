@@ -6,9 +6,10 @@ import { gardenPoints, spendDates } from '../../domain/garden'
 import { compare, defaultBudget, negativeAmortization } from '../../domain/debt'
 import { isImpulseExpired } from '../../domain/impulse'
 import { isSpend } from '../../domain/reconcile'
-import { addedOnMap, billEntriesBetween } from '../../domain/bills'
+import { billEntriesBetween } from '../../domain/bills'
 import { isDebtPayment, isEverydaySpend } from '../../domain/insights'
 import { historyStart, payPeriodRanges, periodSummaries, totalFlows } from '../../domain/review'
+import { monthSpan } from '../../domain/safeToSpend'
 import { planToday } from '../../domain/today'
 import { todayISO } from '../../lib/clock'
 import { exportBackup, importBackup, validateBackup } from '../backup'
@@ -206,24 +207,28 @@ describe('sample data', () => {
     fc.assert(
       fc.property(someDay, ({ today, now, decimals }) => {
         const data = buildDemoData(today, now, decimals)
+        // The same money settings seedDemo writes: this month, no roll over, no cushion.
         const plan = planToday({
           today,
+          money: {
+            planBy: 'month',
+            startDate: monthSpan(today).start,
+            startingBalance: 0,
+            rollover: false,
+          },
           incomes: data.incomes,
           paydayOverrides: [],
           bills: data.bills,
           occurrences: data.billOccurrences,
           transactions: data.transactions,
-          checkIn: data.checkIns.at(-1),
-          funds: data.funds,
           envelopes: data.envelopes,
           envelopesEnabled: true,
-          buffer: data.buffer,
-          addedOn: addedOnMap(data.bills, (at) => todayISO(new Date(at))),
         })
         expect(plan.kind).toBe('ready')
         if (plan.kind !== 'ready') return
-        // An everyday amount, not the whole cushion: the buffer keeps most of it out.
-        expect(plan.safe.total).toBeLessThan(10 ** decimals * 1500)
+        // A month's pay minus its bills, never the year's savings. Paid every two weeks,
+        // a month holds at most three paydays.
+        expect(plan.safe.total).toBeLessThan(3 * DEMO_PAY * 10 ** decimals)
         // Nothing overdue, nothing short, and a balance never below zero at a check-in.
         expect(plan.safe.dueEntries.every((e) => e.date >= today)).toBe(true)
         expect(plan.safe.total).toBeGreaterThan(0)

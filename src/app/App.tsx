@@ -14,6 +14,7 @@ import { HelpScreen } from '../features/more/HelpScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
 import { PlanScreen } from '../features/plan/PlanScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
+import { MoneyBasicsScreen } from '../features/settings/MoneyBasicsScreen'
 import { ReviewScreen } from '../features/review/ReviewScreen'
 import { ReportsScreen } from '../features/reports/ReportsScreen'
 import { RequireSetup } from '../features/setup/RequireSetup'
@@ -73,6 +74,7 @@ export function App() {
                       />
                       <Route path="more" element={<MoreScreen />} />
                       <Route path="more/settings" element={<SettingsScreen />} />
+                      <Route path="more/basics" element={<MoneyBasicsScreen />} />
                       <Route path="more/help" element={<HelpScreen />} />
                       <Route path="more/backup" element={<BackupScreen />} />
                       <Route path="more/transactions" element={<TransactionsScreen />} />

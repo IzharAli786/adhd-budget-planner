@@ -11,7 +11,7 @@ export interface TabDef {
 export const TABS: readonly TabDef[] = [
   { to: '/', label: 'Today', icon: 'today' },
   { to: '/plan', label: 'Plan', icon: 'plan', full: true },
-  { to: '/bills', label: 'Bills', icon: 'bills' },
+  { to: '/bills', label: 'Calendar', icon: 'calendar' },
   { to: '/goals', label: 'Goals', icon: 'goals', full: true },
   { to: '/more', label: 'More', icon: 'more' },
 ]

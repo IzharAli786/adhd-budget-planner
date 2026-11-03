@@ -1,85 +1,196 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
-import {
-  useCheckIns,
-  useFunds,
-  useIncomes,
-  usePaydayOverrides,
-  useTransactions,
-} from '../../db/hooks'
+import { useFunds, useTransactions } from '../../db/hooks'
 import { addDays } from '../../domain/dates'
-import { paydayEntriesBetween } from '../../domain/bills'
-import { periodIncome, type PeriodIncome } from '../../domain/plan'
-import { simpleLines, type SafeToSpend } from '../../domain/safeToSpend'
+import type { SafeToSpend } from '../../domain/safeToSpend'
 import { fundPace, fundProgress, fundSaved } from '../../domain/savings'
-import type { Cents, ISODate } from '../../domain/types'
+import { moneyFor, periodAt } from '../../domain/today'
+import type { ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
 import { buttonClass } from '../../ui/Button'
 import { Disclosure } from '../../ui/Disclosure'
+import { Icon } from '../../ui/Icon'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { ProgressBar } from '../../ui/Progress'
 import { StatStrip } from '../../ui/StatStrip'
-import { useFormat, type Formatters } from '../bills/format'
+import { useFormat } from '../bills/format'
 import { PaydayNote } from '../notes/PaydayNote'
 import { paceText, SavingsTiles, usePaydays } from '../goals/FundsSection'
 import { CanFitForm } from '../today/CanFitSheet'
-import { useTodayModel, type TodayModel } from '../today/useTodayModel'
+import { monthName } from '../today/Dashboard'
+import { useTodayModel } from '../today/useTodayModel'
 import { InsightsSection } from '../review/InsightsSection'
 import { useReviewData } from '../review/useReviewData'
+import { BudgetChart } from './BudgetChart'
 import { EnvelopesSection } from './EnvelopesSection'
-import { PastPeriod, PeriodNav } from './PastPeriod'
+import { LeftToSpendBar, SpendingDonut } from './MoneyShape'
 import type { DateRange } from '../../domain/insights'
 
-// Plan (Full mode, PLAN §5): where this paycheck goes. The same planToday() result as
-// Today, so the numbers here can never disagree with the hero.
+const navButton =
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-accent hover:bg-accent-soft/60 disabled:text-muted disabled:opacity-40 disabled:hover:bg-transparent'
+
+// Plan (Full mode): any month (or pay period) at a glance. The same engine as Today's hero,
+// so the current period here can never disagree with it.
 export function PlanScreen() {
   const today = useToday()
   const now = useNow()
   const model = useTodayModel(today, now)
   const data = useReviewData(today)
-  // A past pay period shown read-only; null is the current one.
-  const [viewing, setViewing] = useState<DateRange | null>(null)
-  const income = usePeriodIncome(model)
+  const { settings } = useAppSettings()
+  const f = useFormat()
+  // The period being looked at, by any date inside it; null is the current one.
+  const [at, setAt] = useState<ISODate | null>(null)
+  const input = model.input
+  const span = useMemo(() => (input ? periodAt(input, at ?? today) : null), [input, at, today])
+  const money = useMemo(() => (input && span ? moneyFor(input, span) : null), [input, span])
+  const current = at === null || (span !== null && today >= span.start && today < span.end)
+  const month = settings.planBy === 'month'
+  const name = span
+    ? month
+      ? f.month(span.start)
+      : `${f.day(span.start)} – ${f.day(addDays(span.end, -1))}`
+    : ''
 
   return (
     <>
       <PageHeader
         title="Plan"
-        subtitle={viewing ? 'A look back at an earlier paycheck.' : 'Where this paycheck goes.'}
+        subtitle={
+          month
+            ? 'Pick any month and see its whole picture.'
+            : 'Pick any pay period and see its whole picture.'
+        }
       />
-      {!model.loaded || !model.plan ? (
+      {!model.loaded || !model.plan || !input ? (
         <div aria-hidden="true" className="h-64 animate-pulse rounded-3xl bg-surface" />
-      ) : model.plan.kind !== 'ready' ? (
+      ) : !span || !money ? (
         <div className="space-y-8">
           <EmptyState
             art="sunrise"
-            title="One number first"
+            title="Add your payday first"
             action={
-              <Link to="/" className={buttonClass()}>
-                Go to Today
+              <Link to="/bills?view=paydays" className={buttonClass()}>
+                Add your payday
               </Link>
             }
           >
-            Add your payday and today’s balance on Today, and your plan fills in here.
+            Planning by pay period needs a payday. Or switch to calendar months in Money basics.
           </EmptyState>
-          <EnvelopesSection envelopes={model.envelopes} usage={[]} />
         </div>
       ) : (
         <div className="space-y-8">
-          {data && (
-            <PeriodNav
-              data={data}
-              current={model.plan.period}
-              viewing={viewing}
-              onView={setViewing}
-            />
+          <nav
+            aria-label={month ? 'Months' : 'Pay periods'}
+            className="-mt-3 flex items-center gap-2"
+          >
+            <button
+              type="button"
+              className={navButton}
+              aria-label={month ? 'Previous month' : 'Previous pay period'}
+              onClick={() => setAt(addDays(span.start, -1))}
+            >
+              <Icon name="back" size={20} />
+            </button>
+            <p className="min-w-0 flex-1 text-center font-display text-title" aria-live="polite">
+              {name}
+            </p>
+            <button
+              type="button"
+              className={navButton}
+              aria-label={month ? 'Next month' : 'Next pay period'}
+              onClick={() => setAt(span.end)}
+            >
+              <Icon name="chevron" size={20} />
+            </button>
+            {!current && (
+              <button
+                type="button"
+                onClick={() => setAt(null)}
+                className="min-h-11 rounded-full px-3 text-sm font-medium text-accent hover:bg-accent-soft/60"
+              >
+                {month ? 'This month' : 'Now'}
+              </button>
+            )}
+          </nav>
+
+          <PlanStrip safe={money} current={current} future={span.start > today} />
+
+          <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+            <PeriodCard safe={money} title={name} />
+            {current ? (
+              <Disclosure
+                id="plan-fit"
+                title="Can this fit?"
+                summary="Try a price. Nothing is saved."
+              >
+                <p className="mt-1 mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
+                <CanFitForm
+                  total={model.plan.kind === 'ready' ? model.plan.safe.total : 0}
+                  runway={model.plan.kind === 'ready' ? model.plan.runway : NO_RUNWAY}
+                  envelopes={settings.envelopesEnabled ? money.envelopes : []}
+                />
+              </Disclosure>
+            ) : (
+              <div />
+            )}
+          </div>
+
+          {settings.envelopesEnabled && (
+            <section aria-labelledby="bva-title" className="space-y-3">
+              <h2 id="bva-title" className="px-1 text-heading">
+                Budget vs actual — {month ? monthName(f, span.start) : 'this period'}
+              </h2>
+              <div className="card p-5 sm:p-6">
+                {money.envelopes.some((e) => e.budget > 0 || e.spent + e.linkedDue > 0) ? (
+                  <BudgetChart rows={money.envelopes} f={f} label={`Budget vs actual, ${name}`} />
+                ) : (
+                  <p className="text-body text-muted">
+                    Give an envelope a budget below. As you add spending to it, planned vs actual
+                    shows up here.
+                  </p>
+                )}
+              </div>
+            </section>
           )}
-          {viewing && data ? (
-            <PastPeriod data={data} range={viewing} />
-          ) : (
-            <CurrentPlan model={model} today={today} data={data} income={income} />
+
+          <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+            <section aria-labelledby="dist-title" className="space-y-3">
+              <h2 id="dist-title" className="px-1 text-heading">
+                Spending distribution
+              </h2>
+              <div className="card p-5 sm:p-6">
+                <SpendingDonut safe={money} f={f} />
+              </div>
+            </section>
+            <section aria-labelledby="left-title" className="space-y-3">
+              <h2 id="left-title" className="px-1 text-heading">
+                Left to spend
+              </h2>
+              <div className="card p-5 sm:p-6">
+                <LeftToSpendBar safe={money} f={f} />
+              </div>
+            </section>
+          </div>
+
+          {current && <PaydayNote periodStart={span.start} foldId="plan-note" />}
+          <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+            <EnvelopesSection
+              envelopes={model.envelopes}
+              usage={money.envelopes}
+              period={span}
+              today={today}
+            />
+            <SavingsSummary today={today} />
+          </div>
+          {data && (
+            <InsightsSection
+              data={data}
+              range={span as DateRange}
+              past={span.end <= today}
+              foldId="plan-insights"
+            />
           )}
         </div>
       )}
@@ -87,181 +198,110 @@ export function PlanScreen() {
   )
 }
 
-function CurrentPlan({
-  model,
-  today,
-  data,
-  income,
+const NO_RUNWAY = {
+  perDay: 0,
+  leftToday: 0,
+  spentToday: 0,
+  startOfDaySafe: 0,
+  daysLeft: 1,
+  onTrack: true,
+}
+
+/** Money in · Bills · Spent · Safe to spend (or "Left over" once the period is done). */
+function PlanStrip({
+  safe,
+  current,
+  future,
 }: {
-  model: TodayModel
-  today: ISODate
-  data: ReturnType<typeof useReviewData>
-  income: PeriodIncome | null
+  safe: SafeToSpend
+  current: boolean
+  future: boolean
 }) {
-  const { settings } = useAppSettings()
-  const plan = model.plan
-  if (plan?.kind !== 'ready') return null
-  return (
-    <>
-      {income && <PlanStrip model={model} income={income} />}
-      {/* Desktop: the period and the "try a price" box side by side, then envelopes
-          beside savings. Phones keep the same order in one column. */}
-      <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-        {income && <PeriodCard model={model} today={today} income={income} />}
-        {/* Secondary sections fold away (remembered per section), so a phone keeps the
-            period and the envelopes within a short scroll. */}
-        <Disclosure id="plan-fit" title="Can this fit?" summary="Try a price. Nothing is saved.">
-          <p className="mt-1 mb-4 text-body text-muted">Try a price. Nothing is saved.</p>
-          <CanFitForm
-            total={plan.safe.total}
-            runway={plan.runway}
-            envelopes={settings.envelopesEnabled ? plan.safe.envelopes : []}
-          />
-        </Disclosure>
-      </div>
-      <PaydayNote periodStart={plan.period.start} foldId="plan-note" />
-      <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
-        <EnvelopesSection
-          envelopes={model.envelopes}
-          usage={plan.safe.envelopes}
-          period={plan.period}
-          today={today}
-        />
-        <SavingsSummary today={today} />
-      </div>
-      {data && <InsightsSection data={data} range={plan.period} foldId="plan-insights" />}
-    </>
-  )
-}
-
-/** This period's pay, or the next pay in the first period (see periodIncome). */
-function usePeriodIncome(model: TodayModel): PeriodIncome | null {
-  const incomes = useIncomes()
-  const overrides = usePaydayOverrides()
-  const checkIns = useCheckIns()
-  const period = model.plan?.kind === 'ready' ? model.plan.period : null
-  return useMemo(() => {
-    if (!incomes || !overrides || !checkIns || !period) return null
-    const firstBalance = checkIns.reduce<ISODate | undefined>(
-      (min, c) => (min === undefined || c.date < min ? c.date : min),
-      undefined,
-    )
-    return periodIncome(
-      paydayEntriesBetween(incomes, overrides, period.start, period.end),
-      paydayEntriesBetween(incomes, overrides, period.end, addDays(period.end, 1)),
-      firstBalance,
-    )
-  }, [incomes, overrides, checkIns, period])
-}
-
-// simpleLines gives each deduction as a negative line (it adds up to the total). Shown on
-// its own, "Set aside −€300" reads like money lost, so the summary shows what is held
-// back as a plain amount: never below zero, never with a minus sign.
-const held = (line: Cents) => Math.max(0, -line)
-
-/** How far the envelopes went past their budgets this period, in total. */
-const overBudget = (safe: SafeToSpend) => safe.envelopes.reduce((a, e) => a + e.over, 0)
-
-const overNote = (f: Formatters, over: Cents) =>
-  `Over budget by ${f.money(over)} in envelopes this period`
-
-const incomeLabel = (income: PeriodIncome) =>
-  income.kind === 'expected' ? 'Expected pay' : 'Income this period'
-
-/** Income · Set aside · Safe to spend, above the detail. */
-function PlanStrip({ model, income }: { model: TodayModel; income: PeriodIncome }) {
   const f = useFormat()
-  if (model.plan?.kind !== 'ready') return null
-  const { safe, period } = model.plan
-  const [, , setAside, total] = simpleLines(safe)
-  const over = overBudget(safe)
+  const short = safe.status === 'short'
   return (
     <StatStrip
       label="This period at a glance"
       items={[
         {
-          label: incomeLabel(income),
-          value: f.money(income.total),
+          label: 'Money in',
+          value: f.money(safe.income + safe.carriedIn),
           hint:
-            income.kind === 'expected'
-              ? `On ${f.day(period.end)}`
-              : `${f.day(period.start)} – ${f.day(addDays(period.end, -1))}`,
+            safe.carriedIn !== 0
+              ? `${f.money(safe.carriedIn)} ${safe.isStartPeriod ? 'starting balance' : 'carried over'}`
+              : 'Paydays and income',
         },
         {
-          label: 'Set aside',
-          value: f.money(held(setAside!.amount)),
-          hint: over > 0 ? overNote(f, over) : 'Savings, envelopes, buffer',
+          label: 'Bills',
+          value: f.money(safe.bills),
+          hint: `${f.money(safe.billsPaid)} paid · ${f.money(safe.billsPending)} to pay`,
         },
         {
-          label: safe.status === 'short' ? 'Short until payday' : 'Safe to spend',
-          value: f.money(total!.amount),
-          hint: `Until payday · ${f.day(period.end)}`,
+          label: 'Spent',
+          value: f.money(safe.expenses),
+          hint: 'Logged spending, net of refunds',
+        },
+        {
+          label:
+            current || future
+              ? short
+                ? 'Short'
+                : 'Safe to spend'
+              : short
+                ? 'Ran short'
+                : 'Left over',
+          value: f.money(Math.abs(safe.total)),
+          hint:
+            safe.buffer > 0
+              ? `After a ${f.money(safe.buffer)} cushion`
+              : 'Money in − bills − spent',
         },
       ]}
     />
   )
 }
 
-function PeriodCard({
-  model,
-  today,
-  income,
-}: {
-  model: TodayModel
-  today: ISODate
-  income: PeriodIncome
-}) {
+/** Every line of the formula with what's inside it, plus the walled-off savings and debt. */
+function PeriodCard({ safe, title }: { safe: SafeToSpend; title: string }) {
   const f = useFormat()
-  const plan = model.plan
-  if (plan?.kind !== 'ready') return null
-  const { period } = plan
-  const pay = income.entries
-  const [balance, bills, setAside, total] = simpleLines(plan.safe)
-  const over = overBudget(plan.safe)
-
   return (
     <section aria-labelledby="period-title" className="card p-5">
-      <p className="text-sm text-muted">
-        {f.day(period.start)} – {f.day(addDays(period.end, -1))} · {period.daysLeft}{' '}
-        {period.daysLeft === 1 ? 'day' : 'days'} left
-      </p>
-      <h2 id="period-title" className="mt-0.5 text-heading">
-        This period
+      <h2 id="period-title" className="text-heading">
+        {title}
       </h2>
+      {safe.beforeTracking && (
+        <p className="mt-1 text-sm text-muted">Before you started tracking: actuals only.</p>
+      )}
       <dl className="mt-4 divide-y divide-line text-body">
+        {safe.lines.map((line) => (
+          <Row key={line.id} label={line.label} value={f.money(line.amount)}>
+            {line.items && line.items.length > 0 && (
+              <ul className="mt-1 space-y-0.5 text-sm text-muted">
+                {line.items.slice(0, 8).map((item, i) => (
+                  <li key={i} className="flex justify-between gap-4">
+                    <span className="truncate">
+                      {item.label}
+                      {item.date && ` · ${f.day(item.date)}`}
+                      {line.id === 'bills' && (item.done ? ' · paid' : ' · to pay')}
+                    </span>
+                    <span className="shrink-0 tabular-nums">{f.money(item.amount)}</span>
+                  </li>
+                ))}
+                {line.items.length > 8 && <li>and {line.items.length - 8} more</li>}
+              </ul>
+            )}
+          </Row>
+        ))}
         <Row
-          label={
-            income.kind === 'expected' ? `Expected pay · ${f.day(period.end)}` : incomeLabel(income)
-          }
-          value={f.money(income.total)}
-        >
-          {/* The expected pay is the label itself; a breakdown would only repeat it. */}
-          {income.kind === 'received' && pay.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-sm text-muted">
-              {pay.map((p) => (
-                <li key={`${p.incomeId}|${p.nominal}`} className="flex justify-between gap-4">
-                  <span className="truncate">
-                    {p.name} · {f.day(p.date)}
-                    {p.date > today && ' (coming)'}
-                  </span>
-                  <span className="shrink-0 tabular-nums">{f.money(p.amount)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Row>
-        <Row label="Balance now" value={f.money(balance!.amount)} />
-        <Row label="Bills before payday" value={f.money(held(bills!.amount))} />
-        <Row label="Set aside" value={f.money(held(setAside!.amount))}>
-          {over > 0 && <p className="mt-1 text-sm text-muted">{overNote(f, over)}</p>}
-        </Row>
-        <Row
-          label={plan.safe.status === 'short' ? 'Short until payday' : 'Safe to spend'}
-          value={f.money(total!.amount)}
+          label={safe.status === 'short' ? 'Short' : 'Safe to spend'}
+          value={f.money(safe.total)}
           strong
         />
       </dl>
-      <p className="mt-3 text-sm text-muted">{plan.safe.estimateNote}</p>
+      <p className="mt-3 rounded-2xl bg-bg px-4 py-3 text-sm text-muted">
+        Saved {f.money(safe.savingsMoved)} · debt paid {f.money(safe.debtPaid)}. Tracked on their
+        own; they never change safe to spend.
+      </p>
     </section>
   )
 }

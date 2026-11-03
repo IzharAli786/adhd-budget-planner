@@ -11,6 +11,7 @@ import { STARTER_CATEGORIES } from '../../domain/categories'
 import { addDays, addMonths, isWeekend, makeDate, parseISODate } from '../../domain/dates'
 import { gardenPoints } from '../../domain/garden'
 import { challengeTotal } from '../../domain/savings'
+import { monthSpan } from '../../domain/safeToSpend'
 import { withDefaults, type Settings } from '../../domain/settings'
 import type {
   BalanceCheckIn,
@@ -618,7 +619,14 @@ export async function seedDemo(now: Date = new Date()): Promise<void> {
         ...previous,
         simpleMode: false,
         envelopesEnabled: true,
-        buffer: data.buffer,
+        // Pay-based safe to spend (PLAN-v2): the sample tracks from the start of this month,
+        // so the hero is this month's pay minus its bills and spending. The year's
+        // left-over stays out of it (no roll over), so no cushion is needed to hide it.
+        buffer: 0,
+        planBy: 'month',
+        startDate: monthSpan(today).start,
+        startingBalance: 0,
+        rollover: false,
       } satisfies Settings,
     },
     { key: 'setupProgress', value: { step: 'done', ackAt: stamp, doneAt: stamp } },

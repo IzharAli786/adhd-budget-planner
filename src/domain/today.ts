@@ -1,105 +1,132 @@
-// Everything Today shows, from raw rows and today's date. Composes the period, the
-// reconciliation, safe-to-spend and the runway in one pure function, so the screen stays
-// a thin view and the whole chain can be property-tested end to end.
-import { currentPeriod, previousPayday, primaryIncome, type PayPeriod } from './paySchedule'
-import { isSpend, lookbackStart, paydaySinceCheckIn, type CheckInLike } from './reconcile'
-import { runway, spentLast7Days, spentOn, type Runway } from './runway'
-import { safeToSpend, type SafeToSpend } from './safeToSpend'
+// Everything Today shows, from raw rows and today's date. Picks the period (calendar month
+// or pay period), runs the pay-based safe to spend over it and turns that into the day's
+// number, in one pure function so the whole chain can be tested end to end.
+import { currentPeriod, primaryIncome, type PayPeriod } from './paySchedule'
+import { runway, spentLast7Days, type Runway } from './runway'
+import {
+  daysLeftIn,
+  monthSpan,
+  safeToSpend,
+  type DateSpan,
+  type MoneyStart,
+  type PlanBy,
+  type SafeToSpend,
+} from './safeToSpend'
 import type {
+  BalanceCheckIn,
   Bill,
   BillOccurrence,
+  Cents,
   Envelope,
-  Id,
   IncomeSource,
   ISODate,
   PaydayOverride,
-  SavingsFund,
   Transaction,
 } from './types'
 import type { BillEntry } from './bills'
 
+export interface MoneySettings {
+  planBy: PlanBy
+  startingBalance: Cents
+  startDate: ISODate | null
+  rollover: boolean
+}
+
+/**
+ * Where tracking starts. Stored once (setup, or Money basics). Installs from before v2
+ * have none yet: their latest balance check-in is the natural start (PLAN-v2 decision 19).
+ */
+export function moneyStart(
+  s: Pick<MoneySettings, 'startDate' | 'startingBalance'>,
+  checkIns: readonly Pick<BalanceCheckIn, 'date' | 'balance'>[],
+  today: ISODate,
+): MoneyStart {
+  if (s.startDate) return { date: s.startDate, balance: s.startingBalance }
+  const last = checkIns.at(-1)
+  if (last) return { date: last.date, balance: last.balance }
+  return { date: today, balance: s.startingBalance }
+}
+
 export interface TodayInput {
   today: ISODate
+  money: MoneySettings
+  checkIns?: readonly Pick<BalanceCheckIn, 'date' | 'balance'>[]
   incomes: readonly IncomeSource[]
   paydayOverrides: readonly PaydayOverride[]
   bills: readonly Bill[]
   occurrences: readonly BillOccurrence[]
   transactions: readonly Transaction[]
-  checkIn: CheckInLike | undefined
-  funds?: readonly SavingsFund[]
   envelopes?: readonly Envelope[]
   envelopesEnabled?: boolean
   buffer?: number
-  addedOn?: ReadonlyMap<Id, ISODate>
 }
 
 export type TodayPlan =
   | { kind: 'no-income' }
   | { kind: 'no-payday' }
-  /** Has a period but no balance yet. `due` feeds the first check-in. */
-  | { kind: 'no-balance'; period: PayPeriod; due: BillEntry[] }
   | {
       kind: 'ready'
       period: PayPeriod
-      lookback: ISODate
+      start: MoneyStart
       safe: SafeToSpend
       runway: Runway
-      paydaySinceCheckIn: boolean
     }
 
+/** The period containing `date`, or null in payday mode when no payday is known. */
+export function periodAt(
+  input: Pick<TodayInput, 'money' | 'incomes' | 'paydayOverrides'>,
+  date: ISODate,
+): DateSpan | null {
+  if (input.money.planBy === 'month') return monthSpan(date)
+  const income = primaryIncome(input.incomes)
+  if (!income) return null
+  const p = currentPeriod(income, date, input.paydayOverrides)
+  return p && { start: p.start, end: p.end }
+}
+
+/** Safe to spend for any period (Plan's month picker, Look back), same rules as Today. */
+export function moneyFor(input: TodayInput, period: DateSpan): SafeToSpend {
+  return safeToSpend({
+    today: input.today,
+    period,
+    start: moneyStart(input.money, input.checkIns ?? [], input.today),
+    rollover: input.money.rollover,
+    incomes: input.incomes,
+    paydayOverrides: input.paydayOverrides,
+    bills: input.bills,
+    occurrences: input.occurrences,
+    transactions: input.transactions,
+    envelopes: input.envelopes,
+    envelopesEnabled: input.envelopesEnabled,
+    buffer: input.buffer,
+  })
+}
+
 export function planToday(input: TodayInput): TodayPlan {
-  const { today, incomes, paydayOverrides, checkIn } = input
-  const income = primaryIncome(incomes)
-  if (!income) return { kind: 'no-income' }
-  const period = currentPeriod(income, today, paydayOverrides)
-  if (!period) return { kind: 'no-payday' }
-
-  // Before the first check-in, "since the last check-in" means since this period began.
-  const anchor: CheckInLike = checkIn ?? { at: '', date: today, balance: 0 }
-  const lookback = lookbackStart(
-    anchor.date,
-    checkIn ? previousPayday(income, checkIn.date, paydayOverrides) : period.start,
-  )
-  const safeWith = (transactions: readonly Transaction[]) =>
-    safeToSpend({
-      today,
-      period,
-      checkIn: anchor,
-      lookback,
-      transactions,
-      bills: input.bills,
-      occurrences: input.occurrences,
-      funds: input.funds,
-      envelopes: input.envelopes,
-      envelopesEnabled: input.envelopesEnabled,
-      buffer: input.buffer,
-      addedOn: input.addedOn,
-    })
-  const safe = safeWith(input.transactions)
-  if (!checkIn) return { kind: 'no-balance', period, due: safe.dueEntries }
-
-  // The day's allowance is fixed at the start of the day (PLAN §4.2): safe-to-spend as it
-  // was before today's spending. Recomputed rather than "safe + spentToday", because with
-  // envelopes on, money spent inside an envelope's room never lowered safe-to-spend.
-  const spentTodayRows = new Set(safe.counted.filter((t) => t.date === today && isSpend(t)))
-  const startOfDaySafe =
-    spentTodayRows.size === 0
-      ? safe.total
-      : safeWith(input.transactions.filter((t) => !spentTodayRows.has(t))).total
-
+  const { today } = input
+  if (input.money.planBy === 'payday') {
+    const income = primaryIncome(input.incomes)
+    if (!income) return { kind: 'no-income' }
+    if (!currentPeriod(income, today, input.paydayOverrides)) return { kind: 'no-payday' }
+  }
+  const span = periodAt(input, today)!
+  const safe = moneyFor(input, span)
+  const daysLeft = daysLeftIn(span, today)
   return {
     kind: 'ready',
-    period,
-    lookback,
+    period: { ...span, daysLeft },
+    start: moneyStart(input.money, input.checkIns ?? [], today),
     safe,
+    // The day's allowance is fixed at the start of the day (PLAN §4.2): today's spending
+    // comes out of today's number. Expenses enter the total one for one, so the start of
+    // the day is exactly total + spentToday.
     runway: runway({
       safeToSpend: safe.total,
-      spentToday: spentOn(safe.counted, today),
-      daysLeft: period.daysLeft,
+      spentToday: safe.spentToday,
+      daysLeft,
       spentLast7Days: spentLast7Days(input.transactions, today),
-      startOfDaySafe,
+      startOfDaySafe: safe.total + safe.spentToday,
     }),
-    paydaySinceCheckIn: paydaySinceCheckIn(period.start, checkIn.date),
   }
 }
 

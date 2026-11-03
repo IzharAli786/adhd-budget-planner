@@ -148,6 +148,8 @@ export interface Note {
   periodStart?: ISODate
   text: string
   updatedAt: Instant
+  /** A day note ticked off in Coming up ("Dentist appointment" ✓). */
+  doneAt?: Instant
 }
 
 /** Notes are a few words; the cap only stops a pasted essay (or an edited backup). */

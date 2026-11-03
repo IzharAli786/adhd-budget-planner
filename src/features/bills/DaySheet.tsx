@@ -1,6 +1,7 @@
 import type { BillEntry, PaydayEntry } from '../../domain/bills'
 import type { PaydaySaving } from '../../domain/savings'
-import type { ISODate } from '../../domain/types'
+import type { ISODate, Transaction } from '../../domain/types'
+import { EntryRow } from '../transactions/EntryRow'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { Sheet } from '../../ui/Sheet'
@@ -14,9 +15,12 @@ interface DaySheetProps {
   bills: BillEntry[]
   paydays: PaydayEntry[]
   savings?: readonly PaydaySaving[]
+  /** Everything logged on this day: spending, income, savings moves, debt payments. */
+  entries?: readonly Transaction[]
   onClose: () => void
   onOpenBill: (entry: BillEntry) => void
-  onAddBill: (date: ISODate) => void
+  onAdd: (date: ISODate) => void
+  onEditEntry: (tx: Transaction) => void
 }
 
 export function DaySheet({
@@ -25,12 +29,14 @@ export function DaySheet({
   bills,
   paydays,
   savings = [],
+  entries = [],
   onClose,
   onOpenBill,
-  onAddBill,
+  onAdd,
+  onEditEntry,
 }: DaySheetProps) {
   const f = useFormat()
-  const empty = bills.length === 0 && paydays.length === 0
+  const empty = bills.length === 0 && paydays.length === 0 && entries.length === 0
   // Debt minimums are bills too (paid the same way), but listed apart so a glance shows
   // what is everyday cost and what is paying something down.
   const regular = bills.filter((b) => b.debtId === undefined)
@@ -43,9 +49,9 @@ export function DaySheet({
       description={date ? (date === today ? 'Today' : capitalize(f.relative(date, today))) : ''}
       actions={
         date && (
-          <Button variant={empty ? 'primary' : 'secondary'} block onClick={() => onAddBill(date)}>
+          <Button variant={empty ? 'primary' : 'secondary'} block onClick={() => onAdd(date)}>
             <Icon name="plus" size={18} />
-            Add a bill on this day
+            Add to this day
           </Button>
         )
       }
@@ -114,6 +120,18 @@ export function DaySheet({
                     onOpen={onOpenBill}
                     showDate={false}
                   />
+                ))}
+              </ul>
+            </section>
+          )}
+          {entries.length > 0 && (
+            <section aria-labelledby="day-logged" className="pt-1">
+              <h3 id="day-logged" className="eyebrow px-1 text-muted">
+                Logged
+              </h3>
+              <ul className="divide-y divide-line px-1">
+                {entries.map((t) => (
+                  <EntryRow key={t.id} tx={t} onEdit={onEditEntry} showDate={false} showKind />
                 ))}
               </ul>
             </section>

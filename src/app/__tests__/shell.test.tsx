@@ -30,24 +30,24 @@ afterEach(cleanup)
 describe('tabs in Simple and Full mode (PLAN §5)', () => {
   it('new installs show every tab, in thumb order', async () => {
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Bills', 'Goals', 'More']))
+    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Calendar', 'Goals', 'More']))
   })
 
-  it('Simple mode shows Today, Bills, More', async () => {
+  it('Simple mode shows Today, Calendar, More', async () => {
     await updateSettings({ simpleMode: true })
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Bills', 'More']))
+    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Calendar', 'More']))
   })
 
   it('Full mode adds Plan and Goals in thumb order', async () => {
     await updateSettings({ simpleMode: false })
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Bills', 'Goals', 'More']))
+    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Calendar', 'Goals', 'More']))
   })
 
   it.each([
     ['/', 'Today'],
-    ['/bills', 'Bills'],
+    ['/bills', 'Calendar'],
     ['/more', 'More'],
     ['/more/settings', 'More'],
     ['/more/backup', 'More'],
@@ -80,7 +80,7 @@ describe('tabs in Simple and Full mode (PLAN §5)', () => {
     await waitFor(() => expect(tabNames()).toContain('Goals'))
     await act(() => updateSettings({ simpleMode: true }))
     await waitFor(() => expect(window.location.pathname).toBe('/'))
-    expect(tabNames()).toEqual(['Today', 'Bills', 'More'])
+    expect(tabNames()).toEqual(['Today', 'Calendar', 'More'])
   })
 
   it('the More toggle turns on Simple mode and it persists', async () => {
@@ -89,7 +89,7 @@ describe('tabs in Simple and Full mode (PLAN §5)', () => {
     await waitFor(() => expect(tabNames()).not.toContain('Plan'))
     cleanup()
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Bills', 'More']))
+    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Calendar', 'More']))
   })
 
   it('unknown paths fall back to Today', async () => {

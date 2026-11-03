@@ -33,7 +33,7 @@ describe('More › How each part works', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'How each part works' }),
     ).toBeTruthy()
-    for (const tab of ['Today', 'Bills', 'Plan', 'Goals', 'More'])
+    for (const tab of ['Today', 'Calendar', 'Plan', 'Goals', 'More'])
       expect(screen.getByRole('heading', { level: 2, name: tab })).toBeTruthy()
     for (const q of [/offline/, /backups/, /estimate/, /Simple or Full/, /private/])
       expect(screen.getByText(q, { selector: 'summary span' })).toBeTruthy()

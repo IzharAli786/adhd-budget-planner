@@ -7,7 +7,7 @@ import { resetDb, seedReadyInstall } from '../../../db/__tests__/helpers'
 import * as r from '../../../db/repos'
 import { STARTER_CATEGORIES } from '../../../domain/categories'
 
-// Wed 4 Nov 2026. Salary on the last day: this period started Fri 30 Oct.
+// Wed 4 Nov 2026, planning by month: this period started Sun 1 Nov.
 const NOW = new Date(2026, 10, 4, 12, 0)
 const EARLIER = new Date(2026, 10, 4, 8, 0).toISOString()
 
@@ -37,6 +37,7 @@ const goto = (path: string) => window.history.replaceState(null, '', path)
 
 describe('Common categories', () => {
   it('are offered right after envelopes go on, added in one tap with empty budgets, and undoable', async () => {
+    await r.updateSettings({ envelopesEnabled: false })
     goto('/plan')
     render(<App />)
     await userEvent.click(await screen.findByRole('switch', { name: 'Use envelopes' }))
@@ -63,6 +64,7 @@ describe('Common categories', () => {
   })
 
   it('can be skipped, and stays skipped', async () => {
+    await r.updateSettings({ envelopesEnabled: false })
     goto('/plan')
     const { unmount } = render(<App />)
     await userEvent.click(await screen.findByRole('switch', { name: 'Use envelopes' }))
@@ -118,17 +120,17 @@ describe('Common categories', () => {
   })
 })
 
-describe('Note for this payday', () => {
+describe('Note for this month', () => {
   it('is written on Plan and shows on Today in Full mode', async () => {
     goto('/plan')
     const { unmount } = render(<App />)
-    const card = await screen.findByRole('region', { name: 'Note for this payday' })
+    const card = await screen.findByRole('region', { name: 'Note for this month' })
     await userEvent.click(await within(card).findByRole('button', { name: 'Add a note' }))
     await userEvent.type(within(card).getByRole('textbox'), '  Birthday month, go easy  ')
     await userEvent.click(within(card).getByRole('button', { name: 'Save note' }))
     await waitFor(async () =>
-      expect(await r.getNote({ periodStart: '2026-10-30' })).toMatchObject({
-        id: 'period|2026-10-30',
+      expect(await r.getNote({ periodStart: '2026-11-01' })).toMatchObject({
+        id: 'period|2026-11-01',
         text: 'Birthday month, go easy',
       }),
     )
@@ -137,13 +139,13 @@ describe('Note for this payday', () => {
 
     goto('/')
     render(<App />)
-    const today = await screen.findByRole('region', { name: 'Note for this payday' })
+    const today = await screen.findByRole('region', { name: 'Note for this month' })
     expect(await within(today).findByText('Birthday month, go easy')).toBeTruthy()
   })
 
   it('is not on Today in Simple mode', async () => {
     await r.updateSettings({ simpleMode: true })
-    await r.saveNote({ periodStart: '2026-10-30' }, 'hidden in simple')
+    await r.saveNote({ periodStart: '2026-11-01' }, 'hidden in simple')
     goto('/')
     render(<App />)
     expect(await screen.findByRole('region', { name: 'Today’s number' })).toBeTruthy()
@@ -151,20 +153,20 @@ describe('Note for this payday', () => {
   })
 
   it('editing to blank removes it, with undo', async () => {
-    await r.saveNote({ periodStart: '2026-10-30' }, 'old note')
+    await r.saveNote({ periodStart: '2026-11-01' }, 'old note')
     goto('/plan')
     render(<App />)
-    const card = await screen.findByRole('region', { name: 'Note for this payday' })
+    const card = await screen.findByRole('region', { name: 'Note for this month' })
     await userEvent.click(
-      await within(card).findByRole('button', { name: 'Edit Note for this payday' }),
+      await within(card).findByRole('button', { name: 'Edit Note for this month' }),
     )
     await userEvent.click(within(card).getByRole('button', { name: 'Remove' }))
     await waitFor(async () =>
-      expect(await r.getNote({ periodStart: '2026-10-30' })).toBeUndefined(),
+      expect(await r.getNote({ periodStart: '2026-11-01' })).toBeUndefined(),
     )
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
     await waitFor(async () =>
-      expect((await r.getNote({ periodStart: '2026-10-30' }))?.text).toBe('old note'),
+      expect((await r.getNote({ periodStart: '2026-11-01' }))?.text).toBe('old note'),
     )
   })
 })

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { useUndoToast } from '../../app/useUndoToast'
 import { catchUp, type CatchUp } from '../../domain/catchUp'
+import { addDays } from '../../domain/dates'
 import { greeting } from '../../domain/greeting'
 import { nextAction } from '../../domain/nextAction'
 import { primaryIncome } from '../../domain/paySchedule'
@@ -28,6 +29,7 @@ import { ActionCard } from './ActionCard'
 import { CanFitSheet } from './CanFitSheet'
 import { CheckInSheet } from './CheckInSheet'
 import { ComingUp } from './ComingUp'
+import { BudgetGlance, GlanceTiles, GoalsInMotion, MoneyOverview, monthName } from './Dashboard'
 import { MathSheet } from './MathSheet'
 import { useTodayModel, type TodayModel } from './useTodayModel'
 
@@ -153,11 +155,9 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
       // Saving closes the sheet AFTER onSaved, which may have moved on to the backup moment.
       onClose={() => setPanel((p) => (p === 'checkin' ? null : p))}
       today={today}
-      due={plan.kind === 'ready' ? plan.safe.dueEntries : plan.due}
+      due={plan.safe.dueEntries}
       onSaved={(summary) => {
         undoToast(summary)
-        // Payday is the backup moment (PLAN §6): the sheet prepares the file as it opens.
-        // It is also when the last period closes: what was carried in is saved for Look back.
         if (offerBackup) {
           setCarried(null)
           setPanel('backup')
@@ -170,31 +170,19 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
     />
   )
 
-  if (plan.kind === 'no-balance') {
-    return (
-      <>
-        <Welcome
-          title="One number to go"
-          body={`Payday is ${f.dayLong(plan.period.end)}. What’s in your account right now? Then Steady shows what you can spend each day until then.`}
-          cta={
-            <Button onClick={() => setPanel('checkin')}>
-              <Icon name="plus" size={18} />
-              Add your balance
-            </Button>
-          }
-        />
-        {checkIn}
-      </>
-    )
-  }
-
   if (gap.mode === 'fresh') {
     return <FreshStart gap={gap} today={today} onDone={session.dismiss} />
   }
 
   const { safe, runway, period } = plan
   const pay = primaryIncome(model.incomes)
-  const nextPay = pay ? { date: period.end, amount: pay.amount } : undefined
+  const nextPay =
+    pay && model.actionState?.nextPayday
+      ? { date: model.actionState.nextPayday, amount: pay.amount }
+      : undefined
+  const month = settings.planBy === 'month'
+  const periodName = month ? monthName(f, period.start) : 'this pay period'
+  const endsOn = f.day(addDays(period.end, -1))
   const short = safe.status === 'short'
   const over = !short && runway.leftToday < 0
   const heroAmount = f.money(short ? -safe.total : over ? -runway.leftToday : runway.leftToday)
@@ -213,18 +201,18 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         <div className="space-y-5">
           <section aria-label="Today’s number" className="card-hero @container p-6 sm:p-7">
             <p className="text-body text-muted">
-              {short ? 'Before payday' : over ? 'Today' : 'You can spend today'}
+              {short ? `Short for ${periodName}` : over ? 'Today' : 'You can spend today'}
             </p>
             {/* "short" / "over" are words, not part of the number: smaller and calmer. */}
             <BigNumber text={heroAmount} suffix={heroSuffix} className="mt-2" />
             <p className="mt-5 text-base">
               {short ? (
                 // One calm suggestion, no red (PLAN §1.3).
-                'Bills before payday are more than your balance. Moving one past payday is often the quickest fix.'
+                `Bills and spending are more than the money in for ${periodName}. Moving one bill to next ${month ? 'month' : 'period'} is often the quickest fix.`
               ) : (
                 <>
-                  <span className="font-medium tabular-nums">{f.money(safe.total)}</span> until
-                  payday · {f.day(period.end)}
+                  <span className="font-medium tabular-nums">{f.money(safe.total)}</span> safe to
+                  spend in {periodName} · until {endsOn}
                 </>
               )}
             </p>
@@ -236,19 +224,16 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
             {!lite && (
               <div className="mt-5 flex flex-wrap items-center gap-x-3 border-t border-line pt-3 text-caption text-muted">
                 <span>
-                  {runway.daysLeft === 1 ? 'Payday tomorrow' : `${runway.daysLeft} days to payday`}{' '}
-                  · balance from {f.relative(model.checkIn!.date, today)}
+                  {runway.daysLeft === 1 ? 'Last day' : `${runway.daysLeft} days left`} ·{' '}
+                  {f.money(safe.income + safe.carriedIn)} in − {f.money(safe.bills)} bills −{' '}
+                  {f.money(safe.expenses)} spent
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOfferBackup(false)
-                    setPanel('checkin')
-                  }}
-                  className="-mx-1 min-h-11 shrink-0 rounded-full px-1 font-medium whitespace-nowrap text-accent"
+                <Link
+                  to="/more/basics"
+                  className="-mx-1 inline-flex min-h-11 shrink-0 items-center rounded-full px-1 font-medium whitespace-nowrap text-accent"
                 >
-                  Update
-                </button>
+                  Money basics
+                </Link>
                 <button
                   type="button"
                   onClick={() => setPanel('math')}
@@ -291,6 +276,12 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
                   All entries
                 </Link>
               </div>
+
+              <MoneyOverview model={model} />
+              <GlanceTiles model={model} />
+              <ComingUp today={today} />
+              {!settings.simpleMode && <GoalsInMotion />}
+              {!settings.simpleMode && <BudgetGlance model={model} />}
             </>
           )}
         </div>
@@ -298,7 +289,6 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
         {/* Glances: below the fold on phones, a quiet side column on wide screens. */}
         {!lite && (
           <aside aria-label="At a glance" className="mt-8 space-y-6 lg:sticky lg:top-10 lg:mt-0">
-            <ComingUp today={today} />
             {/* Full mode only: Simple stays one number and the next step (PLAN §5). */}
             {!settings.simpleMode && <PaydayNote periodStart={period.start} />}
             {/* Only where the garden lives (Goals is a Full-mode tab). */}

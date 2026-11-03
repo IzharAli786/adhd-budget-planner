@@ -1,6 +1,7 @@
 // User preferences, stored as one row in meta under 'settings'. Plain data so the
 // same object travels through IndexedDB, backups and React without conversion.
 import type { Cents } from './money'
+import type { ISODate } from './types'
 
 export const THEMES = ['clay', 'sage', 'ocean', 'blush', 'sand', 'midnight'] as const
 export type Theme = (typeof THEMES)[number]
@@ -35,6 +36,14 @@ export interface Settings {
   displayName: string
   /** A custom accent (#rrggbb) that passed the contrast check, or null for the theme's. */
   accent: string | null
+  /** Budget by calendar month (like most planners) or from payday to payday. */
+  planBy: 'month' | 'payday'
+  /** Money you had before you started tracking. Added once, to the first period. */
+  startingBalance: Cents
+  /** First day tracked; null until the app records it (setup, or first open after v2). */
+  startDate: ISODate | null
+  /** Carry each period's leftover into the next one. */
+  rollover: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -51,12 +60,17 @@ export const DEFAULT_SETTINGS: Settings = {
   largeText: 100,
   reducedMotion: 'auto',
   buffer: 0,
-  // Off by default (PLAN §10 M9): most people start with one number, not categories.
-  envelopesEnabled: false,
+  // On by default (PLAN-v2 decision 18): budget vs actual works out of the box. A budget of
+  // 0 reads "No budget set", so it changes no number. Existing installs keep their choice.
+  envelopesEnabled: true,
   appBadge: null,
   justToday: false,
   displayName: '',
   accent: null,
+  planBy: 'month',
+  startingBalance: 0,
+  startDate: null,
+  rollover: false,
 }
 
 /** Fills missing fields so rows written by older versions still read as full Settings. */

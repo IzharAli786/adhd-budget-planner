@@ -3,7 +3,8 @@
 // Integer cents throughout; interest is the one rounding point (Math.round, PLAN §3.1).
 // Cost: O(months × debts · log debts), months capped at maxMonths.
 import type { Cents } from './money'
-import type { Id } from './types'
+import type { BillEntry } from './bills'
+import type { Debt, Id, Transaction } from './types'
 
 export type Strategy = 'snowball' | 'avalanche'
 export const STRATEGIES: readonly Strategy[] = ['snowball', 'avalanche']
@@ -179,3 +180,28 @@ export const totalsOverTime = (sim: SimulationOk): Cents[] =>
 /** A suggested starting budget: the minimums plus a small, doable extra. */
 export const defaultBudget = (debts: readonly DebtInput[], extra: Cents): Cents =>
   sumMinimums(debts) + extra
+
+/**
+ * What is still owed today: the balance you entered, less every payment made after that
+ * date (payments logged against the debt, and minimums ticked paid). Never below zero.
+ * Interest is not added: the balance is refreshed whenever you edit it.
+ */
+export function debtOwed(
+  debt: Pick<Debt, 'id' | 'balance' | 'balanceAsOf'>,
+  transactions: readonly Pick<Transaction, 'debtId' | 'amount' | 'date' | 'deletedAt' | 'fundId'>[],
+  paidMinimums: readonly Pick<BillEntry, 'debtId' | 'amount' | 'date' | 'status'>[],
+): Cents {
+  const logged = transactions
+    .filter(
+      (t) =>
+        t.deletedAt === undefined &&
+        t.fundId === undefined &&
+        t.debtId === debt.id &&
+        t.date > debt.balanceAsOf,
+    )
+    .reduce((a, t) => a - t.amount, 0)
+  const minimums = paidMinimums
+    .filter((e) => e.debtId === debt.id && e.status === 'paid' && e.date > debt.balanceAsOf)
+    .reduce((a, e) => a + e.amount, 0)
+  return Math.max(0, debt.balance - logged - minimums)
+}

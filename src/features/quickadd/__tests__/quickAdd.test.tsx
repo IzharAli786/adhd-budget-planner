@@ -26,7 +26,7 @@ describe('Quick add sheet', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Today' })
     expect(screen.queryByRole('button', { name: 'Quick add' })).toBeNull()
-    await userEvent.click(screen.getByRole('link', { name: 'Bills' }))
+    await userEvent.click(screen.getByRole('link', { name: 'Calendar' }))
     expect(await screen.findByRole('button', { name: 'Quick add' })).toBeTruthy()
   })
 

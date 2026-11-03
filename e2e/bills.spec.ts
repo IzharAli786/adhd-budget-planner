@@ -3,7 +3,7 @@ import { addFirstBill, unlockAndSetup } from './helpers'
 
 test('add a monthly bill, mark it paid, undo', async ({ page }) => {
   await unlockAndSetup(page)
-  await page.getByRole('link', { name: 'Bills' }).first().click()
+  await page.getByRole('link', { name: 'Calendar' }).first().click()
 
   await addFirstBill(page, 'Rent', '650')
   await expect(page.getByText(/650\.00 · Every month/)).toBeVisible()

@@ -141,31 +141,14 @@ describe('short gap', () => {
   })
 })
 
-describe('payday backup moment', () => {
-  it('offers a one-tap backup right after the payday check-in', async () => {
-    const share = vi.fn().mockResolvedValue(undefined)
-    Object.assign(navigator, { canShare: () => true, share })
-    await r.addCheckIn(100000, '2026-10-29', local(10, 29))
+describe('backup reminder', () => {
+  // Pay no longer needs a balance check-in to count (PLAN-v2 A), so the reminder is
+  // the 14-day backup card rather than a payday check-in moment.
+  it('asks for a backup once two weeks pass without one', async () => {
+    await r.updateSettings({ startDate: '2026-11-01', startingBalance: 100000 })
+    await r.addTransaction({ date: '2026-11-20', amount: -500, note: 'tea' })
     await r.setMeta('lastOpened', '2026-11-20')
     render(<App />)
-
-    const payday = await screen.findByRole('region', { name: 'Payday! Update your balance' })
-    await userEvent.click(within(payday).getByRole('button', { name: 'Update' }))
-    const sheet = await screen.findByRole('dialog', { name: /in your account right now/ })
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Balance' }), '2100')
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Update balance' }))
-
-    const moment = await screen.findByRole('dialog', { name: 'Payday done. Save a backup?' })
-    const save = await within(moment).findByRole('button', { name: 'Save backup' })
-    await waitFor(() => expect(save.hasAttribute('disabled')).toBe(false))
-    await userEvent.click(save)
-
-    expect(share).toHaveBeenCalledTimes(1)
-    const [{ files }] = share.mock.calls[0] as [{ files: File[] }]
-    expect(files[0]!.name).toBe('steady-backup-2026-11-20.json')
-    await waitFor(async () => expect(await r.getMeta('lastBackupAt')).toBeTruthy())
-    expect(await r.getChangesSinceBackup()).toBe(0)
-    delete (navigator as Partial<Navigator>).canShare
-    delete (navigator as Partial<Navigator>).share
+    expect(await screen.findByRole('region', { name: 'Save a backup' })).toBeTruthy()
   })
 })

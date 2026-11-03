@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import type { Runway } from '../../domain/runway'
-import { simpleLines, type SafeToSpend } from '../../domain/safeToSpend'
+import { simpleLines, WALLED_OFF_NOTE, type SafeToSpend } from '../../domain/safeToSpend'
 import type { Cents, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { Segmented } from '../../ui/Segmented'
@@ -27,7 +27,7 @@ interface Props {
  * "See the math": renders the very lines safeToSpend() summed, so the breakdown can't
  * disagree with the hero. Simple mode shows 4 lines, Full every line with its items.
  */
-export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props) {
+export function MathSheet({ open, onClose, safe, runway, nextPay }: Props) {
   const f = useFormat()
   const { settings } = useAppSettings()
   const [view, setView] = useState<'simple' | 'full'>(settings.simpleMode ? 'simple' : 'full')
@@ -38,7 +38,7 @@ export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props
       open={open}
       onClose={onClose}
       title="How this number works"
-      description="What you entered, added up. Update your balance to sharpen it."
+      description="Money in, minus bills, minus spending. Nothing hidden."
       actions={
         <Button block onClick={onClose}>
           Got it
@@ -54,10 +54,8 @@ export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props
           <div key={line.id} className="flex flex-wrap justify-between gap-x-4 py-3">
             <dt className="text-muted">
               {line.label}
-              {line.date && line.id === 'balance' && (
-                <span className="block text-sm">
-                  {f.day(line.date)} · {f.relative(line.date, today)}
-                </span>
+              {line.date && line.id === 'carried' && (
+                <span className="block text-sm">from {f.day(line.date)}</span>
               )}
             </dt>
             <dd className="font-medium tabular-nums">{f.money(line.amount)}</dd>
@@ -67,7 +65,11 @@ export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props
                   {line.items.map((item, i) => (
                     <li key={i} className="flex justify-between gap-4">
                       <span className="min-w-0 truncate">
+                        {item.done !== undefined && line.id === 'bills' && (
+                          <span className="sr-only">{item.done ? 'Paid: ' : 'Still to pay: '}</span>
+                        )}
                         {item.label}
+                        {line.id === 'bills' && item.done && <span aria-hidden="true"> ✓</span>}
                         {item.date && <span> · {f.day(item.date)}</span>}
                       </span>
                       <span className="shrink-0 tabular-nums">{f.money(item.amount)}</span>
@@ -80,7 +82,7 @@ export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props
         ))}
         <div className="flex justify-between gap-4 py-3 text-base">
           <dt className="font-semibold">
-            {safe.status === 'short' ? 'Short until payday' : 'Safe to spend until payday'}
+            {safe.status === 'short' ? 'Short this period' : 'Safe to spend this period'}
           </dt>
           <dd className="font-semibold tabular-nums">{f.money(safe.total)}</dd>
         </div>
@@ -108,12 +110,17 @@ export function MathSheet({ open, onClose, safe, runway, today, nextPay }: Props
           <span className="font-medium">
             Next pay: {f.money(nextPay.amount)} on {f.day(nextPay.date)}.
           </span>{' '}
-          <span className="text-muted">
-            Not counted yet. It joins this number once it’s in your account and you update your
-            balance.
-          </span>
+          <span className="text-muted">It counts in the period it lands in.</span>
         </p>
       )}
+      <p className="mt-3 rounded-2xl bg-bg px-4 py-3 text-sm text-muted">
+        {(safe.savingsMoved !== 0 || safe.debtPaid !== 0) && (
+          <span className="block font-medium text-text">
+            Saved {f.money(safe.savingsMoved)} · debt paid {f.money(safe.debtPaid)} this period
+          </span>
+        )}
+        {WALLED_OFF_NOTE}
+      </p>
       <p className="mt-3 rounded-2xl bg-bg px-4 py-3 text-sm text-muted">{safe.estimateNote}</p>
     </Sheet>
   )

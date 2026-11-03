@@ -1,524 +1,293 @@
+// The pay-based money model (PLAN-v2 locked decisions A, A2, C):
+//   safe to spend = carried in + income − bills − expenses − cushion
+// with savings and debt walled off.
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { addedOnMap, billEntriesBetween, paidFields } from '../bills'
-import { addDays, fromDayNumber, makeDate, parseISODate, toDayNumber } from '../dates'
-import { checkInPlan } from '../reconcile'
-import { ESTIMATE_NOTE, safeToSpend, simpleLines, type SafeToSpendInput } from '../safeToSpend'
-import { planToday, type TodayInput } from '../today'
 import {
-  occurrenceId,
-  type Bill,
-  type BillOccurrence,
-  type Envelope,
-  type IncomeSource,
-  type SavingsFund,
-  type Transaction,
-} from '../types'
+  balanceAt,
+  monthSpan,
+  safeToSpend,
+  simpleLines,
+  txKind,
+  type LedgerInput,
+} from '../safeToSpend'
+import type { Bill, Envelope, IncomeSource, Transaction } from '../types'
 
-const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
-const created = '2026-01-01T00:00:00.000Z'
-const monthly = (
-  id: string,
-  name: string,
-  amount: number,
-  day: number,
-  extra: Partial<Bill> = {},
-) =>
-  ({
-    id,
-    name,
-    amount,
-    rule: { freq: 'monthly', interval: 1, day, anchor: makeDate(2026, 1, day) },
-    autopay: false,
-    createdAt: created,
-    ...extra,
-  }) as Bill
+const NOV = monthSpan('2026-11-10')
 
-// A worked example, numbers checked by hand.
-describe('safeToSpend: worked example', () => {
-  const input: SafeToSpendInput = {
-    today: '2026-11-04',
-    period: { start: '2026-10-30', end: '2026-11-30' },
-    checkIn: { at: '2026-11-02T09:00:00.000Z', date: '2026-11-02', balance: 150000 },
-    lookback: '2026-10-30',
-    bills: [
-      monthly('rent', 'Rent', 95000, 1),
-      monthly('gym', 'Gym', 3000, 3),
-      monthly('phone', 'Phone', 2500, 15, { autopay: true }),
-    ],
-    occurrences: [
-      {
-        id: 'rent|2026-11-01',
-        billId: 'rent',
-        originalDate: '2026-11-01',
-        status: 'paid',
-        paidAmount: 95000,
-        paidAt: '2026-11-01T10:00:00.000Z',
-      },
-    ],
-    transactions: [
-      {
-        id: 'old',
-        date: '2026-11-01',
-        amount: -500,
-        note: 'before',
-        createdAt: '2026-11-01T12:00:00.000Z',
-      },
-      {
-        id: 'c',
-        date: '2026-11-03',
-        amount: -1200,
-        note: 'coffee',
-        createdAt: '2026-11-03T08:00:00.000Z',
-      },
-      {
-        id: 'i',
-        date: '2026-11-03',
-        amount: 2000,
-        note: 'refund',
-        createdAt: '2026-11-03T09:00:00.000Z',
-      },
-      {
-        id: 's',
-        date: '2026-11-03',
-        amount: -2000,
-        note: 'to savings',
-        fundId: 'hol',
-        createdAt: '2026-11-03T10:00:00.000Z',
-      },
-    ],
-    funds: [{ id: 'hol', name: 'Holiday', perPeriod: 5000, openingSaved: 0 }],
-    buffer: 5000,
-  }
-  const r = safeToSpend(input)
-
-  it('follows the formula', () => {
-    expect(r.currentBalance).toBe(150000 - 1200 + 2000 - 2000)
-    expect(r.billsDue).toBe(3000 + 2500) // gym (overdue) + phone; rent is paid
-    expect(r.savingsPlanned).toBe(3000)
-    expect(r.envelopeReserved).toBe(0)
-    expect(r.total).toBe(148800 - 5500 - 3000 - 5000)
-    expect(r.status).toBe('ok')
-    expect(r.balanceAgeDays).toBe(2)
-    expect(r.estimateNote).toBe(ESTIMATE_NOTE)
-    expect(r.estimateNote).toBe('Estimate based on what you entered.')
-    expect(r.dueEntries.map((e) => e.name)).toEqual(['Gym', 'Phone'])
-  })
-
-  it('the full lines and the 4 simple lines both sum to the total', () => {
-    expect(r.lines.map((l) => l.id)).toEqual(['balance', 'since', 'bills', 'savings', 'buffer'])
-    expect(sum(r.lines.map((l) => l.amount))).toBe(r.total)
-    const simple = simpleLines(r)
-    expect(simple.map((l) => l.label)).toEqual([
-      'Balance',
-      'Bills before payday',
-      'Set aside (savings, envelopes, buffer)',
-      'Safe to spend',
-    ])
-    expect(sum(simple.slice(0, 3).map((l) => l.amount))).toBe(simple[3]!.amount)
-    expect(simple[3]!.amount).toBe(r.total)
-  })
-
-  it('each line with items sums its items', () => {
-    for (const line of r.lines)
-      if (line.items && line.items.length)
-        expect(sum(line.items.map((i) => i.amount))).toBe(line.amount)
-  })
-
-  it('a negative total is "short"', () => {
-    const short = safeToSpend({ ...input, checkIn: { ...input.checkIn, balance: 10000 } })
-    expect(short.total).toBeLessThan(0)
-    expect(short.status).toBe('short')
-  })
-
-  it('ticking a bill paid after the check-in leaves the total alone', () => {
-    const paidGym: BillOccurrence = {
-      id: 'gym|2026-11-03',
-      billId: 'gym',
-      originalDate: '2026-11-03',
-      ...paidFields(undefined, 3000, '2026-11-04T08:00:00.000Z'),
-    }
-    const after = safeToSpend({ ...input, occurrences: [...input.occurrences, paidGym] })
-    expect(after.total).toBe(r.total)
-    expect(after.lines.find((l) => l.id === 'paidSince')?.amount).toBe(-3000)
-  })
-
-  it('envelopes on: untagged spending uses Everyday; a linked bill shrinks its envelope', () => {
-    const envelopes: Envelope[] = [
-      { id: 'every', name: 'Everyday', budget: 20000, isDefault: true, color: 'accent', sort: 0 },
-      { id: 'gymEnv', name: 'Gym', budget: 5000, isDefault: false, color: 'sage', sort: 1 },
-    ]
-    const bills = input.bills.map((b) => (b.id === 'gym' ? { ...b, envelopeId: 'gymEnv' } : b))
-    const withEnv = safeToSpend({ ...input, bills, envelopes, envelopesEnabled: true })
-    // Everyday: 20000 − 500 − 1200 coffee = 18300. The untagged +2000 is money in, not
-    // Everyday's (only a tagged refund refills an envelope).
-    // Gym: 5000 − 3000 linked unpaid = 2000.
-    expect(withEnv.envelopeReserved).toBe(18300 + 2000)
-    expect(sum(withEnv.lines.map((l) => l.amount))).toBe(withEnv.total)
-    // Ignored while the feature is off.
-    expect(safeToSpend({ ...input, bills, envelopes }).envelopeReserved).toBe(0)
-  })
-})
-
-// --- Properties (PLAN §4.1) ---------------------------------------------------------------
-
-const income: IncomeSource = {
+const pay: IncomeSource = {
   id: 'pay',
-  name: 'Salary',
-  amount: 210000,
-  schedule: { kind: 'monthly', day: 'last' },
-  weekendRule: 'before',
+  name: 'Pay',
+  amount: 200000,
+  schedule: { kind: 'monthly', day: 15 },
+  weekendRule: 'none',
   primary: true,
   active: true,
 }
 
-const DAY0 = toDayNumber('2026-09-01')
-const arbDay = fc.integer({ min: 0, max: 200 }).map((n) => fromDayNumber(DAY0 + n))
+const bill = (id: string, amount: number, day: number, extra: Partial<Bill> = {}): Bill => ({
+  id,
+  name: id,
+  amount,
+  rule: { freq: 'monthly', interval: 1, day, anchor: '2026-01-01' },
+  autopay: false,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  ...extra,
+})
 
-interface World {
-  base: Omit<TodayInput, 'today'>
-  checkInDate: string
-  today: string
+let n = 0
+const tx = (
+  amount: number,
+  date = '2026-11-05',
+  extra: Partial<Transaction> = {},
+): Transaction => ({
+  id: `t${++n}`,
+  date,
+  amount,
+  note: '',
+  createdAt: `${date}T10:00:00.000Z`,
+  ...extra,
+})
+
+const env = (id: string, budget: number, isDefault = false): Envelope => ({
+  id,
+  name: id,
+  budget,
+  isDefault,
+  color: 'clay',
+  sort: 0,
+})
+
+const base: LedgerInput = {
+  today: '2026-11-10',
+  period: NOV,
+  start: { date: '2026-11-01', balance: 0 },
+  rollover: false,
+  incomes: [pay],
+  paydayOverrides: [],
+  bills: [bill('rent', 100000, 1), bill('phone', 3000, 20)],
+  occurrences: [],
+  transactions: [],
 }
 
-/**
- * A random but internally consistent world: a check-in, bills (some autopay, some linked
- * to envelopes), paid rows, transactions dated up to today, funds and a buffer.
- * Instants: everything "before" the check-in is at 11:00 on its day, everything "after"
- * at 13:00, so a later check-in at 23:00 today comes after all of it.
- */
-const arbWorld: fc.Arbitrary<World> = fc
-  .record({
-    checkInDay: arbDay,
-    age: fc.integer({ min: 0, max: 45 }),
-    balance: fc.integer({ min: -100000, max: 500000 }),
-    bills: fc.array(
-      fc.record({
-        amount: fc.integer({ min: 1, max: 150000 }),
-        day: fc.integer({ min: 1, max: 28 }),
-        autopay: fc.boolean(),
-        envelope: fc.constantFrom(undefined, 'every', 'food'),
-        paid: fc.array(
-          fc.record({ monthOffset: fc.integer({ min: -2, max: 2 }), after: fc.boolean() }),
-          {
-            maxLength: 2,
-          },
+describe('txKind', () => {
+  it.each([
+    [{ amount: -500 }, 'expense'],
+    [{ amount: 500 }, 'income'],
+    [{ amount: 500, envelopeId: 'food' }, 'refund'],
+    [{ amount: -500, fundId: 'f' }, 'saving'],
+    [{ amount: -500, debtId: 'd' }, 'debt'],
+    [{ amount: -500, billOccurrenceId: 'x|2026-11-01' }, 'billPayment'],
+  ] as const)('%o is %s', (t, kind) => expect(txKind(t)).toBe(kind))
+})
+
+describe('safe to spend = income − bills − expenses', () => {
+  it('counts the payday, every bill (paid or not) and spending in the month', () => {
+    const r = safeToSpend({ ...base, transactions: [tx(-2500), tx(-1000, '2026-11-25')] })
+    expect(r.income).toBe(200000)
+    expect(r.bills).toBe(103000)
+    expect(r.billsPending).toBe(103000)
+    expect(r.expenses).toBe(3500)
+    expect(r.total).toBe(200000 - 103000 - 3500)
+  })
+
+  it('ticking a bill paid never moves the number', () => {
+    const paid = safeToSpend({
+      ...base,
+      occurrences: [
+        {
+          id: 'rent|2026-11-01',
+          billId: 'rent',
+          originalDate: '2026-11-01',
+          status: 'paid',
+          paidAmount: 100000,
+        },
+      ],
+    })
+    expect(paid.total).toBe(safeToSpend(base).total)
+    expect(paid.billsPaid).toBe(100000)
+    expect(paid.billsPending).toBe(3000)
+  })
+
+  it('a skipped bill does not count', () => {
+    const r = safeToSpend({
+      ...base,
+      occurrences: [
+        { id: 'phone|2026-11-20', billId: 'phone', originalDate: '2026-11-20', status: 'skipped' },
+      ],
+    })
+    expect(r.bills).toBe(100000)
+  })
+
+  it('logged income adds; a refund into an envelope lowers spending instead', () => {
+    const r = safeToSpend({
+      ...base,
+      transactions: [tx(5000), tx(-4000), tx(1000, '2026-11-06', { envelopeId: 'food' })],
+    })
+    expect(r.income).toBe(205000)
+    expect(r.expenses).toBe(3000)
+  })
+
+  it('the cushion comes off the total', () => {
+    expect(safeToSpend({ ...base, buffer: 5000 }).total).toBe(safeToSpend(base).total - 5000)
+  })
+
+  it('reads "short" below zero', () => {
+    expect(safeToSpend({ ...base, incomes: [] }).status).toBe('short')
+  })
+
+  it('the lines always add up to the total, and so do the simple lines', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.tuple(fc.integer({ min: -50000, max: 50000 }), fc.integer({ min: 1, max: 30 })),
         ),
-      }),
-      { maxLength: 6 },
-    ),
-    txs: fc.array(
-      fc.record({
-        amount: fc.integer({ min: -50000, max: 50000 }).filter((n) => n !== 0),
-        dayOffset: fc.integer({ min: -20, max: 45 }),
-        after: fc.boolean(),
-        inBalance: fc.boolean(),
-        kind: fc.constantFrom('plain', 'plain', 'fund', 'food'),
-      }),
-      { maxLength: 10 },
-    ),
-    funds: fc.array(fc.integer({ min: 0, max: 30000 }), { maxLength: 2 }),
-    envelopesEnabled: fc.boolean(),
-    budgets: fc.tuple(fc.nat(60000), fc.nat(30000)),
-    buffer: fc.nat(10000),
-  })
-  .map((g) => {
-    const checkInDate = g.checkInDay
-    const today = addDays(checkInDate, g.age)
-    const at = (_date: string, after: boolean) => `${checkInDate}T${after ? '13' : '11'}:00:00.000Z`
-    const bills: Bill[] = []
-    const occurrences: BillOccurrence[] = []
-    g.bills.forEach((b, i) => {
-      const bill = monthly(`b${i}`, `Bill ${i}`, b.amount, b.day, {
-        autopay: b.autopay,
-        ...(b.envelope ? { envelopeId: b.envelope } : {}),
-      })
-      bills.push(bill)
-      const { year, month } = parseISODate(checkInDate)
-      for (const p of b.paid) {
-        const index = year * 12 + month - 1 + p.monthOffset
-        const date = makeDate(Math.floor(index / 12), (index % 12) + 1, b.day)
-        occurrences.push({
-          id: occurrenceId(bill.id, date),
-          billId: bill.id,
-          originalDate: date,
-          ...paidFields(undefined, b.amount, at(date, p.after)),
-        })
-      }
-    })
-    const funds: SavingsFund[] = g.funds.map((perPeriod, i) => ({
-      id: `f${i}`,
-      name: `Fund ${i}`,
-      perPeriod,
-      openingSaved: 0,
-    }))
-    const transactions: Transaction[] = g.txs.map((t, i) => {
-      const date = addDays(checkInDate, t.dayOffset)
-      return {
-        id: `t${i}`,
-        date: date > today ? today : date,
-        amount: t.amount,
-        note: `tx ${i}`,
-        createdAt: at(date, t.after),
-        ...(t.inBalance ? { inBalance: true } : {}),
-        ...(t.kind === 'fund' && funds.length ? { fundId: 'f0' } : {}),
-        ...(t.kind === 'food' ? { envelopeId: 'food' } : {}),
-      }
-    })
-    const envelopes: Envelope[] = [
-      {
-        id: 'every',
-        name: 'Everyday',
-        budget: g.budgets[0],
-        isDefault: true,
-        color: 'accent',
-        sort: 0,
-      },
-      { id: 'food', name: 'Food', budget: g.budgets[1], isDefault: false, color: 'sage', sort: 1 },
-    ]
-    return {
-      checkInDate,
-      today,
-      base: {
-        incomes: [income],
-        paydayOverrides: [],
-        bills,
-        occurrences,
-        transactions,
-        checkIn: {
-          at: at(checkInDate, false).replace('T11', 'T12'),
-          date: checkInDate,
-          balance: g.balance,
-        },
-        funds,
-        envelopes,
-        envelopesEnabled: g.envelopesEnabled,
-        buffer: g.buffer,
-      },
-    }
-  })
-
-function ready(input: TodayInput) {
-  const plan = planToday(input)
-  if (plan.kind !== 'ready') throw new Error(`expected a ready plan, got ${plan.kind}`)
-  return plan
-}
-const totalOf = (input: TodayInput) => ready(input).safe.total
-
-describe('safe-to-spend properties (PLAN §4.1)', () => {
-  it('lines always sum to the total, in Full and Simple', () => {
-    fc.assert(
-      fc.property(arbWorld, ({ base, today }) => {
-        const { safe } = ready({ ...base, today })
-        expect(sum(safe.lines.map((l) => l.amount))).toBe(safe.total)
-        const simple = simpleLines(safe)
-        expect(simple).toHaveLength(4)
-        expect(sum(simple.slice(0, 3).map((l) => l.amount))).toBe(safe.total)
-        expect(safe.status).toBe(safe.total < 0 ? 'short' : 'ok')
-      }),
-    )
-  })
-
-  it('time passing never raises it unless money comes in', () => {
-    fc.assert(
-      fc.property(arbWorld, fc.integer({ min: 1, max: 70 }), ({ base, today }, k) => {
-        // One known exception, left out here: an envelope-linked bill PAID AHEAD for a
-        // later period uses up that period's envelope when it arrives, so less is
-        // reserved then. The money left long ago; the envelope just catches up.
-        const { period } = ready({ ...base, today })
-        const world = {
-          ...base,
-          occurrences: base.occurrences.filter((o) => o.originalDate < period.end),
-        }
-        expect(totalOf({ ...world, today: addDays(today, k) })).toBeLessThanOrEqual(
-          totalOf({ ...world, today }),
-        )
-      }),
-    )
-  })
-
-  it('adding a bill never raises it', () => {
-    fc.assert(
-      fc.property(
-        arbWorld,
-        fc.integer({ min: 1, max: 100000 }),
-        fc.integer({ min: 1, max: 28 }),
-        fc.boolean(),
-        fc.constantFrom(undefined, 'every', 'food'),
-        ({ base, today }, amount, day, autopay, envelopeId) => {
-          const extra = monthly('new', 'New', amount, day, {
-            autopay,
-            ...(envelopeId ? { envelopeId } : {}),
+        fc.integer({ min: -100000, max: 100000 }),
+        fc.integer({ min: 0, max: 10000 }),
+        (rows, balance, buffer) => {
+          const transactions = rows.map(([a, d]) => tx(a, `2026-11-${String(d).padStart(2, '0')}`))
+          const r = safeToSpend({
+            ...base,
+            transactions,
+            buffer,
+            start: { date: '2026-11-01', balance },
           })
-          expect(totalOf({ ...base, today, bills: [...base.bills, extra] })).toBeLessThanOrEqual(
-            totalOf({ ...base, today }),
-          )
+          expect(r.lines.reduce((a, l) => a + l.amount, 0)).toBe(r.total)
+          expect(
+            simpleLines(r)
+              .slice(0, 3)
+              .reduce((a, l) => a + l.amount, 0),
+          ).toBe(r.total)
         },
       ),
-    )
-  })
-
-  it('an overdue unpaid bill lowers it (by exactly its amount)', () => {
-    fc.assert(
-      fc.property(
-        arbWorld,
-        fc.integer({ min: 1, max: 100000 }),
-        fc.nat(),
-        ({ base, today }, amount, pick) => {
-          const { lookback } = ready({ ...base, today })
-          const span = toDayNumber(today) - toDayNumber(lookback)
-          fc.pre(span > 0)
-          const date = addDays(lookback, pick % span) // in [lookback, today)
-          const overdue: Bill = {
-            id: 'late',
-            name: 'Late',
-            amount,
-            rule: { freq: 'once', date },
-            autopay: false,
-            createdAt: created,
-          }
-          const before = totalOf({ ...base, today })
-          expect(totalOf({ ...base, today, bills: [...base.bills, overdue] })).toBe(before - amount)
-        },
-      ),
-    )
-  })
-
-  it('a check-in after an autopay bill does not change it (no double count)', () => {
-    fc.assert(
-      fc.property(arbWorld, ({ base, today }) => {
-        const { safe } = ready({ ...base, today })
-        const plan = checkInPlan(safe.dueEntries, today)
-        // The bank now shows those bills gone. The user says yes to the manual ones too.
-        const gone = [...plan.autoPaid, ...plan.ask]
-        const at = `${today}T23:00:00.000Z`
-        const marked = gone.map((e) => ({
-          id: occurrenceId(e.billId, e.originalDate),
-          billId: e.billId,
-          originalDate: e.originalDate,
-          ...paidFields(e.override, e.amount, at, e.autopay),
-        }))
-        const ids = new Set(marked.map((m) => m.id))
-        const after = totalOf({
-          ...base,
-          today,
-          checkIn: {
-            at,
-            date: today,
-            balance: safe.currentBalance - sum(gone.map((e) => e.amount)),
-          },
-          occurrences: [...base.occurrences.filter((o) => !ids.has(o.id)), ...marked],
-        })
-        expect(after).toBe(safe.total)
-      }),
-    )
-  })
-
-  it('an envelope-linked bill is counted once', () => {
-    fc.assert(
-      fc.property(
-        arbWorld,
-        fc.integer({ min: 1, max: 100000 }),
-        fc.integer({ min: 1, max: 28 }),
-        ({ base, today }, amount, day) => {
-          const world = { ...base, today, envelopesEnabled: true }
-          const before = totalOf(world)
-          const linked = monthly('lnk', 'Linked', amount, day, { envelopeId: 'food' })
-          const plan = ready({ ...world, bills: [...base.bills, linked] })
-          const n = plan.safe.dueEntries.filter((e) => e.billId === 'lnk').length
-          // It lowers the total by at most its own amount per occurrence, never twice...
-          expect(plan.safe.total).toBeGreaterThanOrEqual(before - n * amount)
-          expect(plan.safe.total).toBeLessThanOrEqual(before)
-          // ...and paying it changes nothing.
-          const at = `${today}T23:30:00.000Z`
-          const paid = plan.safe.dueEntries
-            .filter((e) => e.billId === 'lnk')
-            .map((e) => ({
-              id: occurrenceId(e.billId, e.originalDate),
-              billId: e.billId,
-              originalDate: e.originalDate,
-              ...paidFields(undefined, e.amount, at),
-            }))
-          const afterPaid = totalOf({
-            ...world,
-            bills: [...base.bills, linked],
-            occurrences: [...base.occurrences, ...paid],
-          })
-          expect(afterPaid).toBe(plan.safe.total)
-        },
-      ),
-    )
-  })
-
-  it('a savings contribution never raises it', () => {
-    fc.assert(
-      fc.property(arbWorld, fc.integer({ min: 1, max: 50000 }), ({ base, today }, amount) => {
-        fc.pre((base.funds ?? []).length > 0)
-        // Made now, so it leaves the balance. (Logging an OLD transfer that is already
-        // in the balance may raise it, correctly: the target was met all along.)
-        const contribution: Transaction = {
-          id: 'save',
-          date: today,
-          amount: -amount,
-          note: 'savings',
-          fundId: 'f0',
-          createdAt: `${today}T23:59:00.000Z`,
-        }
-        expect(
-          totalOf({ ...base, today, transactions: [...base.transactions, contribution] }),
-        ).toBeLessThanOrEqual(totalOf({ ...base, today }))
-      }),
     )
   })
 })
 
-describe('ticking a bill paid (review)', () => {
-  it('never moves the total when nothing new left the bank, history included', () => {
+describe('savings and debt are walled off (A2)', () => {
+  it('moving money into savings or paying a debt never changes safe to spend', () => {
     fc.assert(
-      fc.property(arbWorld, fc.nat(), fc.nat(), ({ base, today }, addedPick, pick) => {
-        // Bills entered the app on random days, so some dates are history (PLAN M4).
-        const bills = base.bills.map((b, i) => ({
-          ...b,
-          createdAt: `${addDays(today, -((addedPick >> i) % 60))}T09:00:00.000Z`,
-        }))
-        const world = {
-          ...base,
-          today,
-          bills,
-          envelopesEnabled: false,
-          addedOn: addedOnMap(bills, (at) => at.slice(0, 10)),
-        }
-        const plan = ready(world)
-        const unpaid = billEntriesBetween(
-          bills,
-          base.occurrences,
-          addDays(today, -90),
-          plan.period.end,
-        ).filter((e) => e.status === 'due')
-        fc.pre(unpaid.length > 0)
-        const e = unpaid[pick % unpaid.length]!
-        const counted = plan.safe.dueEntries.some(
-          (d) => d.billId === e.billId && d.originalDate === e.originalDate,
-        )
-        const history = e.date < world.addedOn.get(e.billId)!
-        fc.pre(counted || history)
-        const id = occurrenceId(e.billId, e.originalDate)
-        const after = totalOf({
-          ...world,
-          occurrences: [
-            ...base.occurrences.filter((o) => o.id !== id),
-            {
-              id,
-              billId: e.billId,
-              originalDate: e.originalDate,
-              ...paidFields(e.override, e.amount, `${today}T23:30:00.000Z`),
-            },
-          ],
-        })
-        // A counted bill moves from "bills due" to "paid since"; a history one was never
-        // owed, so ticking it for the record changes nothing either.
-        expect(after).toBe(plan.safe.total)
-      }),
+      fc.property(
+        fc.integer({ min: 1, max: 1_000_000 }),
+        fc.integer({ min: 1, max: 1_000_000 }),
+        (s, d) => {
+          const r = safeToSpend({
+            ...base,
+            transactions: [
+              tx(-s, '2026-11-03', { fundId: 'f' }),
+              tx(-d, '2026-11-04', { debtId: 'd' }),
+            ],
+          })
+          expect(r.total).toBe(safeToSpend(base).total)
+          expect(r.income).toBe(200000)
+          expect(r.expenses).toBe(0)
+          expect(r.savingsMoved).toBe(s)
+          expect(r.debtPaid).toBe(d)
+        },
+      ),
     )
+  })
+
+  it('a debt minimum bill is not a bill here; paid, it counts as debt paid', () => {
+    const minimum = bill('card', 9500, 11, { debtId: 'd' })
+    const r = safeToSpend({
+      ...base,
+      bills: [...base.bills, minimum],
+      occurrences: [
+        {
+          id: 'card|2026-11-11',
+          billId: 'card',
+          originalDate: '2026-11-11',
+          status: 'paid',
+          paidAmount: 9500,
+        },
+      ],
+    })
+    expect(r.bills).toBe(103000)
+    expect(r.debtPaid).toBe(9500)
+  })
+})
+
+describe('starting balance and roll over (C)', () => {
+  it('the starting balance is added to the first period only', () => {
+    const start = { date: '2026-11-01', balance: 50000 }
+    expect(safeToSpend({ ...base, start }).total).toBe(safeToSpend(base).total + 50000)
+    const dec = safeToSpend({
+      ...base,
+      start,
+      today: '2026-12-10',
+      period: monthSpan('2026-12-01'),
+    })
+    expect(dec.carriedIn).toBe(0)
+  })
+
+  it('with roll over on, last month’s leftover carries in', () => {
+    const start = { date: '2026-11-01', balance: 50000 }
+    const nov = safeToSpend({ ...base, start, today: '2026-12-10' })
+    const dec = safeToSpend({
+      ...base,
+      start,
+      rollover: true,
+      today: '2026-12-10',
+      period: monthSpan('2026-12-01'),
+    })
+    expect(dec.carriedIn).toBe(nov.total)
+    expect(balanceAt({ ...base, start }, '2026-12-01')).toBe(nov.total)
+  })
+
+  it('money from before the start date is already in the starting balance', () => {
+    const r = safeToSpend({
+      ...base,
+      start: { date: '2026-11-10', balance: 70000 },
+      transactions: [tx(-9999, '2026-11-05'), tx(-100, '2026-11-12')],
+    })
+    // Rent on the 1st and spending on the 5th are before the start: not counted again.
+    expect(r.bills).toBe(3000)
+    expect(r.expenses).toBe(100)
+    expect(r.total).toBe(70000 + 200000 - 3000 - 100)
+  })
+})
+
+describe('envelopes: budget vs actual', () => {
+  const input: LedgerInput = {
+    ...base,
+    envelopesEnabled: true,
+    envelopes: [env('everyday', 20000, true), env('food', 30000), env('home', 100000)],
+    bills: [
+      bill('rent', 100000, 1, { envelopeId: 'home' }),
+      bill('box', 4000, 20, { envelopeId: 'food' }),
+    ],
+  }
+
+  it('untagged spending lands in Everyday, tagged in its envelope, future-dated as still coming', () => {
+    const r = safeToSpend({
+      ...input,
+      transactions: [
+        tx(-500),
+        tx(-700, '2026-11-06', { envelopeId: 'food' }),
+        tx(-300, '2026-11-25', { envelopeId: 'food' }),
+      ],
+    })
+    const by = Object.fromEntries(r.envelopes.map((e) => [e.id, e]))
+    expect(by.everyday!.spent).toBe(500)
+    expect(by.food!.spent).toBe(700)
+    expect(by.food!.linkedDue).toBe(300 + 4000)
+    expect(by.food!.reserved).toBe(30000 - 700 - 4300)
+    expect(by.home!.spent).toBe(100000)
+    expect(by.home!.reserved).toBe(0)
+  })
+
+  it('budgets never hold money back from safe to spend', () => {
+    expect(safeToSpend(input).total).toBe(safeToSpend({ ...input, envelopesEnabled: false }).total)
+  })
+
+  it('over budget is reported, never with no budget set', () => {
+    const r = safeToSpend({
+      ...input,
+      envelopes: [env('everyday', 0, true), env('food', 1000)],
+      transactions: [tx(-5000), tx(-1500, '2026-11-06', { envelopeId: 'food' })],
+    })
+    expect(r.envelopes.find((e) => e.id === 'everyday')!.over).toBe(0)
+    expect(r.envelopes.find((e) => e.id === 'food')!.over).toBe(4500)
   })
 })

@@ -161,6 +161,7 @@ export const rowSchemas = {
     periodStart: z.optional(isoDate),
     text: z.string().check(z.maxLength(NOTE_MAX_LENGTH)),
     updatedAt: instant,
+    doneAt: z.optional(instant),
   }),
   // v4. Optional like every table, so files from before life goals simply have none.
   lifeGoals: z.object({
@@ -196,6 +197,11 @@ export const settingsSchema = z.object({
   // Added after v3 as optional fields, so no schema bump: older files simply lack them.
   displayName: z.optional(z.string().check(z.maxLength(DISPLAY_NAME_MAX))),
   accent: z.optional(z.nullable(z.string().check(z.regex(HEX_COLOR)))),
+  // v2 money basics, optional for the same reason.
+  planBy: z.optional(z.enum(['month', 'payday'])),
+  startingBalance: z.optional(cents),
+  startDate: z.optional(z.nullable(isoDate)),
+  rollover: z.optional(z.boolean()),
 })
 
 // domain/setup.ts SetupProgress. A bad row would send a restored device back into setup

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
 import {
   useBillOccurrences,
@@ -13,11 +13,11 @@ import {
   useTransactions,
 } from '../../db/hooks'
 import { getMeta } from '../../db/repos'
-import { addedOnMap } from '../../domain/bills'
-import { daysBetween } from '../../domain/dates'
+import { paydayEntriesBetween } from '../../domain/bills'
+import { addDays, daysBetween } from '../../domain/dates'
 import { type ActionState, type Snoozes } from '../../domain/nextAction'
 import { expiredImpulse } from '../../domain/impulse'
-import { overdueManual, planToday } from '../../domain/today'
+import { overdueManual, planToday, type TodayInput } from '../../domain/today'
 import type { Instant, ISODate } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
 import { IS_DEMO } from '../../lib/demo'
@@ -30,7 +30,7 @@ const localDate = (at: Instant) => todayISO(new Date(at))
  * when any of these tables change, so logging "12 coffee" anywhere updates the hero.
  */
 export function useTodayModel(today: ISODate, now: Instant) {
-  const { settings } = useAppSettings()
+  const { settings, loaded: settingsLoaded, update } = useAppSettings()
   const incomes = useIncomes()
   const paydayOverrides = usePaydayOverrides()
   const bills = useBills()
@@ -62,25 +62,24 @@ export function useTodayModel(today: ISODate, now: Instant) {
     lastBackupAt !== undefined &&
     demo !== undefined
 
-  const checkIn = checkIns?.at(-1)
-
-  const plan = useMemo(() => {
+  const input = useMemo<TodayInput | null>(() => {
     if (!loaded) return null
-    return planToday({
+    return {
       today,
+      money: settings,
+      checkIns,
       incomes,
       paydayOverrides,
       bills,
       occurrences,
       transactions,
-      checkIn,
-      funds,
       envelopes,
       envelopesEnabled: settings.envelopesEnabled,
       buffer: settings.buffer,
-      addedOn: addedOnMap(bills, localDate),
-    })
+    }
   }, [
+    settings,
+    checkIns,
     loaded,
     today,
     incomes,
@@ -88,23 +87,36 @@ export function useTodayModel(today: ISODate, now: Instant) {
     bills,
     occurrences,
     transactions,
-    checkIn,
-    funds,
     envelopes,
-    settings.envelopesEnabled,
-    settings.buffer,
   ])
+  const plan = useMemo(() => (input ? planToday(input) : null), [input])
+
+  // Tracking starts once and stays put: record the derived start the first time, so the
+  // starting balance is added to that first period only, never again next month.
+  const start = plan?.kind === 'ready' ? plan.start : null
+  useEffect(() => {
+    if (!settingsLoaded || settings.startDate !== null || !start) return
+    void update({ startDate: start.date, startingBalance: start.balance })
+  }, [settingsLoaded, settings.startDate, start, update])
 
   // Only a ready Today has an action card; before that, the empty state IS the action.
   const actionState = useMemo<ActionState | null>(() => {
-    if (plan?.kind !== 'ready' || !checkIns?.length) return null
-    // With no backup yet, the clock starts with the first check-in.
-    const since = lastBackupAt ? localDate(lastBackupAt) : checkIns[0]!.date
+    if (plan?.kind !== 'ready') return null
+    // With no backup yet, the clock starts with tracking.
+    const since = lastBackupAt ? localDate(lastBackupAt) : plan.start.date
+    const nextPay = paydayEntriesBetween(
+      incomes ?? [],
+      paydayOverrides ?? [],
+      addDays(today, 1),
+      addDays(today, 62),
+    )[0]
     return {
-      nextPayday: plan.period.end,
+      nextPayday: nextPay?.date ?? null,
+      paydayOptional: settings.planBy === 'month',
       overdue: overdueManual(plan.safe.dueEntries, today),
-      balanceAgeDays: plan.safe.balanceAgeDays,
-      paydaySinceCheckIn: plan.paydaySinceCheckIn,
+      // The number no longer depends on a bank balance (PLAN-v2 locked decision A).
+      balanceAgeDays: 0,
+      paydaySinceCheckIn: false,
       daysSinceBackup: daysBetween(since, today),
       expiredImpulse: expiredImpulse(impulse ?? [], now).length,
       hasBills: (bills?.length ?? 0) > 0,
@@ -113,17 +125,32 @@ export function useTodayModel(today: ISODate, now: Instant) {
         ? { demo: demo?.kind === 'sample' && demo.entries === 0 ? 'sample' : 'other' }
         : {}),
     }
-  }, [plan, checkIns, lastBackupAt, today, now, impulse, bills, transactions, demo])
+  }, [
+    plan,
+    settings.planBy,
+    incomes,
+    paydayOverrides,
+    lastBackupAt,
+    today,
+    now,
+    impulse,
+    bills,
+    transactions,
+    demo,
+  ])
 
   return {
     loaded,
+    input,
     plan,
     actionState,
     snoozes: snoozes ?? {},
-    checkIn,
     incomes: incomes ?? [],
     transactions: transactions ?? [],
     envelopes: envelopes ?? [],
+    funds: funds ?? [],
+    bills: bills ?? [],
+    occurrences: occurrences ?? [],
     impulse: impulse ?? [],
   }
 }

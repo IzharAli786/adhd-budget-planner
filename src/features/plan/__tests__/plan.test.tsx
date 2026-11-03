@@ -6,7 +6,8 @@ import { App } from '../../../app/App'
 import { resetDb, seedReadyInstall } from '../../../db/__tests__/helpers'
 import * as r from '../../../db/repos'
 
-// Wed 4 Nov 2026. Salary on the last day (Mon 30 Nov), so 26 days to payday.
+// Wed 4 Nov 2026, planning by month: 27 days left. Tracking starts today with €842.50
+// (the check-in), and the €2,100 salary on Mon 30 Nov counts as November's money in.
 const NOW = new Date(2026, 10, 4, 12, 0)
 const EARLIER = new Date(2026, 10, 4, 8, 0).toISOString()
 
@@ -37,37 +38,36 @@ const hero = async () =>
   (await screen.findByRole('region', { name: 'Today’s number' })).querySelector('[aria-live]')!
 
 describe('Plan', () => {
-  it('first period: shows the expected pay, not a payday from before the first balance', async () => {
+  it('shows the month: starting balance, the pay, and what is safe to spend', async () => {
     goto('/plan')
     render(<App />)
-    const card = await screen.findByRole('region', { name: 'This period' })
-    // Fri 30 Oct started this period, but the first balance is from 4 Nov: that pay is
-    // already in it and was never entered here, so the line shows the next pay instead.
-    expect(await within(card).findByText(/Expected pay · Mon,? 30 Nov/)).toBeTruthy()
-    expect(within(card).queryByText(/Salary · Fri,? 30 Oct/)).toBeNull()
+    const card = await screen.findByRole('region', { name: 'November 2026' })
+    expect(within(card).getByText('Starting balance')).toBeTruthy()
+    expect(within(card).getByText(/Salary · Mon,? 30 Nov/)).toBeTruthy()
     expect(within(card).getAllByText('€2,100.00').length).toBeGreaterThan(0)
-    expect(within(card).getAllByText('€842.50').length).toBe(2) // balance, safe to spend
+    expect(within(card).getByText('€2,942.50')).toBeTruthy()
   })
 
-  it('a later period lists the payday that started it', async () => {
-    await r.addCheckIn(50000, '2026-10-01', new Date(2026, 9, 1, 8).toISOString())
+  it('steps back a month; before tracking started it shows actuals only', async () => {
     goto('/plan')
     render(<App />)
-    const card = await screen.findByRole('region', { name: 'This period' })
-    // Fri 30 Oct (31 Oct is a Saturday) started this period.
-    expect(await within(card).findByText(/Salary · Fri,? 30 Oct/)).toBeTruthy()
-    expect(within(card).getByText('Income this period')).toBeTruthy()
+    await screen.findByRole('region', { name: 'November 2026' })
+    await userEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+    const card = await screen.findByRole('region', { name: 'October 2026' })
+    expect(within(card).getByText(/Before you started tracking/)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'This month' }))
+    expect(await screen.findByRole('region', { name: 'November 2026' })).toBeTruthy()
   })
 
-  it('the strip shows income, set aside and safe to spend', async () => {
+  it('the strip shows money in, bills, spent and safe to spend', async () => {
     goto('/plan')
     render(<App />)
     const strip = await screen.findByRole('region', { name: 'This period at a glance' })
-    expect(within(strip).getByText('Expected pay')).toBeTruthy()
-    expect(within(strip).getByText('€2,100.00')).toBeTruthy()
-    expect(within(strip).getByText('Set aside')).toBeTruthy()
+    expect(within(strip).getByText('Money in')).toBeTruthy()
+    expect(within(strip).getByText('Bills')).toBeTruthy()
+    expect(within(strip).getByText('Spent')).toBeTruthy()
     expect(within(strip).getByText('Safe to spend')).toBeTruthy()
-    expect(within(strip).getByText('€842.50')).toBeTruthy()
+    expect(within(strip).getAllByText('€2,942.50')).toHaveLength(2)
   })
 
   it('savings: totals, and the per-payday pace for a fund with a date', async () => {
@@ -87,18 +87,17 @@ describe('Plan', () => {
     expect(screen.getByText(/About €200\.00 per payday to reach it by/)).toBeTruthy()
   })
 
-  it('envelopes are off by default, explained, and turn on with Everyday', async () => {
+  it('envelopes are on by default; add one with a monthly budget and reorder', async () => {
+    await r.ensureDefaultEnvelope()
     goto('/plan')
     render(<App />)
-    expect(await screen.findByText(/Envelopes give parts of your money a job/)).toBeTruthy()
-    await userEvent.click(screen.getByRole('switch', { name: 'Use envelopes' }))
     expect(await screen.findByRole('heading', { name: 'Everyday' })).toBeTruthy()
     expect((await r.getSettings()).envelopesEnabled).toBe(true)
 
     await userEvent.click(screen.getByRole('button', { name: 'Add envelope' }))
     const sheet = await screen.findByRole('dialog', { name: 'New envelope' })
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Name' }), 'Food')
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Budget each payday' }), '300')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Budget each month' }), '300')
     await userEvent.click(within(sheet).getByRole('button', { name: 'Add envelope' }))
     expect(await screen.findByText('€300.00 left of €300.00')).toBeTruthy()
 
@@ -121,7 +120,7 @@ describe('Plan', () => {
     })
     goto('/plan')
     render(<App />)
-    expect(await screen.findByText(/Over by €25\.00/)).toBeTruthy()
+    expect(await screen.findByText(/€25\.00 over the plan/)).toBeTruthy()
     expect(
       screen.getByRole('progressbar', { name: 'Food used' }).getAttribute('aria-valuenow'),
     ).toBe('100')
@@ -141,7 +140,7 @@ describe('Plan', () => {
     expect(await screen.findByRole('heading', { name: 'Fun' })).toBeTruthy()
   })
 
-  it('"Can this fit?" counts an envelope’s room first', async () => {
+  it('"Can this fit?" says how a price sits in an envelope’s budget', async () => {
     await r.updateSettings({ envelopesEnabled: true })
     await r.ensureDefaultEnvelope()
     await r.addEnvelope({ name: 'Food', budget: 10000, color: 'accent' })
@@ -150,25 +149,26 @@ describe('Plan', () => {
     const fit = await screen.findByRole('region', { name: 'Can this fit?' })
     await userEvent.type(within(fit).getByRole('textbox', { name: 'Price' }), '40')
     await userEvent.click(within(fit).getByRole('button', { name: /Food · €100\.00 left/ }))
-    expect(await within(fit).findByText(/fits inside Food/)).toBeTruthy()
+    expect(
+      await within(fit).findByText(/Inside your Food budget \(€60\.00 left after\)/),
+    ).toBeTruthy()
     // Envelopes without a budget (Everyday here) hold no room, so they are not offered.
     expect(within(fit).queryByRole('button', { name: /Everyday/ })).toBeNull()
   })
 })
 
-describe('Today with envelopes on (open issue)', () => {
-  it('spending inside an envelope still lowers today’s number by exactly the spend', async () => {
+describe('Today with envelopes on', () => {
+  it('budgets hold nothing back; spending lowers today’s number by exactly the spend', async () => {
     await r.updateSettings({ envelopesEnabled: true, simpleMode: true })
     await r.ensureDefaultEnvelope()
     await r.addEnvelope({ name: 'Food', budget: 26000, color: 'accent' })
     goto('/')
     render(<App />)
-    // (84250 − 26000) / 26 = 2240.38 -> €22.40
-    expect((await hero()).textContent).toBe('€22.40')
+    // (84250 + 210000) / 27 = 10898.1 -> €108.98, Food's budget or not.
+    expect((await hero()).textContent).toBe('€108.98')
     const field = screen.getByRole('textbox', { name: /Quick add/ })
     await userEvent.type(field, '12 lunch @food{Enter}')
-    await waitFor(async () => expect((await hero()).textContent).toBe('€10.40'))
-    expect(screen.getByText('€582.50')).toBeTruthy() // until payday: unchanged
+    await waitFor(async () => expect((await hero()).textContent).toBe('€96.98'))
   })
 })
 
@@ -216,7 +216,7 @@ describe('Just today', () => {
     })
     await r.addTransaction({ date: '2026-11-03', amount: -2500, note: 'shop', envelopeId: food.id })
     await r.addTransaction({ date: '2026-11-03', amount: -900, note: 'coffee' })
-    // Before this pay period (it started Fri 30 Oct): not listed.
+    // Before this month: not listed.
     await r.addTransaction({ date: '2026-10-20', amount: -4000, note: 'old', envelopeId: food.id })
     goto('/plan')
     render(<App />)

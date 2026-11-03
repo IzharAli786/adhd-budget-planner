@@ -28,6 +28,11 @@ export interface OverdueBill {
 export interface ActionState {
   /** Null when no schedule gives a future payday (irregular pay with no date left). */
   nextPayday: ISODate | null
+  /**
+   * Planning by calendar month: the number works without a payday, so "add your payday"
+   * is a nudge that waits behind overdue bills instead of coming first (PLAN-v2 B).
+   */
+  paydayOptional?: boolean
   /** Unpaid manual bills dated before today. Autopay ones reconcile at check-in. */
   overdue: readonly OverdueBill[]
   balanceAgeDays: number
@@ -87,15 +92,18 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
   const add = (a: Omit<NextAction, 'snoozable'> & { snoozable?: boolean }) =>
     out.push({ snoozable: true, ...a })
 
-  if (state.nextPayday === null)
+  const paydayUnknown = () =>
     add({
       id: 'payday-unknown',
       kind: 'payday-unknown',
       trigger: 'When is your next pay?',
-      detail: 'Add the date and today’s number counts down to it.',
+      detail: state.paydayOptional
+        ? 'Add it once and every payday counts as money in, in the month it lands.'
+        : 'Add the date and today’s number counts down to it.',
       cta: 'Add payday',
       doneState: 'Payday added.',
     })
+  if (state.nextPayday === null && !state.paydayOptional) paydayUnknown()
   for (const bill of [...state.overdue].sort((a, b) => (a.date < b.date ? -1 : 1)))
     add({
       id: `overdue:${bill.billId}|${bill.originalDate}`,
@@ -106,6 +114,7 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       doneState: `${bill.name} marked paid.`,
       bill,
     })
+  if (state.nextPayday === null && state.paydayOptional) paydayUnknown()
   const payday = () =>
     add({
       id: 'payday-checkin',

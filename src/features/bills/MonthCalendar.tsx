@@ -20,12 +20,15 @@ interface MonthCalendarProps {
   savings?: ReadonlyMap<ISODate, PaydaySaving[]>
   /** Days that have a note. */
   notes?: ReadonlySet<ISODate>
+  /** Entries logged per day (spending, income, savings, debt payments). */
+  logged?: ReadonlyMap<ISODate, readonly unknown[]>
   onMonthChange: (delta: -1 | 1 | 0) => void
   onSelectDay: (date: ISODate) => void
 }
 
 const EMPTY_SAVINGS: ReadonlyMap<ISODate, PaydaySaving[]> = new Map()
 const EMPTY_NOTES: ReadonlySet<ISODate> = new Set()
+const EMPTY_LOGGED: ReadonlyMap<ISODate, readonly unknown[]> = new Map()
 
 const ARROWS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
 
@@ -45,6 +48,7 @@ export function MonthCalendar({
   paydays,
   savings = EMPTY_SAVINGS,
   notes = EMPTY_NOTES,
+  logged = EMPTY_LOGGED,
   onMonthChange,
   onSelectDay,
 }: MonthCalendarProps) {
@@ -138,6 +142,7 @@ export function MonthCalendar({
           const dayPaydays = paydays.get(date) ?? []
           const saving = (savings.get(date) ?? []).reduce((a, s) => a + s.amount, 0)
           const hasNote = notes.has(date)
+          const loggedCount = logged.get(date)?.length ?? 0
           const inMonth = isSameMonth(date, first)
           const isToday = date === today
           const allPaid = (list: BillEntry[]) =>
@@ -158,6 +163,7 @@ export function MonthCalendar({
               aria-label={calendarDayLabel(date, today, live, dayPaydays.length, f, {
                 saving,
                 note: hasNote,
+                logged: loggedCount,
               })}
               aria-current={isToday ? 'date' : undefined}
               className={cx(
@@ -183,6 +189,14 @@ export function MonthCalendar({
                     className={cx(
                       'h-1.5 w-1.5 rounded-full border-[1.5px]',
                       isToday ? 'border-accent-contrast' : 'border-text',
+                    )}
+                  />
+                )}
+                {loggedCount > 0 && (
+                  <span
+                    className={cx(
+                      'h-[5px] w-[5px] rounded-[1px]',
+                      isToday ? 'bg-accent-contrast' : 'bg-muted',
                     )}
                   />
                 )}
@@ -216,6 +230,11 @@ export function MonthCalendar({
         <span className="inline-flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full border-[1.5px] border-text" /> Payday
         </span>
+        {dates.some((d) => (logged.get(d)?.length ?? 0) > 0) && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-[5px] w-[5px] rounded-[1px] bg-muted" /> Logged
+          </span>
+        )}
         {dates.some((d) => notes.has(d)) && (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-[1.5px] w-2 rounded-full bg-muted" /> Note

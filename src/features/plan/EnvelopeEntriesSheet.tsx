@@ -1,10 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
+import { AddEntrySheet } from '../bills/AddEntrySheet'
+import { EntryRow } from '../transactions/EntryRow'
+import { TransactionSheet } from '../transactions/TransactionsScreen'
 import { useTransactions } from '../../db/hooks'
 import { addDays } from '../../domain/dates'
 import type { DateRange } from '../../domain/insights'
-import type { EnvelopeUsage } from '../../domain/safeToSpend'
+import { envelopeHome, txKind, type EnvelopeUsage } from '../../domain/safeToSpend'
 import type { Envelope, ISODate, Transaction } from '../../domain/types'
-import { buttonClass } from '../../ui/Button'
+import { Button, buttonClass } from '../../ui/Button'
 import { EnvelopeDot } from '../../ui/EnvelopeDot'
 import { Icon } from '../../ui/Icon'
 import { Sheet } from '../../ui/Sheet'
@@ -30,22 +34,13 @@ export function envelopeEntries(
   envelopes: readonly Envelope[],
   transactions: readonly Transaction[],
   period: DateRange,
-  today: ISODate,
 ): Transaction[] {
-  const known = new Set(envelopes.map((e) => e.id))
-  const fallback = envelopes.find((e) => e.isDefault)?.id
-  const home = (id: string | undefined) => (id !== undefined && known.has(id) ? id : fallback)
   return transactions
-    .filter(
-      (t) =>
-        t.deletedAt === undefined &&
-        t.fundId === undefined &&
-        t.billOccurrenceId === undefined &&
-        t.date >= period.start &&
-        t.date <= today &&
-        (t.amount < 0 || (t.envelopeId !== undefined && known.has(t.envelopeId))) &&
-        home(t.envelopeId) === envelope.id,
-    )
+    .filter((t) => {
+      if (t.deletedAt !== undefined || t.date < period.start || t.date >= period.end) return false
+      const k = txKind(t)
+      return (k === 'expense' || k === 'refund') && envelopeHome(t, envelopes) === envelope.id
+    })
     .sort((a, b) =>
       a.date === b.date ? (a.createdAt < b.createdAt ? 1 : -1) : a.date < b.date ? 1 : -1,
     )
@@ -61,14 +56,14 @@ export function EnvelopeEntriesSheet({
   onClose,
 }: Props) {
   const f = useFormat()
-  const transactions = useTransactions(period.start, today)
+  const transactions = useTransactions(period.start, addDays(period.end, -1))
+  const [editing, setEditing] = useState<Transaction | null>(null)
+  const [adding, setAdding] = useState(false)
   const entries =
-    envelope && transactions
-      ? envelopeEntries(envelope, envelopes, transactions, period, today)
-      : []
+    envelope && transactions ? envelopeEntries(envelope, envelopes, transactions, period) : []
   const total = -entries.reduce((sum, t) => sum + t.amount, 0)
-  // usage.spent also counts paid bills linked to this envelope.
-  const fromBills = usage ? usage.spent - total : 0
+  // usage also counts bills linked to this envelope.
+  const fromBills = usage ? usage.spent + usage.linkedDue - total : 0
   const range = `${f.day(period.start)} – ${f.day(addDays(period.end, -1))}`
   // Everyday holds every untagged entry, so its log is the whole period; others filter.
   const logLink = envelope?.isDefault
@@ -80,14 +75,14 @@ export function EnvelopeEntriesSheet({
       open={envelope !== null}
       onClose={onClose}
       title={envelope?.name ?? ''}
-      description={`This pay period · ${range}`}
+      description={range}
     >
       {envelope && (
         <div className="space-y-4 pb-4">
           <div className="flex items-center gap-3 rounded-2xl bg-bg px-4 py-3">
             <EnvelopeDot color={envelope.color} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted">Spent this period</p>
+              <p className="text-sm text-muted">Actual this period</p>
               <p className="text-heading tabular-nums">{f.money(total + fromBills)}</p>
             </div>
             {envelope.budget > 0 && usage && (
@@ -109,20 +104,9 @@ export function EnvelopeEntriesSheet({
                 ` Tag spending with @${envelope.name.toLowerCase().split(' ')[0]} in quick-add and it lands here.`}
             </p>
           ) : (
-            <ul aria-label={`${envelope.name} entries`} className="card divide-y divide-line">
+            <ul aria-label={`${envelope.name} entries`} className="card divide-y divide-line px-4">
               {entries.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
-                      {t.note || (t.amount < 0 ? 'Spent' : 'Money back')}
-                    </span>
-                    <span className="text-sm text-muted">{f.day(t.date)}</span>
-                  </span>
-                  <span className="shrink-0 font-medium tabular-nums">
-                    {t.amount > 0 ? '+' : ''}
-                    {f.money(t.amount)}
-                  </span>
-                </li>
+                <EntryRow key={t.id} tx={t} onEdit={setEditing} />
               ))}
               {fromBills !== 0 && (
                 <li className="flex items-center gap-3 px-4 py-3">
@@ -132,12 +116,23 @@ export function EnvelopeEntriesSheet({
               )}
             </ul>
           )}
+          <Button block onClick={() => setAdding(true)}>
+            <Icon name="plus" size={18} />
+            Add spend to {envelope.name}
+          </Button>
           <Link to={logLink} className={buttonClass('secondary', 'md', true)}>
             <Icon name="list" size={18} />
             See all in log
           </Link>
         </div>
       )}
+      <TransactionSheet tx={editing} onClose={() => setEditing(null)} />
+      <AddEntrySheet
+        date={adding ? (today < period.end && today >= period.start ? today : period.start) : null}
+        envelopeId={envelope?.id}
+        onClose={() => setAdding(false)}
+        onAddBill={() => setAdding(false)}
+      />
     </Sheet>
   )
 }

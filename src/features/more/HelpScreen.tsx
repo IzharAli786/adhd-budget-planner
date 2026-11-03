@@ -15,18 +15,18 @@ const PARTS: readonly Part[] = [
   {
     icon: 'today',
     name: 'Today',
-    body: 'One number: what you can spend today and still be fine until payday. Log spending by typing “12 coffee” and the number updates. Tap “See the math” any time.',
+    body: 'One number: what you can spend today and still be fine this month. Below it, the shape of your money: saved, still owed, safe to spend, what’s coming up (tick bills off as you pay them) and the goals in motion. Log spending by typing “12 coffee”.',
   },
   {
-    icon: 'bills',
-    name: 'Bills',
-    body: 'What’s due and when your pay lands, as a list and a calendar. Bills due before payday are already set aside in today’s number, so you don’t have to remember them.',
+    icon: 'calendar',
+    name: 'Calendar',
+    body: 'Tap any day to add an expense, income, bill, savings or a debt payment, even repeating every month. Everything logged on a day shows there, with Edit and × right on it.',
   },
   {
     icon: 'plan',
     name: 'Plan',
     full: true,
-    body: 'Where this paycheck goes: income, bills, what’s set aside and what’s free. Try a price in “Can this fit?” without saving anything.',
+    body: 'Pick any month and see its whole picture: money in, bills, spending and safe to spend, budget vs actual for every envelope, where the money went and what’s left. Try a price in “Can this fit?” without saving anything.',
   },
   {
     icon: 'goals',
@@ -52,11 +52,11 @@ const FAQ: readonly { q: string; a: ReactNode }[] = [
   },
   {
     q: 'What does “estimate” mean?',
-    a: 'Steady can’t see your bank. Its numbers come from what you enter: your balance, pay, bills and spending. They’re a helpful guide, not a promise, and not financial advice. Updating your balance now and then keeps them close.',
+    a: 'Steady can’t see your bank. Safe to spend is money in (your starting balance the first month, then your pay and any income you log) minus bills minus spending. Savings and debt payments are tracked on their own and never lower it. It’s a helpful guide, not a promise, and not financial advice. Change the starting balance, currency or roll over any time in More › Money basics.',
   },
   {
     q: 'Simple or Full?',
-    a: 'Steady starts with every tab. Turning off “Show more tools” in More gives a simpler app with just Today, Bills and More. Switching never deletes anything.',
+    a: 'Steady starts with every tab. Turning off “Show more tools” in More gives a simpler app with just Today, Calendar and More. Switching never deletes anything.',
   },
   {
     q: 'Is my data private?',

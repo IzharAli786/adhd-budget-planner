@@ -46,6 +46,12 @@ export function MoreScreen() {
 
         <ListGroup title="Your money">
           <ListRow
+            icon="wallet"
+            label="Money basics"
+            detail="Currency, starting balance, roll over, month or payday"
+            to="/more/basics"
+          />
+          <ListRow
             icon="list"
             label="Transactions"
             detail="Everything you’ve logged, by day"

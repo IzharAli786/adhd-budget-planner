@@ -55,7 +55,6 @@ export function CanFitForm({
         total,
         startOfDaySafe: runway.startOfDaySafe,
         daysLeft: runway.daysLeft,
-        room: envelope?.reserved,
       })
     : null
 
@@ -87,18 +86,23 @@ export function CanFitForm({
         {result && (
           <section className="rounded-2xl bg-bg p-4">
             <p className="text-heading">
-              {result.fits ? 'Yes, it fits before payday.' : 'Not before payday.'}
+              {result.fits ? 'Yes, it fits this period.' : 'Not this period.'}
             </p>
             <p className="text-body text-muted">
               {result.fits
-                ? envelope && price !== null && price <= envelope.reserved
-                  ? `It fits inside ${envelope.name}, so payday money stays the same.`
-                  : 'Here’s what it would leave you.'
-                : `You’d be ${f.money(-result.after)} short. Could it wait until after payday?`}
+                ? 'Here’s what it would leave you.'
+                : `You’d be ${f.money(-result.after)} short. Could it wait until next period?`}
+              {envelope && price !== null && (
+                <span className="block">
+                  {price <= envelope.reserved
+                    ? `Inside your ${envelope.name} budget (${f.money(envelope.reserved - price)} left after).`
+                    : `${envelope.name} would go ${f.money(price - envelope.reserved)} past its budget.`}
+                </span>
+              )}
             </p>
             <dl className="mt-3 space-y-2 text-body">
               <div className="flex justify-between gap-4">
-                <dt className="text-muted">Until payday</dt>
+                <dt className="text-muted">Safe to spend</dt>
                 <dd className="tabular-nums">
                   {f.money(total)} → <span className="font-semibold">{f.money(result.after)}</span>
                 </dd>

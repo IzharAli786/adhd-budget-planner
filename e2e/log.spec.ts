@@ -13,7 +13,7 @@ test('common categories, an @tag chip, the log filter and a CSV export', async (
   await ensureFullMode(page)
 
   await page.goto('/plan')
-  await page.getByRole('switch', { name: 'Use envelopes' }).click()
+  // Envelopes are on from setup.
   await page.getByRole('button', { name: 'Start with common categories' }).click()
   await expect(page.getByRole('heading', { name: 'Eating out' })).toBeVisible()
 

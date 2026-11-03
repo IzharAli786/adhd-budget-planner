@@ -62,9 +62,9 @@ export function EnvelopesSection({ envelopes, usage, period, today }: Props) {
       {!on ? (
         <div className="card p-5 text-body text-muted">
           <p>
-            Envelopes give parts of your money a job, like{' '}
-            <span className="text-text">Food {f.money(300 * 10 ** f.decimals)}</span> each payday.
-            What’s still in them is set aside, so today’s number only shows what’s truly free.
+            Envelopes give each kind of spending a budget, like{' '}
+            <span className="text-text">Groceries {f.money(300 * 10 ** f.decimals)}</span>, and show
+            planned vs actual as you spend.
           </p>
           <p className="mt-2">
             Off is fine too: everything then shares one Everyday pot. Turn it on any time.
@@ -104,8 +104,9 @@ export function EnvelopesSection({ envelopes, usage, period, today }: Props) {
             Add envelope
           </Button>
           <p className="px-1 text-sm text-muted">
-            Whatever’s left at payday goes back into safe to spend. Untagged spending uses Everyday;
-            tag it in quick-add with @name, like “12 lunch @food”.
+            Budgets are your plan; safe to spend only moves when you actually spend. Untagged
+            spending uses Everyday; tag it in quick-add with @name, like “12 lunch @food”, or add it
+            from the envelope or the calendar.
           </p>
         </>
       )}
@@ -214,16 +215,17 @@ function EnvelopeRow({
   onOpen?: () => void
 }) {
   const f = useFormat()
+  const { planBy } = useAppSettings().settings
   const used = usage ? usage.spent + usage.linkedDue : 0
   const status = !usage
-    ? `${f.money(env.budget)} each payday`
+    ? `${f.money(env.budget)} each ${planBy === 'month' ? 'month' : 'payday'}`
     : env.budget === 0
       ? used > 0
         ? `${f.money(used)} used, no budget yet`
         : 'No budget yet'
       : usage.over > 0
         ? // Calm words instead of red (PLAN §1.3).
-          `Over by ${f.money(usage.over)}. That’s okay, it comes from what’s free.`
+          `${f.money(usage.over)} over the plan. That’s okay, it’s just information.`
         : `${f.money(usage.reserved)} left of ${f.money(env.budget)}`
 
   return (
@@ -264,6 +266,19 @@ function EnvelopeRow({
       </div>
       {env.budget > 0 && (
         <ProgressBar value={used / env.budget} label={`${env.name} used`} className="mx-1 mt-3" />
+      )}
+      {usage && (used > 0 || env.budget > 0) && (
+        <p className="mx-1 mt-1.5 flex justify-between gap-3 text-sm text-muted tabular-nums">
+          <span>
+            {f.money(usage.spent)} spent
+            {usage.linkedDue > 0 && ` · ${f.money(usage.linkedDue)} coming`}
+          </span>
+          {env.budget > 0 && (
+            <span>
+              {usage.over > 0 ? `${f.money(usage.over)} over` : `${f.money(usage.reserved)} left`}
+            </span>
+          )}
+        </p>
       )}
     </li>
   )
@@ -326,6 +341,7 @@ function EnvelopeForm({
   onDone: () => void
 }) {
   const f = useFormat()
+  const { planBy } = useAppSettings().settings
   const undoToast = useUndoToast()
   const [name, setName] = useState(envelope?.name ?? '')
   const [budget, setBudget] = useState<Cents | null>(envelope?.budget ?? null)
@@ -361,7 +377,7 @@ function EnvelopeForm({
         />
       </Field>
       <MoneyInput
-        label="Budget each payday"
+        label={planBy === 'month' ? 'Budget each month' : 'Budget each payday'}
         value={budget}
         onChange={setBudget}
         symbol={f.symbol}

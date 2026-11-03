@@ -16,7 +16,9 @@ import { addDays, addMonths } from '../../domain/dates'
 import { primaryIncome } from '../../domain/paySchedule'
 import { expandOccurrences, ruleDates } from '../../domain/recurrence'
 import { fundSaved, savingsOnPaydays } from '../../domain/savings'
-import type { ISODate } from '../../domain/types'
+import type { ISODate, Transaction } from '../../domain/types'
+import { TransactionSheet } from '../transactions/TransactionsScreen'
+import { AddEntrySheet } from './AddEntrySheet'
 import { todayISO } from '../../lib/clock'
 import { useToday } from '../../lib/useToday'
 import { BigNumber } from '../../ui/BigNumber'
@@ -56,7 +58,10 @@ export function BillsScreen() {
 
   return (
     <>
-      <PageHeader title="Bills" subtitle="What’s due, and when the money comes in." />
+      <PageHeader
+        title="Calendar"
+        subtitle="Bills, paydays and everything you log. Tap a day to add to it."
+      />
       <div className="mb-6 lg:max-w-sm">
         <Segmented
           label="Show"
@@ -87,6 +92,8 @@ export function BillsScreen() {
 
 type Panel =
   | { kind: 'day'; date: ISODate }
+  | { kind: 'add'; date: ISODate }
+  | { kind: 'entry'; tx: Transaction; date: ISODate }
   | { kind: 'occurrence'; billId: string; originalDate: ISODate }
   | { kind: 'editor'; target: BillEditorTarget }
   | null
@@ -140,6 +147,14 @@ function BillsView({
     const paydays = [...calendar.paydays.values()].flat()
     return savingsOnPaydays(paydays, funds, primaryIncome(incomes)?.id, saved)
   }, [funds, transactions, calendar.paydays, incomes])
+  const logged = useMemo(
+    () =>
+      groupByDate((transactions ?? []).filter((t) => t.date >= gridFrom && t.date < gridTo)) as Map<
+        ISODate,
+        Transaction[]
+      >,
+    [transactions, gridFrom, gridTo],
+  )
   const noteDays = useMemo(
     () => new Set((notes ?? []).flatMap((n) => (n.date ? [n.date] : []))),
     [notes],
@@ -204,7 +219,7 @@ function BillsView({
                 <Icon name="plus" size={18} />
                 Add bill
               </Button>
-              {!period.fromPayday && (
+              {!period.fromPayday && incomes.length === 0 && (
                 <button
                   type="button"
                   onClick={onShowPaydays}
@@ -225,6 +240,7 @@ function BillsView({
           paydays={calendar.paydays}
           savings={savings}
           notes={noteDays}
+          logged={logged}
           onMonthChange={(d) => setMonth(d === 0 ? today : addMonths(grid.month, d))}
           onSelectDay={(date) => setPanel({ kind: 'day', date })}
         />
@@ -269,9 +285,21 @@ function BillsView({
         bills={panel?.kind === 'day' ? (calendar.bills.get(panel.date) ?? []) : []}
         paydays={panel?.kind === 'day' ? (calendar.paydays.get(panel.date) ?? []) : []}
         savings={panel?.kind === 'day' ? (savings?.get(panel.date) ?? []) : []}
+        entries={panel?.kind === 'day' ? (logged.get(panel.date) ?? []) : []}
         onClose={() => setPanel(null)}
         onOpenBill={open}
+        onAdd={(date) => setPanel({ kind: 'add', date })}
+        onEditEntry={(tx) => setPanel({ kind: 'entry', tx, date: tx.date })}
+      />
+      <AddEntrySheet
+        date={panel?.kind === 'add' ? panel.date : null}
+        // Back to the day, so what was just added shows right there.
+        onClose={() => setPanel((p) => (p?.kind === 'add' ? { kind: 'day', date: p.date } : p))}
         onAddBill={addBill}
+      />
+      <TransactionSheet
+        tx={panel?.kind === 'entry' ? panel.tx : null}
+        onClose={() => setPanel((p) => (p?.kind === 'entry' ? { kind: 'day', date: p.date } : p))}
       />
       <OccurrenceSheet
         entry={openEntry}

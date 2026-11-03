@@ -1,7 +1,7 @@
 // First-run setup storage (PLAN §5). Progress is written after every step; finishing
 // creates the primary income and the first balance check-in in ONE transaction.
 import { isSetupComplete, scheduleFromSetup, type SetupProgress } from '../../domain/setup'
-import type { BalanceCheckIn, Cents, IncomeSource, ISODate } from '../../domain/types'
+import type { BalanceCheckIn, Cents, Envelope, IncomeSource, ISODate } from '../../domain/types'
 import { db } from '../schema'
 import { mutate } from '../undo'
 import { getMeta } from './meta'
@@ -37,7 +37,7 @@ export class SetupIncompleteError extends Error {
  * after a crash can never create a second income or check-in.
  */
 export function completeSetup(balance: Cents, today: ISODate, at = nowInstant()) {
-  return mutate(null, ['meta', 'incomes', 'checkIns'], async (w) => {
+  return mutate(null, ['meta', 'incomes', 'checkIns', 'envelopes'], async (w) => {
     const progress = (await w.get('meta', 'setupProgress'))?.value as SetupProgress | undefined
     if (progress?.step === 'done') return false
     const { nextPayday, kind, amount, otherDay } = progress ?? {}
@@ -60,6 +60,25 @@ export function completeSetup(balance: Cents, today: ISODate, at = nowInstant())
     await w.put('incomes', income)
     const checkIn: BalanceCheckIn = { id: newId(), at, date: today, balance }
     await w.put('checkIns', checkIn)
+    // The balance answered here is the starting balance (PLAN-v2 §C): added once, to the
+    // first period tracked. Money basics can change it any time.
+    const settings = (await w.get('meta', 'settings'))?.value as Record<string, unknown> | undefined
+    // Envelopes are on for new installs, so untagged spending needs its Everyday home.
+    if (!(await db.envelopes.toArray()).some((e) => e.isDefault && !e.deletedAt)) {
+      const everyday: Envelope = {
+        id: newId(),
+        name: 'Everyday',
+        budget: 0,
+        isDefault: true,
+        color: 'accent',
+        sort: 0,
+      }
+      await w.put('envelopes', everyday)
+    }
+    await w.put('meta', {
+      key: 'settings',
+      value: { ...settings, startDate: today, startingBalance: balance },
+    })
     await w.put('meta', { key: 'setupProgress', value: { ...progress, step: 'done', doneAt: at } })
     return true
   })

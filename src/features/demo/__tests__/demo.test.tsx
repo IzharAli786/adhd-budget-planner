@@ -120,9 +120,9 @@ describe('sample data in the app', () => {
     await seedReadyInstall()
     render(<App />)
     expect(await screen.findByText('You can spend today')).toBeTruthy()
-    expect(screen.getByText(/until payday/)).toBeTruthy()
+    expect(screen.getByText(/safe to\s+spend in/)).toBeTruthy()
 
-    await userEvent.click(screen.getAllByRole('link', { name: 'Bills' })[0]!)
+    await userEvent.click(screen.getAllByRole('link', { name: 'Calendar' })[0]!)
     expect(await screen.findAllByText('Rent')).not.toHaveLength(0)
     expect(screen.getAllByText('Phone').length).toBeGreaterThan(0)
 

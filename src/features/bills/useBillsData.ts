@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useAppSettings } from '../../app/SettingsProvider'
 import { useBillOccurrences, useBills, useIncomes, usePaydayOverrides } from '../../db/hooks'
 import { addDays } from '../../domain/dates'
 import { calendarMonthPeriod, currentPeriod, primaryIncome } from '../../domain/paySchedule'
@@ -20,14 +21,16 @@ export function useBillsData(today: ISODate) {
   const occurrences = useBillOccurrences()
   const incomes = useIncomes()
   const paydayOverrides = usePaydayOverrides()
+  const { planBy } = useAppSettings().settings
 
   const period = useMemo<BillsPeriod>(() => {
-    const primary = incomes && primaryIncome(incomes)
+    // Same period as safe to spend: the calendar month unless planning by payday.
+    const primary = planBy === 'payday' && incomes ? primaryIncome(incomes) : undefined
     const p = primary ? currentPeriod(primary, today, paydayOverrides ?? []) : null
     if (p) return { start: p.start, end: p.end, fromPayday: true }
     const month = calendarMonthPeriod(today)
     return { start: month.start, end: month.end, fromPayday: false }
-  }, [incomes, paydayOverrides, today])
+  }, [planBy, incomes, paydayOverrides, today])
 
   const loaded =
     bills !== undefined &&

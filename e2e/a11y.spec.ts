@@ -5,10 +5,11 @@ import { addFirstBill, ensureFullMode, logExpense, unlockAndSetup } from './help
 const SCREENS = [
   { path: '/', heading: 'Today' },
   { path: '/plan', heading: 'Plan' },
-  { path: '/bills', heading: 'Bills' },
+  { path: '/bills', heading: 'Calendar' },
   { path: '/goals', heading: 'Goals' },
   { path: '/more', heading: 'More' },
   { path: '/more/settings', heading: 'Appearance & settings' },
+  { path: '/more/basics', heading: 'Money basics' },
   { path: '/more/transactions', heading: 'Transactions' },
   { path: '/more/backup', heading: 'Backup & restore' },
   { path: '/more/review', heading: 'Look back' },
@@ -33,7 +34,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // Scan screens with something on them: empty states alone would skip bill rows,
     // repeat chips and the calendar's bill dots.
     await logExpense(page, '12 coffee')
-    await page.getByRole('link', { name: 'Bills' }).first().click()
+    await page.getByRole('link', { name: 'Calendar' }).first().click()
     await addFirstBill(page, 'Rent', '650')
 
     await ensureFullMode(page)
