@@ -24,12 +24,15 @@ import { ENTRY_KINDS, type EntryKind } from './entryKinds'
 export function AddEntrySheet({
   date,
   envelopeId,
+  initialKind = 'expense',
   onClose,
   onAddBill,
 }: {
   date: ISODate | null
   /** Start as an expense in this envelope ("+ Add spend" on an envelope). */
   envelopeId?: Id
+  /** The kind picked when it opens ("+ Add income" starts on Income). Bill is a separate form. */
+  initialKind?: Exclude<EntryKind, 'bill'>
   onClose: () => void
   onAddBill: (date: ISODate) => void
 }) {
@@ -43,9 +46,10 @@ export function AddEntrySheet({
     >
       {date && (
         <AddEntryForm
-          key={date}
+          key={`${date}|${initialKind}`}
           date={date}
           envelopeId={envelopeId}
+          initialKind={initialKind}
           onClose={onClose}
           onAddBill={onAddBill}
         />
@@ -57,11 +61,13 @@ export function AddEntrySheet({
 function AddEntryForm({
   date,
   envelopeId: initialEnvelope,
+  initialKind,
   onClose,
   onAddBill,
 }: {
   date: ISODate
   envelopeId?: Id
+  initialKind: Exclude<EntryKind, 'bill'>
   onClose: () => void
   onAddBill: (date: ISODate) => void
 }) {
@@ -72,7 +78,7 @@ function AddEntryForm({
   const debts = useDebts()
   const undoToast = useUndoToast()
   const noteId = useId()
-  const [kind, setKind] = useState<EntryKind>('expense')
+  const [kind, setKind] = useState<EntryKind>(initialKind)
   const [amount, setAmount] = useState<Cents | null>(null)
   const [note, setNote] = useState('')
   const [envelopeId, setEnvelopeId] = useState<Id | undefined>(initialEnvelope)
