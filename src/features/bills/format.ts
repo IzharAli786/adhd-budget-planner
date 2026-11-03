@@ -35,6 +35,8 @@ export interface Formatters {
   dayFull: (date: ISODate) => string
   /** "November 2026" */
   month: (date: ISODate) => string
+  /** "November": the month's own name, no year (Intl, so "noviembre", not "noviembre de"). */
+  monthName: (date: ISODate) => string
   /** "Mon" for weekday 1 */
   weekday: (dow: number, style?: 'short' | 'narrow' | 'long') => string
   /** "today", "tomorrow", "in 5 days", "3 days ago" */
@@ -72,6 +74,7 @@ export function makeFormatters(
       : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' },
   )
   const month = dt({ month: 'long', year: 'numeric' })
+  const monthOnly = dt({ month: 'long' })
   const wd = {
     short: dt({ weekday: 'short' }),
     narrow: dt({ weekday: 'narrow' }),
@@ -98,6 +101,7 @@ export function makeFormatters(
     dayLong: (d) => dayLong.format(utc(d)),
     dayFull: (d) => dayFull.format(utc(d)),
     month: (d) => month.format(utc(d)),
+    monthName: (d) => monthOnly.format(utc(d)),
     // 1970-01-04 was a Sunday, so day 4 + dow is that weekday.
     weekday: (dow, style = 'short') => wd[style].format(new Date(Date.UTC(1970, 0, 4 + dow))),
     relative: (d, today) => rel.format(daysBetween(today, d), 'day'),
