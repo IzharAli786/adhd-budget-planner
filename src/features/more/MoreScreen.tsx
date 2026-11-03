@@ -41,7 +41,7 @@ export function MoreScreen() {
       {/* Desktop: the groups flow into two balanced columns (CSS columns, so a short group
           never leaves a hole beside a tall one) instead of one long narrow list. */}
       <div className="space-y-7 lg:columns-2 lg:gap-8 lg:space-y-0 lg:[&>*]:mb-7 lg:[&>*]:break-inside-avoid">
-        {IS_DEMO && <DemoMoreGroup />}
+        {/* First: on a phone this is the only way to the sections the bar can't hold. */}
         <ListGroup title="Sections">
           {sections.map((tab) => (
             <ListRow
@@ -53,6 +53,7 @@ export function MoreScreen() {
             />
           ))}
         </ListGroup>
+        {IS_DEMO && <DemoMoreGroup />}
 
         <ListGroup>
           <ListRow

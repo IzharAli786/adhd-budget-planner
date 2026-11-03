@@ -48,9 +48,9 @@ export function GettingStartedScreen() {
         <h2 id="section-guide-title" className="type-display text-[1.375rem] leading-tight">
           How each section works
         </h2>
-        <ul className="card divide-y divide-line px-5 py-3">
+        <ul className="card divide-y divide-line px-5 py-4">
           {sections.map((s) => (
-            <li key={s.to} className="py-4">
+            <li key={s.to} className="py-3.5">
               <h3 className={cardTitle}>{s.label}</h3>
               <p className="mt-0.5 text-sm text-muted">{s.body}</p>
             </li>
