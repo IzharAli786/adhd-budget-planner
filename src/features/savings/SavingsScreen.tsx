@@ -19,7 +19,11 @@ export function SavingsScreen() {
       />
       <div className="space-y-8">
         {funds && transactions && <SavingsTiles funds={funds} transactions={transactions} />}
-        <FundsSection today={today} />
+        {/* FundsSection brings its own totals strip (without the total saved) for where it
+            stands alone; the full strip above already says it all, so that one is hidden. */}
+        <div className="[&_[aria-label='Savings_totals']]:hidden">
+          <FundsSection today={today} />
+        </div>
       </div>
     </>
   )

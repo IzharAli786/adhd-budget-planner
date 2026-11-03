@@ -50,9 +50,9 @@ const axisLabel = (locale: string, mode: ReviewMode, start: ISODate) =>
   ).format(utc(start))
 
 /**
- * Look back (More): a year of money in and out, by month or by pay period, with the
- * year's totals, a table, and a printable report. Read-only, and in both modes: looking
- * back is calm, not a tool to manage.
+ * Yearly review: a year of money in and out, by month or by pay period, with the year's
+ * totals, a table, and a printable report. Read-only: looking back is calm, not a tool
+ * to manage.
  */
 export function ReviewScreen() {
   const today = useToday()
@@ -61,9 +61,8 @@ export function ReviewScreen() {
     <>
       <div className="print-hide">
         <PageHeader
-          title="Look back"
+          title="Yearly review"
           subtitle="How the money moved, month by month or payday by payday."
-          back={{ to: '/more', label: 'More' }}
         />
       </div>
       {!data ? (
@@ -96,7 +95,7 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
     return 'error' in result ? null : result
   }, [data.debts, f.decimals])
 
-  // The year as Look back counts it (from the start of the history), so the cards agree
+  // The year as the review counts it (from the start of the history), so the cards agree
   // with the tiles and the table.
   const yearSummary = useMemo(() => {
     const whole = yearRange(year)

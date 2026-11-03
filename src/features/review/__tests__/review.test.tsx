@@ -49,24 +49,36 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('Look back', () => {
-  it('is one tap from More', async () => {
+describe('Yearly review', () => {
+  it('is a top-level section, one tap from More', async () => {
     goto('/more')
     render(<App />)
-    await userEvent.click(await screen.findByRole('link', { name: /Look back/ }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Look back' })).toBeTruthy()
+    await userEvent.click(
+      within(await screen.findByRole('main')).getByRole('link', { name: /Yearly review/ }),
+    )
+    expect(await screen.findByRole('heading', { level: 1, name: 'Yearly review' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/review')
+    // No way "back" to More: it is a section of its own.
+    expect(within(screen.getByRole('main')).queryByRole('link', { name: 'More' })).toBeNull()
+  })
+
+  it('the old address still lands on it', async () => {
+    goto('/more/review')
+    render(<App />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Yearly review' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/review')
   })
 
   it('explains itself before there is anything to show', async () => {
     await salary()
-    goto('/more/review')
+    goto('/review')
     render(<App />)
     expect(await screen.findByText('Nothing to look back on in 2026 yet')).toBeTruthy()
   })
 
   it('shows the year month by month, counting pay only from when Steady was used', async () => {
     await seedHistory()
-    goto('/more/review')
+    goto('/review')
     render(<App />)
     const table = await screen.findByRole('table')
     const october = within(table).getByRole('row', { name: /October 2026/ })
@@ -102,7 +114,7 @@ describe('Look back', () => {
       autopay: false,
     })
     await r.markPaid(rent.id, '2026-11-01', 90000)
-    goto('/more/review')
+    goto('/review')
     render(<App />)
     const tiles = await screen.findByRole('region', { name: '2026 at a glance' })
     expect(within(tiles).getByText('More out than in so far')).toBeTruthy()
@@ -113,7 +125,7 @@ describe('Look back', () => {
 
   it('per payday, shows what was carried into each payday', async () => {
     await seedHistory()
-    goto('/more/review')
+    goto('/review')
     render(<App />)
     await screen.findByRole('table')
     await userEvent.click(screen.getByRole('radio', { name: 'Per payday' }))
@@ -129,7 +141,7 @@ describe('Look back', () => {
     await seedHistory()
     const print = vi.fn()
     window.print = print
-    goto('/more/review')
+    goto('/review')
     const { container } = render(<App />)
     await screen.findByRole('table')
     await userEvent.click(screen.getByRole('button', { name: 'Print this year' }))
@@ -171,7 +183,7 @@ describe('Look back', () => {
     await r.markPaid(card.id, '2026-11-02', 3500)
     const print = vi.fn()
     window.print = print
-    goto('/more/review')
+    goto('/review')
     const { container } = render(<App />)
 
     const savings = await screen.findByRole('region', { name: 'Savings this year' })
@@ -201,7 +213,7 @@ describe('Look back', () => {
     await seedHistory()
     const print = vi.fn()
     window.print = print
-    goto('/more/review')
+    goto('/review')
     const { container } = render(<App />)
     await screen.findByRole('table')
     await userEvent.click(screen.getByRole('button', { name: 'Print this period' }))

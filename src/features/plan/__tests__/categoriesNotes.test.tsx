@@ -38,7 +38,7 @@ const goto = (path: string) => window.history.replaceState(null, '', path)
 describe('Common categories', () => {
   it('are offered right after envelopes go on, added in one tap with empty budgets, and undoable', async () => {
     await r.updateSettings({ envelopesEnabled: false })
-    goto('/plan')
+    goto('/envelopes')
     render(<App />)
     await userEvent.click(await screen.findByRole('switch', { name: 'Use envelopes' }))
     const offer = await screen.findByRole('region', { name: 'Start with common categories?' })
@@ -65,7 +65,7 @@ describe('Common categories', () => {
 
   it('can be skipped, and stays skipped', async () => {
     await r.updateSettings({ envelopesEnabled: false })
-    goto('/plan')
+    goto('/envelopes')
     const { unmount } = render(<App />)
     await userEvent.click(await screen.findByRole('switch', { name: 'Use envelopes' }))
     await userEvent.click(await screen.findByRole('button', { name: 'I’ll make my own' }))
@@ -80,7 +80,7 @@ describe('Common categories', () => {
   it('a new envelope gets its own colour, and the colour can be changed', async () => {
     await r.updateSettings({ envelopesEnabled: true })
     await r.ensureDefaultEnvelope()
-    goto('/plan')
+    goto('/envelopes')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: 'Add envelope' }))
     const sheet = await screen.findByRole('dialog', { name: 'New envelope' })
@@ -93,36 +93,41 @@ describe('Common categories', () => {
     )
   })
 
-  it('quick-add shows them as chips after @, and a tap writes the tag', async () => {
+  it('“Track spending” shows them as chips, and the tagged entry lands in that envelope', async () => {
     await r.updateSettings({ envelopesEnabled: true })
     await r.ensureDefaultEnvelope()
     await r.addStarterEnvelopes()
-    goto('/')
+    goto('/envelopes')
     render(<App />)
-    const field = await screen.findByRole('textbox', { name: /Quick add/ })
-    await userEvent.type(field, '12 lunch @ea')
-    const chips = await screen.findByRole('group', { name: 'Envelopes' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
+    await userEvent.type(
+      within(sheet).getByRole('textbox', { name: 'What for (optional)' }),
+      'lunch',
+    )
+    const chips = within(sheet).getByRole('group', { name: 'Envelope' })
     expect(
       within(chips)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Eating out'])
-    await userEvent.click(within(chips).getByRole('button', { name: 'Tag Eating out' }))
-    expect((field as HTMLInputElement).value).toBe('12 lunch @eating ')
-    expect(screen.getByText('· Eating out')).toBeTruthy()
-
-    await userEvent.type(field, '{Enter}')
+    ).toEqual(['Everyday', ...STARTER_CATEGORIES.map((c) => c.name)])
+    await userEvent.click(within(chips).getByRole('button', { name: 'Eating out' }))
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
     await waitFor(async () => {
       const [tx] = await r.listTransactions()
       const env = (await r.listEnvelopes()).find((e) => e.name === 'Eating out')
       expect(tx).toMatchObject({ amount: -1200, note: 'lunch', envelopeId: env!.id })
     })
+    const card = screen.getByRole('region', { name: 'Eating out' })
+    expect(await within(card).findByText('lunch')).toBeTruthy()
+    expect(within(card).getByText('€12.00 spent')).toBeTruthy()
   })
 })
 
 describe('Note for this month', () => {
-  it('is written on Plan and shows on Today in Full mode', async () => {
-    goto('/plan')
+  it('is written on Home and is still there next time', async () => {
+    goto('/home')
     const { unmount } = render(<App />)
     const card = await screen.findByRole('region', { name: 'Note for this month' })
     await userEvent.click(await within(card).findByRole('button', { name: 'Add a note' }))
@@ -137,24 +142,29 @@ describe('Note for this month', () => {
     expect(await within(card).findByText('Birthday month, go easy')).toBeTruthy()
     unmount()
 
-    goto('/')
+    goto('/home')
     render(<App />)
-    const today = await screen.findByRole('region', { name: 'Note for this month' })
-    expect(await within(today).findByText('Birthday month, go easy')).toBeTruthy()
+    const again = await screen.findByRole('region', { name: 'Note for this month' })
+    expect(await within(again).findByText('Birthday month, go easy')).toBeTruthy()
   })
 
-  it('is not on Today in Simple mode', async () => {
-    await r.updateSettings({ simpleMode: true })
-    await r.saveNote({ periodStart: '2026-11-01' }, 'hidden in simple')
-    goto('/')
+  it('belongs to its own month: October’s is separate', async () => {
+    await r.saveNote({ periodStart: '2026-11-01' }, 'November only')
+    goto('/home')
     render(<App />)
-    expect(await screen.findByRole('region', { name: 'Today’s number' })).toBeTruthy()
-    expect(screen.queryByText('hidden in simple')).toBeNull()
+    const card = await screen.findByRole('region', { name: 'Note for this month' })
+    expect(await within(card).findByText('November only')).toBeTruthy()
+    const nav = screen.getByRole('navigation', { name: 'Months' })
+    await userEvent.click(within(nav).getByRole('button', { name: 'Previous month' }))
+    expect(await within(nav).findByText('October 2026')).toBeTruthy()
+    const october = await screen.findByRole('region', { name: 'Note for this month' })
+    expect(await within(october).findByRole('button', { name: 'Add a note' })).toBeTruthy()
+    expect(screen.queryByText('November only')).toBeNull()
   })
 
   it('editing to blank removes it, with undo', async () => {
     await r.saveNote({ periodStart: '2026-11-01' }, 'old note')
-    goto('/plan')
+    goto('/home')
     render(<App />)
     const card = await screen.findByRole('region', { name: 'Note for this month' })
     await userEvent.click(

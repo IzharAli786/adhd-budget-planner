@@ -67,12 +67,7 @@ export function MonthTabs({
       ref={scroller}
       className="card-quiet flex overflow-x-auto rounded-full p-1 [scrollbar-width:thin]"
     >
-      <div
-        role="tablist"
-        aria-label="Months"
-        onKeyDown={onKeyDown}
-        className="flex flex-1 gap-0.5"
-      >
+      <div role="tablist" aria-label="Months" onKeyDown={onKeyDown} className="flex flex-1 gap-0.5">
         {months.map((m, i) => {
           const selected = m.key === value
           return (

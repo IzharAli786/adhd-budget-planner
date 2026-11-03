@@ -186,8 +186,8 @@ function OffCard({ onTurnOn }: { onTurnOn: () => void }) {
           </h2>
           <p className="mt-1.5 text-body text-muted">
             An envelope is a monthly budget for one kind of spending, like{' '}
-            <span className="text-text">Groceries {f.money(300 * 10 ** f.decimals)}</span>. Each
-            one shows what is spent and what is left as the month goes.
+            <span className="text-text">Groceries {f.money(300 * 10 ** f.decimals)}</span>. Each one
+            shows what is spent and what is left as the month goes.
           </p>
           <p className="mt-2 text-body text-muted">
             Off is fine too: everything then shares one Everyday pot.

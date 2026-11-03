@@ -98,6 +98,24 @@ describe('Goals: life goals', () => {
     ).toBeTruthy()
   })
 
+  it('comes first on Goals, and moves each goal from not started to in progress to done', async () => {
+    await r.addLifeGoal({ title: 'A new bike', status: 'todo' })
+    render(<App />)
+    const goals = await card()
+    const [firstSection] = screen.getAllByRole('heading', { level: 2 })
+    expect(firstSection!.textContent).toBe('Life goals')
+    expect(await within(goals).findByText('Not started')).toBeTruthy()
+
+    await userEvent.click(within(goals).getByRole('button', { name: 'Start it' }))
+    expect(await within(goals).findByText('In progress')).toBeTruthy()
+    await waitFor(async () => expect((await r.listLifeGoals())[0]!.status).toBe('doing'))
+
+    await userEvent.click(await within(goals).findByRole('button', { name: 'Mark done' }))
+    expect(await within(goals).findByText('Done')).toBeTruthy()
+    await waitFor(async () => expect((await r.listLifeGoals())[0]!.status).toBe('done'))
+    expect(within(goals).queryByRole('button', { name: /Start it|Mark done/ })).toBeNull()
+  })
+
   it('a goal linked to a debt shows how much is paid off', async () => {
     const { debt } = await r.addDebt({
       name: 'Card',

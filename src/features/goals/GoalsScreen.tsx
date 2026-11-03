@@ -1,37 +1,27 @@
-import { useDebts, useFunds, useTransactions } from '../../db/hooks'
+import { useLifeGoals, useNoSpend } from '../../db/hooks'
 import { GARDEN_STAGES } from '../../domain/garden'
-import { savingsTotals } from '../../domain/savings'
+import { noSpendCount } from '../../domain/noSpend'
+import { monthSpan } from '../../domain/safeToSpend'
+import type { ISODate } from '../../domain/types'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { useToday } from '../../lib/useToday'
 import { PageHeader } from '../../ui/PageHeader'
 import { StatStrip } from '../../ui/StatStrip'
-import { useFormat } from '../bills/format'
-import { DebtsSection } from '../debts/DebtsSection'
 import { ImpulseList } from '../impulse/ImpulseList'
-import { FundsSection } from './FundsSection'
 import { GardenCard } from './GardenCard'
 import { LifeGoalsCard } from './LifeGoals'
 import { NoSpendCard } from './NoSpendCard'
 import { useGarden } from './useGarden'
 
-// Goals (Full mode, PLAN §5): life goals, savings, debts, no-spend days, the 48-hour list
-// and the garden. Everything here only grows; nothing counts down or "breaks".
-// Desktop: two independent stacks (savings, no-spend, 48h | life goals, debts, garden), so a tall
-// card on one side never leaves a hole on the other the way a shared-row grid does.
+// Goals (Full mode, PLAN §5): the bigger picture. Life goals first (what the money is
+// for), then the small daily habits that get there: no-spend days, the 48-hour list and
+// the garden. Savings funds and debts have their own sections. Nothing here counts down
+// or "breaks".
 export function GoalsScreen() {
   const today = useToday()
   // Rendered in each layout's own order rather than reordered with CSS, so keyboard and
   // screen-reader order always match what is on screen.
   const wide = useMediaQuery('(min-width: 64rem)')
-  const funds = <FundsSection today={today} />
-  const debts = (
-    <section aria-labelledby="goals-debts" className="space-y-3">
-      <h2 id="goals-debts" className="flex min-h-11 items-end px-1 text-heading">
-        Debts
-      </h2>
-      <DebtsSection />
-    </section>
-  )
   const noSpend = <NoSpendCard today={today} />
   const impulse = (
     <section aria-labelledby="impulse-title" className="space-y-3">
@@ -42,31 +32,25 @@ export function GoalsScreen() {
     </section>
   )
   const garden = <GardenCard />
-  const lifeGoals = <LifeGoalsCard today={today} />
 
   return (
     <>
-      <PageHeader title="Goals" subtitle="Small steps that add up." />
+      <PageHeader title="Goals" subtitle="What the money is for, and the small steps toward it." />
       <div className="space-y-8">
-        <GoalsStrip />
+        <GoalsStrip today={today} />
+        <LifeGoalsCard today={today} />
+        {/* Desktop: two independent stacks, so a tall card on one side never leaves a
+            hole on the other the way a shared-row grid does. */}
         {wide ? (
           <div className="grid grid-cols-2 items-start gap-8">
             <div className="space-y-8">
-              {funds}
               {noSpend}
               {impulse}
             </div>
-            <div className="space-y-8">
-              {lifeGoals}
-              {debts}
-              {garden}
-            </div>
+            {garden}
           </div>
         ) : (
           <>
-            {lifeGoals}
-            {funds}
-            {debts}
             {noSpend}
             {impulse}
             {garden}
@@ -77,36 +61,30 @@ export function GoalsScreen() {
   )
 }
 
-/** Saved · Owed · Garden: the three things Goals tracks, at a glance. */
-function GoalsStrip() {
-  const f = useFormat()
-  const funds = useFunds()
-  const transactions = useTransactions()
-  const debts = useDebts()
+/** Life goals · No-spend days · Garden: what Goals tracks, at a glance. */
+function GoalsStrip({ today }: { today: ISODate }) {
+  const goals = useLifeGoals()
+  const days = useNoSpend()
   const garden = useGarden()
-  if (!funds || !transactions || !debts || !garden)
+  if (!goals || !days || !garden)
     return <div aria-hidden="true" className="h-20 animate-pulse rounded-3xl bg-surface" />
 
-  const owed = debts.reduce((sum, d) => sum + Math.max(0, d.balance), 0)
-  const owing = debts.filter((d) => d.balance > 0).length
+  const done = goals.filter((g) => g.status === 'done').length
+  const doing = goals.filter((g) => g.status === 'doing').length
+  const noSpend = noSpendCount(days, monthSpan(today).start, today)
   return (
     <StatStrip
       label="Goals at a glance"
       items={[
         {
-          label: 'Saved',
-          value: f.money(savingsTotals(funds, transactions).saved),
-          hint: funds.length === 1 ? 'In 1 fund' : `In ${funds.length} funds`,
+          label: 'Life goals',
+          value: goals.length === 0 ? 'None yet' : `${done} of ${goals.length} done`,
+          hint: goals.length === 0 ? 'Add one below' : `${doing} in progress`,
         },
         {
-          label: 'Owed',
-          value: f.money(owed),
-          hint:
-            debts.length === 0
-              ? 'No debts added'
-              : owed === 0
-                ? 'All paid off'
-                : `Across ${owing} ${owing === 1 ? 'debt' : 'debts'}`,
+          label: 'No-spend days',
+          value: String(noSpend),
+          hint: 'This month',
         },
         {
           label: 'Garden',

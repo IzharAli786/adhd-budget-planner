@@ -33,8 +33,24 @@ describe('More › How each part works', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'How each part works' }),
     ).toBeTruthy()
-    for (const tab of ['Today', 'Calendar', 'Plan', 'Goals', 'More'])
-      expect(screen.getByRole('heading', { level: 2, name: tab })).toBeTruthy()
+    // Getting started, every section in menu order, then More.
+    const parts = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent)
+      .filter((t) => t !== 'Questions')
+    expect(parts).toEqual([
+      'Getting started',
+      'Home',
+      'Today',
+      'Calendar',
+      'Goals',
+      'Savings',
+      'Debt',
+      'Envelopes',
+      'Yearly review',
+      'Settings',
+      'More',
+    ])
     for (const q of [/offline/, /backups/, /estimate/, /Simple or Full/, /private/])
       expect(screen.getByText(q, { selector: 'summary span' })).toBeTruthy()
     expect(screen.getByText('Estimates only, not financial advice.')).toBeTruthy()
@@ -49,42 +65,68 @@ describe('Add your rent: one tap to the bill form', () => {
     expect(within(sheet).getByRole('textbox', { name: 'Name' })).toBeTruthy()
     expect(window.location.search).toBe('')
   })
-
-  it('Today’s "Add a bill" lands in the form', async () => {
-    await r.addIncome({
-      name: 'Salary',
-      amount: 210000,
-      schedule: { kind: 'monthly', day: 'last' },
-      weekendRule: 'before',
-      primary: true,
-      active: true,
-    })
-    await r.addCheckIn(84250, '2026-11-04', new Date(2026, 10, 4, 8).toISOString())
-    goto('/')
-    render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Add a bill' }))
-    expect(await screen.findByRole('dialog', { name: 'Add a bill' })).toBeTruthy()
-  })
 })
 
-describe('Goals strip', () => {
-  it('shows saved, owed and the garden stage', async () => {
+describe('More', () => {
+  const sectionRows = () =>
+    within(screen.getByRole('main'))
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href'))
+      .filter((href) =>
+        ['/getting-started', '/goals', '/savings', '/debt', '/review', '/more/settings'].includes(
+          href ?? '',
+        ),
+      )
+
+  it('lists the sections the phone’s tab bar has no room for, first and in menu order', async () => {
     await r.updateSettings({ simpleMode: false })
-    await r.addFund({ name: 'Cushion', perPeriod: 0, openingSaved: 12000 })
-    await r.addDebt({
-      name: 'Card',
-      balance: 50000,
-      balanceAsOf: '2026-11-04',
-      aprBps: 2000,
-      minPayment: 2500,
-      dueDay: 12,
-    })
-    goto('/goals')
+    goto('/more')
     render(<App />)
-    const strip = await screen.findByRole('region', { name: 'Goals at a glance' })
-    expect(within(strip).getByText('€120.00')).toBeTruthy()
-    expect(within(strip).getByText('€500.00')).toBeTruthy()
-    expect(within(strip).getByText(/Stage 1 of/)).toBeTruthy()
+    const group = await screen.findByRole('heading', { name: 'Sections' })
+    expect(group).toBeTruthy()
+    expect(sectionRows()).toEqual([
+      '/getting-started',
+      '/goals',
+      '/savings',
+      '/debt',
+      '/review',
+      '/more/settings',
+    ])
+    const main = within(screen.getByRole('main'))
+    for (const name of [/Getting started/, /Goals/, /Savings/, /Debt/, /Yearly review/, /Settings/])
+      expect(main.getByRole('link', { name })).toBeTruthy()
+    // The old rows that led to the same places are gone.
+    expect(main.queryByRole('link', { name: /Look back/ })).toBeNull()
+    expect(main.queryByRole('link', { name: /Debt payoff/ })).toBeNull()
+    expect(main.queryByRole('link', { name: /Appearance & settings/ })).toBeNull()
+    // The rest is still here.
+    for (const name of [
+      /Transactions/,
+      /Backup & restore/,
+      /Recently deleted/,
+      /48-hour list/,
+      /How each part works/,
+    ])
+      expect(main.getByRole('link', { name })).toBeTruthy()
+  })
+
+  it('in Simple mode only offers the sections that exist', async () => {
+    await r.updateSettings({ simpleMode: true })
+    goto('/more')
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Sections' })
+    expect(sectionRows()).toEqual(['/getting-started', '/more/settings'])
+  })
+
+  it('a row opens its section', async () => {
+    await r.updateSettings({ simpleMode: false })
+    goto('/more')
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Sections' })
+    await userEvent.click(
+      within(screen.getByRole('main')).getByRole('link', { name: /Yearly review/ }),
+    )
+    expect(await screen.findByRole('heading', { level: 1, name: 'Yearly review' })).toBeTruthy()
   })
 })
 

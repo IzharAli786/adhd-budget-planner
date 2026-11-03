@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useAppSettings } from '../../app/SettingsProvider'
+import { visibleTabs } from '../../app/tabs'
 import { useRecentlyDeleted, useUndoLabel } from '../../db/hooks'
 import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import { undoLast } from '../../db/undo'
@@ -13,6 +14,16 @@ import { useToast } from '../../ui/Toast'
 import { relativeDays } from '../backup/relative'
 import { DemoMoreGroup } from '../demo/DemoMore'
 
+// One line on each section the phone's tab bar has no room for, keyed by route.
+const SECTION_DETAIL: Readonly<Record<string, string>> = {
+  '/getting-started': 'Currency, balance and a short tour',
+  '/goals': 'Life goals, no-spend days, the garden',
+  '/savings': 'Your funds and how close each is',
+  '/debt': 'What you owe and the plan to clear it',
+  '/review': 'Your year, ready to print',
+  '/more/settings': 'Name, theme, text size, backups',
+}
+
 export function MoreScreen() {
   const { settings, update } = useAppSettings()
   const lastBackupAt = useLiveQuery(() => getMeta<Instant>('lastBackupAt'))
@@ -21,6 +32,8 @@ export function MoreScreen() {
   const deleted = useRecentlyDeleted()
   const toast = useToast()
   const showInstall = INSTALL_FLOW && !isStandalone()
+  // Every section that isn't in the phone's tab bar, in the menu's own order.
+  const sections = visibleTabs(settings.simpleMode).filter((t) => !t.phone)
 
   return (
     <>
@@ -29,11 +42,23 @@ export function MoreScreen() {
           never leaves a hole beside a tall one) instead of one long narrow list. */}
       <div className="space-y-7 lg:columns-2 lg:gap-8 lg:space-y-0 lg:[&>*]:mb-7 lg:[&>*]:break-inside-avoid">
         {IS_DEMO && <DemoMoreGroup />}
+        <ListGroup title="Sections">
+          {sections.map((tab) => (
+            <ListRow
+              key={tab.to}
+              icon={tab.icon}
+              label={tab.label}
+              detail={SECTION_DETAIL[tab.to]}
+              to={tab.to}
+            />
+          ))}
+        </ListGroup>
+
         <ListGroup>
           <ListRow
             icon="sparkle"
             label="Show more tools"
-            detail="Plan and Goals: savings, debts, envelopes. Off for a simpler app."
+            detail="Home, Goals, Savings, Debt, Envelopes and the yearly review. Off for a simpler app."
             trailing={
               <Switch
                 label="Show more tools"
@@ -56,12 +81,6 @@ export function MoreScreen() {
             label="Transactions"
             detail="Everything you’ve logged, by day"
             to="/more/transactions"
-          />
-          <ListRow
-            icon="history"
-            label="Look back"
-            detail="Your year by month or payday, ready to print"
-            to="/more/review"
           />
           <ListRow
             icon="report"
@@ -94,24 +113,13 @@ export function MoreScreen() {
           ) : (
             <ListRow icon="refresh" label="Undo last change" detail="Nothing to undo" />
           )}
-          {/* Full mode keeps the 48-hour list in Goals (PLAN §5). */}
-          {settings.simpleMode && (
-            <ListRow
-              icon="clock"
-              label="48-hour list"
-              detail="Wait two days before buying, then decide"
-              to="/more/wait"
-            />
-          )}
-          {/* Full mode has debts in Goals; Simple mode keeps them one tap away here. */}
-          {settings.simpleMode && (
-            <ListRow
-              icon="goals"
-              label="Debt payoff"
-              detail="Snowball or avalanche, and when you’re done"
-              to="/more/debts"
-            />
-          )}
+          {/* Also under Goals; here so Simple mode, which has no Goals, keeps it. */}
+          <ListRow
+            icon="clock"
+            label="48-hour list"
+            detail="Wait two days before buying, then decide"
+            to="/more/wait"
+          />
         </ListGroup>
 
         <ListGroup title="Your data">
@@ -135,20 +143,11 @@ export function MoreScreen() {
           )}
         </ListGroup>
 
-        <ListGroup title="Make it yours">
-          <ListRow
-            icon="palette"
-            label="Appearance & settings"
-            detail="Theme, text size, currency, dates"
-            to="/more/settings"
-          />
-        </ListGroup>
-
         <ListGroup title="Help">
           <ListRow
             icon="info"
             label="How each part works"
-            detail="Each tab in a few lines, and common questions"
+            detail="Each section in a few lines, and common questions"
             to="/more/help"
           />
         </ListGroup>

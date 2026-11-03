@@ -1,11 +1,13 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  budgetFor,
   defaultBillEnvelope,
   ENVELOPE_COLORS,
   isPaletteColor,
   missingStarters,
   nextEnvelopeColor,
+  monthKey,
   STARTER_CATEGORIES,
 } from '../categories'
 import {
@@ -165,5 +167,50 @@ describe('@tag suggestions', () => {
   it('completes the tag being typed', () => {
     expect(completeTag('12 lunch @ea', 'eating')).toBe('12 lunch @eating ')
     expect(completeTag('12 lunch @', 'fun')).toBe('12 lunch @fun ')
+  })
+})
+
+describe('budgetFor (“Budget for November”)', () => {
+  it('is the plain budget while no month has its own', () => {
+    expect(budgetFor({ budget: 18000 }, '2026-11-15')).toBe(18000)
+    expect(budgetFor({ budget: 18000, monthBudgets: {} }, '2026-01-01')).toBe(18000)
+  })
+
+  it('a month’s budget holds from that month on, until a later month sets another', () => {
+    const env = { budget: 10000, monthBudgets: { '2026-11': 15000, '2027-02': 9000 } }
+    expect(budgetFor(env, '2026-10-31')).toBe(10000)
+    expect(budgetFor(env, '2026-11-01')).toBe(15000)
+    expect(budgetFor(env, '2026-11-30')).toBe(15000)
+    expect(budgetFor(env, '2027-01-15')).toBe(15000)
+    expect(budgetFor(env, '2027-02-01')).toBe(9000)
+    expect(budgetFor(env, '2030-06-01')).toBe(9000)
+  })
+
+  it('a zero budget for a month counts (it is not “unset”)', () => {
+    expect(budgetFor({ budget: 5000, monthBudgets: { '2026-11': 0 } }, '2026-12-01')).toBe(0)
+  })
+
+  it('earlier months never see a later month’s budget (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 1_000_000 }),
+        fc.dictionary(
+          fc
+            .tuple(fc.integer({ min: 2020, max: 2030 }), fc.integer({ min: 1, max: 12 }))
+            .map(([y, m]) => `${y}-${String(m).padStart(2, '0')}`),
+          fc.integer({ min: 0, max: 1_000_000 }),
+        ),
+        fc.integer({ min: 2019, max: 2031 }),
+        fc.integer({ min: 1, max: 12 }),
+        (budget, monthBudgets, y, m) => {
+          const date = `${y}-${String(m).padStart(2, '0')}-15`
+          const keys = Object.keys(monthBudgets).filter((k) => k <= monthKey(date))
+          const latest = keys.sort().at(-1)
+          expect(budgetFor({ budget, monthBudgets }, date)).toBe(
+            latest === undefined ? budget : monthBudgets[latest],
+          )
+        },
+      ),
+    )
   })
 })

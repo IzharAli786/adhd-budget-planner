@@ -25,55 +25,41 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('Goals: savings funds', () => {
-  it('names the next step when empty, then adds a fund and money to it', async () => {
+describe('Goals: the bigger picture', () => {
+  it('starts with life goals, then no-spend days, the 48-hour list and the garden', async () => {
+    await r.addFund({ name: 'Cushion', perPeriod: 0, openingSaved: 12000 })
+    await r.addDebt({
+      name: 'Card',
+      balance: 50000,
+      balanceAsOf: '2026-11-04',
+      aprBps: 2000,
+      minPayment: 2500,
+      dueDay: 12,
+    })
     render(<App />)
-    expect(await screen.findByText('Start one small fund')).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: 'New savings fund' }))
-    const sheet = await screen.findByRole('dialog', { name: 'New savings fund' })
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Name' }), 'Holiday')
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Each payday' }), '50')
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Target (optional)' }), '500')
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Add fund' }))
-
-    const ring = await screen.findByRole('progressbar', { name: 'Holiday progress' })
-    expect(ring.getAttribute('aria-valuenow')).toBe('0')
-
-    await userEvent.click(screen.getByRole('button', { name: 'Add money' }))
-    const add = await screen.findByRole('dialog', { name: 'Add to Holiday' })
-    // Prefilled with the per-payday amount.
-    expect((within(add).getByRole('textbox', { name: 'Amount' }) as HTMLInputElement).value).toBe(
-      '50',
-    )
-    await userEvent.click(within(add).getByRole('button', { name: 'Add money' }))
-
-    await waitFor(() => expect(ring.getAttribute('aria-valuenow')).toBe('10'))
-    expect(screen.getByText('of €500.00', { exact: false })).toBeTruthy()
-    // Stored as a fundId transaction leaving the balance (PLAN §3.3).
-    const [tx] = await db.transactions.toArray()
-    expect(tx).toMatchObject({ amount: -5000, date: '2026-11-04' })
-    expect(tx!.fundId).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Goals' })).toBeTruthy()
+    await screen.findByRole('heading', { name: 'A seed' })
+    const order = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(order).toEqual(['Life goals', 'No-spend days', '48-hour list', 'A seed'])
+    // Savings funds and debts have their own sections now.
+    expect(screen.queryByRole('button', { name: 'Add money' })).toBeNull()
+    expect(screen.queryByRole('list', { name: 'Payoff order' })).toBeNull()
+    expect(screen.queryByText('Cushion')).toBeNull()
   })
 
-  it('says the pace per payday to reach a target by a date', async () => {
-    await r.addIncome({
-      name: 'Salary',
-      amount: 210000,
-      schedule: { kind: 'monthly', day: 'last' },
-      weekendRule: 'before',
-      primary: true,
-      active: true,
-    })
-    await r.addFund({
-      name: 'Laptop',
-      target: 60000,
-      targetDate: '2027-01-31',
-      perPeriod: 0,
-      openingSaved: 0,
-    })
+  it('the strip sums up life goals, no-spend days and the garden', async () => {
+    await r.addLifeGoal({ title: 'A week in Lisbon', status: 'doing' })
+    await r.addLifeGoal({ title: 'Debt-free', status: 'done' })
+    await r.addLifeGoal({ title: 'A new bike', status: 'todo' })
+    await r.toggleNoSpend('2026-11-02')
+    await r.toggleNoSpend('2026-10-30')
     render(<App />)
-    // Paydays Mon 30 Nov, Thu 31 Dec, Fri 29 Jan: €600 / 3.
-    expect(await screen.findByText(/About €200\.00 per payday to reach it by/)).toBeTruthy()
+    const strip = await screen.findByRole('region', { name: 'Goals at a glance' })
+    expect(await within(strip).findByText('1 of 3 done')).toBeTruthy()
+    expect(within(strip).getByText('1 in progress')).toBeTruthy()
+    // Only this month's no-spend days count.
+    expect(within(strip).getByText('1')).toBeTruthy()
+    expect(within(strip).getByText(/Stage \d of/)).toBeTruthy()
   })
 })
 
@@ -153,24 +139,5 @@ describe('Goals: no-spend days and garden', () => {
       screen.getByRole('button', { name: /^Tuesday,? (3 November|November 3)$/ }),
     )
     expect(await screen.findByText(/1 this month/)).toBeTruthy()
-  })
-})
-
-describe('Goals: taking money out of a fund', () => {
-  it('never takes out more than is in the fund', async () => {
-    await r.addFund({ name: 'Cushion', perPeriod: 0, openingSaved: 3000 })
-    render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Add money' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Add to Cushion' })
-    await userEvent.click(within(sheet).getByRole('radio', { name: 'Take out' }))
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '40')
-    expect(within(sheet).getByText(/more than the €30\.00 in it/)).toBeTruthy()
-    const go = within(sheet).getByRole('button', { name: 'Take it out' }) as HTMLButtonElement
-    expect(go.disabled).toBe(true)
-    await userEvent.clear(within(sheet).getByRole('textbox', { name: 'Amount' }))
-    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '30')
-    await userEvent.click(go)
-    await waitFor(async () => expect(await db.transactions.toArray()).toHaveLength(1))
-    expect((await db.transactions.toArray())[0]).toMatchObject({ amount: 3000 })
   })
 })

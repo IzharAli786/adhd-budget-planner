@@ -45,7 +45,7 @@ export function GettingStartedScreen() {
       )}
 
       <section aria-labelledby="section-guide-title" className="mt-10 space-y-3">
-        <h2 id="section-guide-title" className="px-1 type-display text-[1.375rem] leading-tight">
+        <h2 id="section-guide-title" className="type-display text-[1.375rem] leading-tight">
           How each section works
         </h2>
         <ul className="card divide-y divide-line px-5 py-3">

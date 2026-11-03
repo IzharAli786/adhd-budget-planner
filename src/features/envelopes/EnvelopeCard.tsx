@@ -28,8 +28,7 @@ interface Props {
 }
 
 type Row =
-  | { kind: 'tx'; date: ISODate; tx: Transaction }
-  | { kind: 'bill'; date: ISODate; bill: BillEntry }
+  { kind: 'tx'; date: ISODate; tx: Transaction } | { kind: 'bill'; date: ISODate; bill: BillEntry }
 
 /**
  * One envelope for one month: its name and actions, the month's budget beside a bar of
@@ -61,10 +60,7 @@ export function EnvelopeCard({
   return (
     <section aria-labelledby={titleId} className="card p-5 sm:px-8 sm:pt-7 sm:pb-6">
       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2
-          id={titleId}
-          className="min-w-0 type-display text-[1.375rem] leading-tight break-words"
-        >
+        <h2 id={titleId} className="min-w-0 type-display text-[1.375rem] leading-tight break-words">
           {env.name}
         </h2>
         <div className="-mx-2.5 flex shrink-0 flex-wrap items-center sm:gap-1">
@@ -210,7 +206,7 @@ function BudgetRow({
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-3 sm:mt-4">
       <label htmlFor={inputId} className="text-sm font-semibold text-muted">
         Budget for {monthName}
       </label>

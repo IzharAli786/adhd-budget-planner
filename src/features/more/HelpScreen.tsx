@@ -2,42 +2,28 @@ import type { ReactNode } from 'react'
 import { Icon, type IconName } from '../../ui/Icon'
 import { PageHeader } from '../../ui/PageHeader'
 import { SectionHeader } from '../../ui/Section'
+import { SECTION_GUIDE } from '../start/sections'
 
 interface Part {
   icon: IconName
   name: string
-  /** Plan and Goals only show with "Show more tools" on. */
+  /** Only shown with "Show more tools" on. */
   full?: boolean
   body: string
 }
 
+// Getting started, the sections in menu order (the same lines it shows), then More.
 const PARTS: readonly Part[] = [
   {
-    icon: 'today',
-    name: 'Today',
-    body: 'One number: what you can spend today and still be fine this month. Below it, the shape of your money: saved, still owed, safe to spend, what’s coming up (tick bills off as you pay them) and the goals in motion. Log spending by typing “12 coffee”.',
+    icon: 'info',
+    name: 'Getting started',
+    body: 'Your currency, starting balance and roll over in one place, and a line on what each section is for.',
   },
-  {
-    icon: 'calendar',
-    name: 'Calendar',
-    body: 'Tap any day to add an expense, income, bill, savings or a debt payment, even repeating every month. Everything logged on a day shows there, with Edit and × right on it.',
-  },
-  {
-    icon: 'plan',
-    name: 'Plan',
-    full: true,
-    body: 'Pick any month and see its whole picture: money in, bills, spending and safe to spend, budget vs actual for every envelope, where the money went and what’s left. Try a price in “Can this fit?” without saving anything.',
-  },
-  {
-    icon: 'goals',
-    name: 'Goals',
-    full: true,
-    body: 'Savings funds, debts, no-spend days and the 48-hour list. The garden grows with good moments and never shrinks.',
-  },
+  ...SECTION_GUIDE.map((s) => ({ icon: s.icon, name: s.label, full: s.full, body: s.body })),
   {
     icon: 'more',
     name: 'More',
-    body: 'Your entries, backups, recently deleted items and settings like theme, text size and currency.',
+    body: 'On a phone, the sections the bar has no room for, plus everything you’ve logged, backups, recently deleted items and this guide.',
   },
 ]
 
@@ -48,15 +34,15 @@ const FAQ: readonly { q: string; a: ReactNode }[] = [
   },
   {
     q: 'How do backups work?',
-    a: 'More › Backup & restore saves one small file with everything in it. Keep it somewhere safe, like your email or cloud drive. Steady reminds you now and then, usually around payday. Restoring that file on any device brings it all back.',
+    a: 'Settings › Backups (also in More) saves one small file with everything in it. Keep it somewhere safe, like your email or cloud drive. Steady reminds you now and then, usually around payday. Restoring that file on any device brings it all back.',
   },
   {
     q: 'What does “estimate” mean?',
-    a: 'Steady can’t see your bank. Safe to spend is money in (your starting balance the first month, then your pay and any income you log) minus bills minus spending. Savings and debt payments are tracked on their own and never lower it. It’s a helpful guide, not a promise, and not financial advice. Change the starting balance, currency or roll over any time in More › Money basics.',
+    a: 'Steady can’t see your bank. Safe to spend is money in (your starting balance the first month, then your pay and any income you log) minus bills minus spending. Savings and debt payments are tracked on their own and never lower it. It’s a helpful guide, not a promise, and not financial advice. Change the currency, starting balance or roll over any time in Getting started.',
   },
   {
     q: 'Simple or Full?',
-    a: 'Steady starts with every tab. Turning off “Show more tools” in More gives a simpler app with just Today, Calendar and More. Switching never deletes anything.',
+    a: 'Steady starts with every section. Turning off “Show more tools” in More or Settings gives a simpler app: Today, Calendar, Getting started and Settings. Switching never deletes anything.',
   },
   {
     q: 'Is my data private?',
@@ -64,7 +50,7 @@ const FAQ: readonly { q: string; a: ReactNode }[] = [
   },
 ]
 
-/** More › How each part works: one kind card per tab, then the questions people ask. */
+/** More › How each part works: one card per section, then the questions people ask. */
 export function HelpScreen() {
   return (
     <>

@@ -7,7 +7,9 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useAppSettings } from '../../app/SettingsProvider'
+import { getChangesSinceBackup, getMeta } from '../../db/repos'
 import { accentTokens, checkAccent, HEX_COLOR, type Mode } from '../../domain/accent'
 import { DISPLAY_NAME_MAX } from '../../domain/greeting'
 import {
@@ -18,6 +20,7 @@ import {
   type Theme,
   type WeekStart,
 } from '../../domain/settings'
+import type { Instant } from '../../domain/types'
 import { todayISO } from '../../lib/clock'
 import { askBadgePermission, badgeEnabled, badgePlatform } from '../../lib/badge'
 import { formatBytes, requestPersist, storageStatus, type StorageStatus } from '../../lib/storage'
@@ -26,9 +29,11 @@ import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Field, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
+import { ListGroup, ListRow } from '../../ui/List'
 import { PageHeader } from '../../ui/PageHeader'
 import { Segmented } from '../../ui/Segmented'
 import { Switch } from '../../ui/Switch'
+import { relativeDays } from '../backup/relative'
 import { makeFormatters, useFormat } from '../bills/format'
 import { LocalePickers } from '../setup/LocaleLine'
 
@@ -78,9 +83,27 @@ export function SettingsScreen() {
 
   return (
     <>
-      <PageHeader title="Appearance & settings" back={{ to: '/more', label: 'More' }} />
+      <PageHeader
+        title="Settings"
+        subtitle="How Steady looks and works. Change any of it, any time."
+      />
       <div className="space-y-8">
         <NameSection />
+
+        <ListGroup title="Money">
+          <ListRow
+            icon="info"
+            label="Getting started"
+            detail="Currency, starting balance, roll over, and what each section does"
+            to="/getting-started"
+          />
+          <ListRow
+            icon="wallet"
+            label="Money basics"
+            detail="Cushion, month or payday, and when tracking starts"
+            to="/more/basics"
+          />
+        </ListGroup>
 
         <Section title="Theme" id="theme-label">
           <div
@@ -137,7 +160,8 @@ export function SettingsScreen() {
             <div className="min-w-0 flex-1 py-1.5">
               <p className="font-medium">Show more tools</p>
               <p className="text-sm text-muted">
-                Shows Plan and Goals. Turn it off for a simpler app; nothing is deleted.
+                Home, Goals, Savings, Debt, Envelopes and the yearly review. Turn it off for a
+                simpler app; nothing is deleted.
               </p>
             </div>
             <Switch
@@ -150,9 +174,31 @@ export function SettingsScreen() {
 
         <BadgeSetting />
 
+        <BackupsGroup />
+
         <StorageCard />
       </div>
     </>
+  )
+}
+
+/** Backups live on their own screen (save, restore, erase everything); this is the way in. */
+function BackupsGroup() {
+  const lastBackupAt = useLiveQuery(() => getMeta<Instant>('lastBackupAt'))
+  const changes = useLiveQuery(getChangesSinceBackup)
+  return (
+    <ListGroup title="Backups">
+      <ListRow
+        icon="shield"
+        label="Backup, restore & erase"
+        detail={
+          lastBackupAt
+            ? `Last backup ${relativeDays(lastBackupAt)}${changes ? ` · ${changes} ${changes === 1 ? 'change' : 'changes'} since` : ''}`
+            : 'No backup yet'
+        }
+        to="/more/backup"
+      />
+    </ListGroup>
   )
 }
 

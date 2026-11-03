@@ -62,7 +62,7 @@ function BasicsForm({ model, today }: { model: TodayModel; today: ISODate }) {
       <PageHeader
         title="Money basics"
         subtitle="What safe to spend is built on. Change any of it, any time."
-        back={{ to: '/more', label: 'More' }}
+        back={{ to: '/more/settings', label: 'Settings' }}
       />
       <div className="max-w-2xl space-y-5">
         {plan && (

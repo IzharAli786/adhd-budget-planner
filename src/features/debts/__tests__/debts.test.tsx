@@ -13,6 +13,7 @@ beforeEach(async () => {
   vi.setSystemTime(NOW)
   await resetDb()
   await seedReadyInstall()
+  await r.updateSettings({ simpleMode: false })
   localStorage.clear()
 })
 afterEach(() => {
@@ -31,17 +32,29 @@ const card = {
 const loan = { ...card, name: 'Car loan', balance: 60000, aprBps: 2400 }
 
 describe('Debts', () => {
-  it('Simple mode: More links to Debt payoff, whose empty state names the next step', async () => {
-    await r.updateSettings({ simpleMode: true })
+  it('is its own section, one tap from More, and its empty state names the next step', async () => {
     window.history.replaceState(null, '', '/more')
     render(<App />)
-    await userEvent.click(await screen.findByRole('link', { name: /Debt payoff/ }))
+    await userEvent.click(
+      within(await screen.findByRole('main')).getByRole('link', { name: /^Debt/ }),
+    )
+    expect(await screen.findByRole('heading', { level: 1, name: 'Debt' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/debt')
+    // Top level: no way "back" to More.
+    expect(within(screen.getByRole('main')).queryByRole('link', { name: 'More' })).toBeNull()
     expect(await screen.findByRole('heading', { name: 'No debts added' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Add a debt' })).toBeTruthy()
   })
 
-  it('adds a debt with a linked minimum bill', async () => {
+  it('the old address still lands on it', async () => {
     window.history.replaceState(null, '', '/more/debts')
+    render(<App />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Debt' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/debt')
+  })
+
+  it('adds a debt with a linked minimum bill', async () => {
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: 'Add a debt' }))
     const sheet = await screen.findByRole('dialog', { name: 'Add a debt' })
@@ -68,7 +81,7 @@ describe('Debts', () => {
   })
 
   it('asks for the missing fields instead of saving', async () => {
-    window.history.replaceState(null, '', '/more/debts')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: 'Add a debt' }))
     const sheet = await screen.findByRole('dialog', { name: 'Add a debt' })
@@ -79,22 +92,20 @@ describe('Debts', () => {
   })
 
   it('never says a plan "saves €0.00": equal plans are named as the same cost', async () => {
-    await r.updateSettings({ simpleMode: false })
     await r.addDebt(card)
-    window.history.replaceState(null, '', '/goals')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     expect(await screen.findByText(/Both plans cost the same here/)).toBeTruthy()
     expect(screen.queryByText(/saves .*0\.00/)).toBeNull()
   })
 
-  it('Full mode: Goals compares snowball and avalanche with order, chart table and note', async () => {
-    await r.updateSettings({ simpleMode: false })
+  it('compares snowball and avalanche with order, chart table and note', async () => {
     await r.addDebt(card)
     await r.addDebt(loan)
-    window.history.replaceState(null, '', '/goals')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Debts' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Debt' })).toBeTruthy()
     // Default budget = minimums (€100) + €50.
     const budget = await screen.findByRole('textbox', { name: 'Each month toward debts' })
     expect((budget as HTMLInputElement).value).toBe('150')
@@ -131,11 +142,10 @@ describe('Debts', () => {
   })
 
   it('"Focus first" marks where the extra goes, even when another debt finishes first', async () => {
-    await r.updateSettings({ simpleMode: false })
     // The 0% card clears on its own minimum in month 1; the extra goes to the loan.
     await r.addDebt({ ...card, name: 'Store card', balance: 10000, aprBps: 0, minPayment: 10000 })
     await r.addDebt({ ...loan, balance: 100000, aprBps: 2000, minPayment: 2000 })
-    window.history.replaceState(null, '', '/goals')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     const order = await screen.findByRole('list', { name: 'Payoff order' })
     const items = within(order).getAllByRole('listitem')
@@ -146,7 +156,7 @@ describe('Debts', () => {
 
   it('a budget that never finishes says so instead of showing a 50-year total', async () => {
     await r.addDebt({ ...loan, name: 'Store card', balance: 100000, minPayment: 1500 })
-    window.history.replaceState(null, '', '/more/debts')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     const budget = await screen.findByRole('textbox', { name: 'Each month toward debts' })
     await userEvent.clear(budget)
@@ -161,7 +171,7 @@ describe('Debts', () => {
 
   it('setting a balance to 0 marks it paid off and takes its minimum out of Bills', async () => {
     const { debt } = await r.addDebt(card)
-    window.history.replaceState(null, '', '/more/debts')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: /Visa/ }))
     const sheet = await screen.findByRole('dialog', { name: 'Edit Visa' })
@@ -177,7 +187,7 @@ describe('Debts', () => {
   })
 
   it('a new debt needs something owed', async () => {
-    window.history.replaceState(null, '', '/more/debts')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: 'Add a debt' }))
     const sheet = await screen.findByRole('dialog', { name: 'Add a debt' })
@@ -192,14 +202,14 @@ describe('Debts', () => {
 
   it('warns when a minimum does not cover the interest', async () => {
     await r.addDebt({ ...loan, name: 'Store card', balance: 100000, minPayment: 1500 })
-    window.history.replaceState(null, '', '/more/debts')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     expect(await screen.findByText(/minimum doesn’t cover its interest/)).toBeTruthy()
   })
 
   it('% paid keeps its starting point when the balance is edited', async () => {
     const { debt } = await r.addDebt(card)
-    window.history.replaceState(null, '', '/more/debts')
+    window.history.replaceState(null, '', '/debt')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: /Visa/ }))
     const sheet = await screen.findByRole('dialog', { name: 'Edit Visa' })
