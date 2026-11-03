@@ -1,6 +1,7 @@
 // User preferences, stored as one row in meta under 'settings'. Plain data so the
 // same object travels through IndexedDB, backups and React without conversion.
-import type { Cents } from './money'
+// The money settings (start, roll over, cushion) live in their own row, meta.plan
+// (domain/plan.ts), so undoing one never undoes a theme change (PLAN-v2 decision 3).
 
 export const THEMES = ['clay', 'sage', 'ocean', 'blush', 'sand', 'midnight'] as const
 export type Theme = (typeof THEMES)[number]
@@ -24,8 +25,6 @@ export interface Settings {
   /** Root font size in percent, 100-150. */
   largeText: number
   reducedMotion: MotionPreference
-  /** Kept aside from safe-to-spend as a cushion. */
-  buffer: Cents
   envelopesEnabled: boolean
   /** App-icon badge; null = the platform default (on in Chromium, off on iOS). */
   appBadge: boolean | null
@@ -50,9 +49,9 @@ export const DEFAULT_SETTINGS: Settings = {
   simpleMode: false,
   largeText: 100,
   reducedMotion: 'auto',
-  buffer: 0,
-  // Off by default (PLAN §10 M9): most people start with one number, not categories.
-  envelopesEnabled: false,
+  // On by default (PLAN-v2 decision 18) with only "Everyday" at budget 0, which gives
+  // exactly the numbers of envelopes off. The v5 migration pins `false` where it was off.
+  envelopesEnabled: true,
   appBadge: null,
   justToday: false,
   displayName: '',

@@ -2,8 +2,9 @@
 // a different comparator for where the extra money goes (the strategy pattern).
 // Integer cents throughout; interest is the one rounding point (Math.round, PLAN §3.1).
 // Cost: O(months × debts · log debts), months capped at maxMonths.
+import { effectiveStatus, type BillEntry } from './bills'
 import type { Cents } from './money'
-import type { Id } from './types'
+import { occurrenceId, type DateRange, type Debt, type Id, type ISODate, type Transaction } from './types'
 
 export type Strategy = 'snowball' | 'avalanche'
 export const STRATEGIES: readonly Strategy[] = ['snowball', 'avalanche']
@@ -179,3 +180,97 @@ export const totalsOverTime = (sim: SimulationOk): Cents[] =>
 /** A suggested starting budget: the minimums plus a small, doable extra. */
 export const defaultBudget = (debts: readonly DebtInput[], extra: Cents): Cents =>
   sumMinimums(debts) + extra
+
+// --- The Debt section's own numbers (PLAN-v2 §1.6, A2) ----------------------------------
+// Debt payments never touch safe to spend. Each payment is stored once: a logged payment is
+// a dated debt transaction; a minimum ticked paid with no linked transaction counts at its
+// own date (R6, decision 5).
+
+export interface DebtPayment {
+  debtId: Id
+  date: ISODate
+  /** Positive: money paid towards the debt. */
+  amount: Cents
+  source: 'tx' | 'minimum'
+  txId?: Id
+  /** The minimum it paid: the linked one for a tx, the entry itself for 'minimum'. */
+  occurrenceId?: string
+}
+
+const isDebtTx = (t: Transaction) =>
+  t.deletedAt === undefined && t.fundId === undefined && t.debtId !== undefined
+
+/**
+ * Every payment towards debts, oldest first. `debtEntries` are the debt bills' entries
+ * (any range); an autopay minimum dated on or before today counts as paid (R4).
+ */
+export function debtPayments(
+  txs: readonly Transaction[],
+  debtEntries: readonly BillEntry[],
+  today: ISODate,
+): DebtPayment[] {
+  const out: DebtPayment[] = []
+  const linked = new Set<string>()
+  for (const t of txs) {
+    if (!isDebtTx(t)) continue
+    if (t.billOccurrenceId !== undefined) linked.add(t.billOccurrenceId)
+    out.push({
+      debtId: t.debtId!,
+      date: t.date,
+      amount: -t.amount,
+      source: 'tx',
+      txId: t.id,
+      ...(t.billOccurrenceId !== undefined ? { occurrenceId: t.billOccurrenceId } : {}),
+    })
+  }
+  for (const e of debtEntries) {
+    if (e.debtId === undefined || effectiveStatus(e, today) !== 'paid') continue
+    const id = occurrenceId(e.billId, e.originalDate)
+    if (linked.has(id)) continue
+    out.push({ debtId: e.debtId, date: e.date, amount: e.amount, source: 'minimum', occurrenceId: id })
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+}
+
+/** Still owed: the balance minus payments after it was set. An estimate (interest ignored). */
+export function owedNow(
+  d: Pick<Debt, 'id' | 'balance' | 'balanceAsOf'>,
+  payments: readonly DebtPayment[],
+  today: ISODate,
+): Cents {
+  let paid = 0
+  for (const p of payments)
+    if (p.debtId === d.id && p.date > d.balanceAsOf && p.date <= today) paid += p.amount
+  return Math.max(0, d.balance - paid)
+}
+
+export interface PeriodDebt {
+  /** Every debt minimum in the period, paid or not (skipped ones left out). */
+  due: Cents
+  /** Payments dated in the period, up to today. */
+  paid: Cents
+  /** Minimums still due, dated after today in the period. */
+  scheduled: Cents
+  entries: BillEntry[]
+  payments: DebtPayment[]
+}
+
+export function periodDebt(
+  period: DateRange,
+  debtEntries: readonly BillEntry[],
+  payments: readonly DebtPayment[],
+  today: ISODate,
+): PeriodDebt {
+  const inP = (d: ISODate) => d >= period.start && d < period.end
+  const entries = debtEntries.filter((e) => e.debtId !== undefined && inP(e.date))
+  const own = payments.filter((p) => inP(p.date))
+  let due = 0
+  let scheduled = 0
+  for (const e of entries) {
+    if (e.status === 'skipped') continue
+    due += e.amount
+    if (e.date > today && effectiveStatus(e, today) === 'due') scheduled += e.amount
+  }
+  const paid = own.filter((p) => p.date <= today).reduce((a, p) => a + p.amount, 0)
+  return { due, paid, scheduled, entries, payments: own }
+}

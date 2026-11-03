@@ -1,5 +1,6 @@
+// The frozen v4 engine still computes exactly what v4 did (it feeds legacySnapshot).
 import { describe, expect, it } from 'vitest'
-import type { BillEntry } from '../bills'
+import type { BillEntry } from '../../bills'
 import {
   askIfInBalance,
   checkInPlan,
@@ -9,8 +10,8 @@ import {
   lookbackStart,
   paidSinceCheckIn,
   paydaySinceCheckIn,
-} from '../reconcile'
-import type { Bill, BillOccurrence, Transaction } from '../types'
+} from '../v4Today'
+import type { Bill, BillOccurrence, Transaction } from '../../types'
 
 const checkIn = { at: '2026-11-02T09:00:00.000Z', date: '2026-11-02', balance: 100000 }
 const tx = (extra: Partial<Transaction>): Transaction => ({

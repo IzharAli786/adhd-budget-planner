@@ -8,8 +8,6 @@ import type { Id, Instant, ISODate } from './types'
 export type ActionKind =
   | 'payday-unknown'
   | 'overdue-bill'
-  | 'stale-balance'
-  | 'payday-checkin'
   | 'demo-try'
   | 'backup'
   | 'impulse'
@@ -28,10 +26,8 @@ export interface OverdueBill {
 export interface ActionState {
   /** Null when no schedule gives a future payday (irregular pay with no date left). */
   nextPayday: ISODate | null
-  /** Unpaid manual bills dated before today. Autopay ones reconcile at check-in. */
+  /** Unpaid manual bills dated before today (autopay ones already read as paid). */
   overdue: readonly OverdueBill[]
-  balanceAgeDays: number
-  paydaySinceCheckIn: boolean
   /** Days since the last backup, or since the data started when there was none. */
   daysSinceBackup: number
   /** 48h-list items whose wait is over (M9; 0 until then). */
@@ -64,7 +60,6 @@ export interface NextAction {
 export type Snoozes = Readonly<Record<string, Instant>>
 
 export const SNOOZE_HOURS = 24
-export const STALE_BALANCE_DAYS = 3
 export const BACKUP_DAYS = 14
 
 /** Pure: `now` is passed in. Instants from toISOString sort as strings. */
@@ -106,29 +101,6 @@ export function candidates(state: ActionState, today: ISODate): NextAction[] {
       doneState: `${bill.name} marked paid.`,
       bill,
     })
-  const payday = () =>
-    add({
-      id: 'payday-checkin',
-      kind: 'payday-checkin',
-      trigger: 'Payday! Update your balance',
-      detail: 'Your pay isn’t in today’s number until you do.',
-      cta: 'Update',
-      // PLAN §4.5: payday is the backup moment, so the done state offers one.
-      doneState: 'Balance updated. A good moment for a backup.',
-    })
-  // A stale balance after a payday is the same task (one check-in), so it takes the
-  // payday wording at the stale slot. Otherwise the plainer card wins, the check-in
-  // clears the payday one, and the payday backup offer is lost.
-  if (state.balanceAgeDays > STALE_BALANCE_DAYS && !state.paydaySinceCheckIn)
-    add({
-      id: 'stale-balance',
-      kind: 'stale-balance',
-      trigger: 'Update your balance',
-      detail: 'Takes 20 seconds. Keeps today’s number honest.',
-      cta: 'Update',
-      doneState: 'Balance updated.',
-    })
-  if (state.paydaySinceCheckIn) payday()
   if (state.demo === 'sample')
     add({
       id: 'demo-try',

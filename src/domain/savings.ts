@@ -1,20 +1,80 @@
 // Savings funds (PLAN §3.3): money moved into a fund is a transaction with fundId, so the
 // fund's total is derived (opening + Σ moves) and can never drift from the history.
-import { daysBetween } from './dates'
+// Savings live in their own section (PLAN-v2 A2): nothing here touches safe to spend.
+import { addDays, daysBetween } from './dates'
 import type { Cents } from './money'
-import type { Id, ISODate, SavingsFund, Transaction } from './types'
+import type { DateRange, Id, ISODate, SavingsFund, Transaction } from './types'
 
 export const CHALLENGE_WEEKS = 52
 
-/** Moves into the fund are negative (they leave the balance), so saved = −Σ amount. */
+/**
+ * Moves into the fund are negative (they leave the spending money), so saved = −Σ amount.
+ * With `asOf`, only moves dated on or before it: later ones show as "Scheduled".
+ */
 export function fundSaved(
   fund: Pick<SavingsFund, 'id' | 'openingSaved'>,
-  txs: readonly Transaction[],
+  txs: readonly Pick<Transaction, 'fundId' | 'amount' | 'date' | 'deletedAt'>[],
+  asOf?: ISODate,
 ): Cents {
   return txs.reduce(
-    (saved, t) => (t.fundId === fund.id && t.deletedAt === undefined ? saved - t.amount : saved),
+    (saved, t) =>
+      t.fundId === fund.id && t.deletedAt === undefined && (asOf === undefined || t.date <= asOf)
+        ? saved - t.amount
+        : saved,
     fund.openingSaved,
   )
+}
+
+export interface FundPeriod {
+  fundId: Id
+  name: string
+  /** Net moved in, dated in the period up to today. */
+  saved: Cents
+  /** Net moved in, dated after today in the period. */
+  scheduled: Cents
+  /** The per-payday plan for the period, never more than what's left to the target. */
+  planned: Cents
+}
+
+export interface PeriodSavings {
+  saved: Cents
+  scheduled: Cents
+  planned: Cents
+  funds: FundPeriod[]
+}
+
+/**
+ * The Savings panel for a period (PLAN-v2 §1.6). `primaryPaydays` is how many primary
+ * paydays fall in it: a plan is "each payday", and a side gig's payday doesn't ask again.
+ */
+export function periodSavings(
+  period: DateRange,
+  funds: readonly SavingsFund[],
+  txs: readonly Transaction[],
+  primaryPaydays: number,
+  today: ISODate,
+): PeriodSavings {
+  const cut = addDays(today, 1)
+  const out: PeriodSavings = { saved: 0, scheduled: 0, planned: 0, funds: [] }
+  for (const f of funds) {
+    if (f.deletedAt !== undefined) continue
+    let saved = 0
+    let scheduled = 0
+    for (const t of txs) {
+      if (t.fundId !== f.id || t.deletedAt !== undefined) continue
+      if (t.date < period.start || t.date >= period.end) continue
+      if (t.date < cut) saved -= t.amount
+      else scheduled -= t.amount
+    }
+    const before = fundSaved(f, txs, addDays(period.start, -1))
+    const left = f.target === undefined ? Infinity : f.target - before
+    const planned = Math.max(0, Math.min(f.perPeriod * primaryPaydays, left))
+    out.funds.push({ fundId: f.id, name: f.name, saved, scheduled, planned })
+    out.saved += saved
+    out.scheduled += scheduled
+    out.planned += planned
+  }
+  return out
 }
 
 /** 0..1 toward the target; 0 without one. */

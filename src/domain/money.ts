@@ -36,3 +36,26 @@ export function formatMoney(
 export function rescaleCents(cents: Cents, fromDecimals: number, toDecimals: number): Cents {
   return Math.round(cents * 10 ** (toDecimals - fromDecimals))
 }
+
+/**
+ * Whole percents that add up to exactly `total` (largest remainder): each row gets its
+ * floor, then the rows that lost the most to rounding get the leftover points. Plain
+ * rounding can give 99 or 101, which a reader notices. Negative amounts count as 0.
+ */
+export function largestRemainder(amounts: readonly number[], total = 100): number[] {
+  const clean = amounts.map((a) => Math.max(0, a))
+  const all = clean.reduce((a, b) => a + b, 0)
+  if (all <= 0) return clean.map(() => 0)
+  const exact = clean.map((a) => (a / all) * total)
+  const out = exact.map(Math.floor)
+  let left = total - out.reduce((a, b) => a + b, 0)
+  const order = exact
+    .map((x, i) => ({ i, r: x - Math.floor(x) }))
+    .sort((a, b) => b.r - a.r || a.i - b.i)
+  for (const { i } of order) {
+    if (left <= 0) break
+    out[i]! += 1
+    left--
+  }
+  return out
+}

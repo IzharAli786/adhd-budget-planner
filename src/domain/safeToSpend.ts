@@ -1,51 +1,44 @@
-// Safe-to-spend (PLAN §4.1). One exact formula, returned as the lines that make it up so
-// "See the math" renders the very numbers that produced the total; the view can never
-// show a breakdown that disagrees with the hero.
+// Safe to spend as lines (PLAN-v2 §1.5). The math sheet, the simple view and the bar are
+// all built FROM these lines, never recomputed, so they can't disagree with the number.
 //
-//   currentBalance   = checkIn.balance + counted transactions − bills paid since
-//   safeToSpend      = currentBalance − billsDue − savingsPlanned − envelopeReserved − buffer
-import { billEntriesBetween, type BillEntry } from './bills'
-import { daysBetween } from './dates'
-import type { Cents } from './money'
-import { countedTransactions, paidSinceCheckIn, type CheckInLike } from './reconcile'
-import type { Bill, BillOccurrence, Envelope, Id, ISODate, SavingsFund, Transaction } from './types'
-
-export const ESTIMATE_NOTE = 'Estimate based on what you entered.'
-
-export interface SafeToSpendInput {
-  today: ISODate
-  /** The current period: [start, end), end being the next payday. */
-  period: { start: ISODate; end: ISODate }
-  checkIn: CheckInLike
-  /** Unpaid bills dated from here on still count (reconcile.lookbackStart). */
-  lookback: ISODate
-  transactions: readonly Transaction[]
-  bills: readonly Bill[]
-  occurrences: readonly BillOccurrence[]
-  funds?: readonly SavingsFund[]
-  envelopes?: readonly Envelope[]
-  envelopesEnabled?: boolean
-  buffer?: Cents
-  /** Day each bill entered the app; earlier occurrences are history, not overdue. */
-  addedOn?: ReadonlyMap<Id, ISODate>
-}
+//   S = carriedIn + income + corrections − bills − expenses − reserved − buffer
+//
+// Savings and debt payments appear in none of the lines (A2). Labels are plain and
+// period-neutral; the screen adds "for November" / "this pay period".
+import { effectiveStatus, type BillEntry, type EffectiveStatus, type PaydayLine } from './bills'
+import type { EnvelopeUsage, PeriodPlan } from './ledger'
+import { largestRemainder, type Cents } from './money'
+import type { ISODate, Transaction } from './types'
 
 export interface BreakdownItem {
   label: string
+  /** Signed, like the line it belongs to. */
   amount: Cents
   date?: ISODate
+  /** Bills: the effective status (autopay on or before today reads paid). Paydays:
+   *  'skipped' when skipped (amount then 0). */
+  status?: EffectiveStatus
+  /** A bill still owed from before tracking started (owedAtStart). */
+  beforeStart?: true
 }
 
 export type LineId =
-  | 'balance'
-  | 'since'
-  | 'paidSince'
+  // The full view, in order.
+  | 'carried'
+  | 'income'
+  | 'corrections'
   | 'bills'
-  | 'savings'
+  | 'expenses'
   | 'envelopes'
   | 'buffer'
+  // The simple view.
+  | 'money'
   | 'setAside'
   | 'total'
+  // The guard's "Before your pay" block (pace.ts).
+  | 'cash'
+  | 'savings'
+  | 'debt'
 
 export interface BreakdownLine {
   id: LineId
@@ -56,234 +49,222 @@ export interface BreakdownLine {
   items?: BreakdownItem[]
 }
 
-export interface SafeToSpend {
-  total: Cents
-  /** Every term of the formula, in order. They sum to `total`. */
-  lines: BreakdownLine[]
-  balanceAgeDays: number
-  estimateNote: string
-  /** A negative total reads "€38 short", never a red minus sign. */
-  status: 'ok' | 'short'
-  currentBalance: Cents
-  billsDue: Cents
-  savingsPlanned: Cents
-  envelopeReserved: Cents
-  buffer: Cents
-  /** The unpaid entries inside billsDue (overdue first, then by date). */
-  dueEntries: BillEntry[]
-  /** Transactions that moved the balance since the check-in. */
-  counted: Transaction[]
-  /** One row per live envelope, in input order; empty while envelopes are off. */
-  envelopes: EnvelopeUsage[]
-}
+export const LINE_LABELS = {
+  start: 'Starting balance',
+  carried: 'Carried in',
+  income: 'Money in',
+  corrections: 'Corrections',
+  bills: 'Bills',
+  expenses: 'Spending',
+  envelopes: 'Still budgeted in envelopes',
+  buffer: 'Cushion',
+  noEnvelope: 'Not in an envelope',
+} as const
 
-export interface EnvelopeUsage {
-  id: Id
-  name: string
-  budget: Cents
-  /** Spending this period plus linked bills already paid this period. */
-  spent: Cents
-  /** Linked bills still due before payday (they sit in billsDue). */
-  linkedDue: Cents
-  /** max(0, budget − spent − linkedDue), capped at the budget: the envelopeReserved term. */
-  reserved: Cents
-  /** How far past the budget it went, 0 if not. Shown as calm text, never red. */
-  over: Cents
+export interface LineParts {
+  carriedIn: Cents
+  carriedKind: 'start' | 'rollover' | 'none'
+  /** Starting balance: the start date; carried: the period's start. */
+  carriedDate: ISODate
+  rollover: boolean
+  paydays: readonly PaydayLine[]
+  logged: readonly Transaction[]
+  corrections: readonly Transaction[]
+  entries: readonly BillEntry[]
+  owedAtStart: readonly BillEntry[]
+  /** Spending grouped for the items, positive = money out; sums to the expenses total. */
+  expenseGroups: readonly { label: string; amount: Cents; date?: ISODate }[]
+  expenses: Cents
+  envelopes: readonly EnvelopeUsage[]
+  showEnvelopes: boolean
+  buffer: Cents
+  today: ISODate
 }
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0)
-const inPeriod = (date: ISODate, start: ISODate, today: ISODate) => date >= start && date <= today
 
-export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
-  const { today, period, checkIn, lookback, transactions, bills, occurrences } = input
-  const funds = (input.funds ?? []).filter((f) => f.deletedAt === undefined)
-  const envelopes = input.envelopesEnabled
-    ? (input.envelopes ?? []).filter((e) => e.deletedAt === undefined)
-    : []
-  const buffer = Math.max(0, input.buffer ?? 0)
-  const live = transactions.filter((t) => t.deletedAt === undefined)
-
-  // Balance
-  const counted = countedTransactions(live, checkIn)
-  const since = sum(counted.map((t) => t.amount))
-  const paid = paidSinceCheckIn(occurrences, bills, counted, checkIn, input.addedOn)
-  const paidTotal = sum(paid.map((p) => p.amount))
-  const currentBalance = checkIn.balance + since - paidTotal
-
-  // Bills before payday, overdue included.
-  const addedOn = input.addedOn
-  const dueEntries = billEntriesBetween(bills, occurrences, lookback, period.end).filter(
-    (e) => e.status === 'due' && (addedOn?.get(e.billId) ?? e.date) <= e.date,
-  )
-  const billsDue = sum(dueEntries.map((e) => e.amount))
-
-  // Savings still to put away this period.
-  const savingsItems: BreakdownItem[] = funds.map((f) => {
-    const contributed = -sum(
-      live
-        .filter((t) => t.fundId === f.id && inPeriod(t.date, period.start, today))
-        .map((t) => t.amount),
-    )
-    // Clamped to [0, perPeriod]: a withdrawal is money coming in, not a bigger target.
-    return { label: f.name, amount: Math.min(f.perPeriod, Math.max(0, f.perPeriod - contributed)) }
+export function buildLines(p: LineParts): BreakdownLine[] {
+  const lines: BreakdownLine[] = []
+  // Left out when 0 and roll over is off: "Carried in €0" would only raise a question.
+  if (p.carriedIn !== 0 || p.rollover)
+    lines.push({
+      id: 'carried',
+      label: p.carriedKind === 'start' ? LINE_LABELS.start : LINE_LABELS.carried,
+      amount: p.carriedIn,
+      date: p.carriedDate,
+    })
+  const incomeItems: BreakdownItem[] = [
+    ...p.paydays.map(
+      (d): BreakdownItem => ({
+        label: d.name,
+        amount: d.skipped ? 0 : d.amount,
+        date: d.date,
+        ...(d.skipped ? { status: 'skipped' as const } : {}),
+      }),
+    ),
+    ...p.logged.map((t) => ({ label: t.note || LINE_LABELS.income, amount: t.amount, date: t.date })),
+  ].sort(byDate)
+  lines.push({
+    id: 'income',
+    label: LINE_LABELS.income,
+    amount: sum(incomeItems.map((i) => i.amount)),
+    items: incomeItems,
   })
-  const savingsPlanned = sum(savingsItems.map((i) => i.amount))
-
-  const envelopeUsage = envelopesUsage({ ...input, envelopes, live, dueEntries })
-  const envelopeItems: BreakdownItem[] = envelopeUsage.map((u) => ({
-    label: u.name,
-    amount: u.reserved,
-  }))
-  const envelopeReserved = sum(envelopeItems.map((i) => i.amount))
-
-  const total = currentBalance - billsDue - savingsPlanned - envelopeReserved - buffer
-
-  const lines: BreakdownLine[] = [
-    {
-      id: 'balance',
-      label: 'Balance when you checked in',
-      amount: checkIn.balance,
-      date: checkIn.date,
-    },
+  if (p.corrections.length > 0)
+    lines.push({
+      id: 'corrections',
+      label: LINE_LABELS.corrections,
+      amount: sum(p.corrections.map((t) => t.amount)),
+      items: p.corrections.map((t) => ({
+        label: t.note || LINE_LABELS.corrections,
+        amount: t.amount,
+        date: t.date,
+      })),
+    })
+  const billItems: BreakdownItem[] = [
+    ...p.owedAtStart.map(
+      (e): BreakdownItem => ({
+        label: e.name,
+        amount: -e.amount,
+        date: e.date,
+        status: effectiveStatus(e, p.today),
+        beforeStart: true,
+      }),
+    ),
+    ...p.entries.map((e) => ({
+      label: e.name,
+      amount: -e.amount,
+      date: e.date,
+      status: effectiveStatus(e, p.today),
+    })),
   ]
-  if (counted.length > 0)
-    lines.push({
-      id: 'since',
-      label: 'Logged since',
-      amount: since,
-      items: counted
-        .slice()
-        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-        .map((t) => ({
-          label: t.note || (t.amount < 0 ? 'Spent' : 'Added'),
-          amount: t.amount,
-          date: t.date,
-        })),
-    })
-  if (paid.length > 0)
-    lines.push({
-      id: 'paidSince',
-      label: 'Bills paid since',
-      amount: -paidTotal,
-      items: paid.map((p) => ({ label: p.name, amount: -p.amount, date: p.originalDate })),
-    })
   lines.push({
     id: 'bills',
-    label: 'Bills before payday',
-    amount: -billsDue,
-    items: dueEntries.map((e) => ({ label: e.name, amount: -e.amount, date: e.date })),
+    label: LINE_LABELS.bills,
+    amount: sum(billItems.map((i) => i.amount)),
+    items: billItems,
   })
-  if (funds.length > 0)
-    lines.push({
-      id: 'savings',
-      label: 'Savings this period',
-      amount: -savingsPlanned,
-      items: savingsItems.map((i) => ({ ...i, amount: -i.amount })),
-    })
-  if (envelopes.length > 0)
+  lines.push({
+    id: 'expenses',
+    label: LINE_LABELS.expenses,
+    amount: -p.expenses,
+    items: p.expenseGroups.map((g) => ({
+      label: g.label,
+      amount: -g.amount,
+      ...(g.date ? { date: g.date } : {}),
+    })),
+  })
+  if (p.showEnvelopes)
     lines.push({
       id: 'envelopes',
-      label: 'Left in envelopes',
-      amount: -envelopeReserved,
-      items: envelopeItems.map((i) => ({ ...i, amount: -i.amount })),
+      label: LINE_LABELS.envelopes,
+      amount: -sum(p.envelopes.map((e) => e.reserved)),
+      items: p.envelopes.map((e) => ({ label: e.name, amount: -e.reserved })),
     })
-  if (buffer > 0) lines.push({ id: 'buffer', label: 'Buffer', amount: -buffer })
-
-  return {
-    total,
-    lines,
-    balanceAgeDays: Math.max(0, daysBetween(checkIn.date, today)),
-    estimateNote: ESTIMATE_NOTE,
-    status: total < 0 ? 'short' : 'ok',
-    currentBalance,
-    billsDue,
-    savingsPlanned,
-    envelopeReserved,
-    buffer,
-    dueEntries,
-    counted,
-    envelopes: envelopeUsage,
-  }
+  if (p.buffer > 0) lines.push({ id: 'buffer', label: LINE_LABELS.buffer, amount: -p.buffer })
+  return lines
 }
 
-/**
- * Envelopes (PLAN §4.1): what is still budgeted this period but not yet used. A bill
- * linked to an envelope uses it up like spending does, so the bill is counted once:
- * while unpaid it sits in billsDue and shrinks the reserve; once paid it counts as spent
- * instead. Overdue linked bills from an earlier period belonged to that period's budget.
- * Untagged spending (or spending tagged with a deleted envelope) uses the default one;
- * untagged income does not.
- */
-function envelopesUsage({
-  today,
-  period,
-  bills,
-  occurrences,
-  envelopes,
-  live,
-  dueEntries,
-}: Pick<SafeToSpendInput, 'today' | 'period' | 'bills' | 'occurrences'> & {
-  envelopes: readonly Envelope[]
-  live: readonly Transaction[]
-  dueEntries: readonly BillEntry[]
-}): EnvelopeUsage[] {
-  if (envelopes.length === 0) return []
-  const billEnvelope = new Map(bills.map((b) => [b.id, b.envelopeId]))
-  const known = new Set(envelopes.map((e) => e.id))
-  const fallback = envelopes.find((e) => e.isDefault)?.id
-  const envelopeOf = (id: Id | undefined) => (id !== undefined && known.has(id) ? id : fallback)
-  const paidInPeriod = billEntriesBetween(bills, occurrences, period.start, period.end).filter(
-    (e) => e.status === 'paid',
-  )
-  return envelopes.map((env) => {
-    const linkedTo = (e: BillEntry) =>
-      e.date >= period.start && billEnvelope.get(e.billId) === env.id
-    const spent =
-      -sum(
-        live
-          .filter(
-            (t) =>
-              t.fundId === undefined &&
-              t.billOccurrenceId === undefined &&
-              inPeriod(t.date, period.start, today) &&
-              // Money in counts only when tagged (a refund back into Food). Untagged
-              // income like a salary is not Everyday's money; counting it would refill
-              // the reserve and make later spending come off safe-to-spend twice.
-              (t.amount < 0 || (t.envelopeId !== undefined && known.has(t.envelopeId))) &&
-              envelopeOf(t.envelopeId) === env.id,
-          )
-          .map((t) => t.amount),
-      ) + sum(paidInPeriod.filter(linkedTo).map((e) => e.amount))
-    const linkedDue = sum(dueEntries.filter(linkedTo).map((e) => e.amount))
-    // Clamped to [0, budget]: refunds can't push the reserve above the budget. (Flooring
-    // `spent` instead would make paying a linked bill move the total.)
-    const reserved = Math.min(env.budget, Math.max(0, env.budget - spent - linkedDue))
-    return {
-      id: env.id,
-      name: env.name,
-      budget: env.budget,
-      spent,
-      linkedDue,
-      reserved,
-      over: Math.max(0, spent + linkedDue - env.budget),
-    }
-  })
-}
+const byDate = (a: { date?: ISODate }, b: { date?: ISODate }) =>
+  (a.date ?? '') < (b.date ?? '') ? -1 : (a.date ?? '') > (b.date ?? '') ? 1 : 0
 
-const SET_ASIDE: readonly LineId[] = ['savings', 'envelopes', 'buffer']
-const BALANCE: readonly LineId[] = ['balance', 'since', 'paidSince']
+const MONEY: readonly LineId[] = ['carried', 'income', 'corrections']
+const SET_ASIDE: readonly LineId[] = ['expenses', 'envelopes', 'buffer']
 
 /**
- * Simple mode's four lines (PLAN §4.1): Balance, Bills before payday, Set aside, Safe to
+ * The simple view (§1.5): Money for the period · Bills · Spending and set aside · Safe to
  * spend. Built by summing the full lines, never recomputed, so they always add up.
  */
-export function simpleLines(result: Pick<SafeToSpend, 'lines' | 'total'>): BreakdownLine[] {
+export function simpleLines(plan: Pick<PeriodPlan, 'lines' | 'safe'>): BreakdownLine[] {
   const pick = (ids: readonly LineId[]) =>
-    sum(result.lines.filter((l) => ids.includes(l.id)).map((l) => l.amount))
+    sum(plan.lines.filter((l) => ids.includes(l.id)).map((l) => l.amount))
   return [
-    { id: 'balance', label: 'Balance', amount: pick(BALANCE) },
-    { id: 'bills', label: 'Bills before payday', amount: pick(['bills']) },
-    { id: 'setAside', label: 'Set aside (savings, envelopes, buffer)', amount: pick(SET_ASIDE) },
-    { id: 'total', label: 'Safe to spend', amount: result.total },
+    { id: 'money', label: 'Money for this period', amount: pick(MONEY) },
+    { id: 'bills', label: LINE_LABELS.bills, amount: pick(['bills']) },
+    { id: 'setAside', label: 'Spending and set aside', amount: pick(SET_ASIDE) },
+    { id: 'total', label: 'Safe to spend', amount: plan.safe ?? 0 },
   ]
+}
+
+// --- The "Left to spend" bar (§1.5, R25) ---------------------------------------------------
+
+export type BarSegmentId =
+  | 'lighter'
+  | 'bills'
+  | 'spent'
+  | 'corrections'
+  | 'envelopes'
+  | 'buffer'
+  | 'safe'
+
+export interface BarSegment {
+  id: BarSegmentId
+  label: string
+  /** Positive. Zero-width segments are left out. */
+  amount: Cents
+  /** Whole percent of the bar; the segments add up to exactly 100. */
+  percent: number
+}
+
+export interface LeftToSpendBar {
+  segments: BarSegment[]
+  /** What the bar spans: the inflows, or the outflows when short. */
+  total: Cents
+  inflows: Cents
+  /** How far past the plan (S < 0), as a positive number; 0 when not short. */
+  short: Cents
+}
+
+const BAR_LABELS: Record<BarSegmentId, string> = {
+  lighter: 'Started lighter',
+  bills: 'Bills',
+  spent: 'Spent',
+  corrections: 'Corrections',
+  envelopes: 'Still in envelopes',
+  buffer: 'Cushion',
+  safe: 'Safe to spend',
+}
+
+/**
+ * Inflows = max(0, carried) + income + max(0, corrections) (+ net refunds when refunds
+ * beat spending). A negative carry is its own "Started lighter" segment and a negative
+ * correction its own "Corrections" segment, so every segment is positive. When S ≥ 0 the
+ * segments add up to the inflows; when short, the safe segment is 0 and they add up to
+ * the outflows (inflows + the shortfall). Savings and debt are never segments (A2).
+ */
+export function leftToSpendBar(
+  plan: Pick<PeriodPlan, 'carriedIn' | 'income' | 'corrections' | 'bills' | 'expenses'> &
+    Pick<PeriodPlan, 'reserved' | 'buffer' | 'safe'>,
+): LeftToSpendBar {
+  const carried = plan.carriedIn ?? 0
+  const corrections = plan.corrections.total
+  const expenses = plan.expenses.total
+  const inflows =
+    Math.max(0, carried) +
+    plan.income.total +
+    Math.max(0, corrections) +
+    Math.max(0, -expenses)
+  const safe = plan.safe ?? 0
+  const raw: [BarSegmentId, Cents][] = [
+    ['lighter', Math.max(0, -carried)],
+    ['bills', plan.bills.total],
+    ['spent', Math.max(0, expenses)],
+    ['corrections', Math.max(0, -corrections)],
+    ['envelopes', plan.reserved],
+    ['buffer', plan.buffer],
+    ['safe', Math.max(0, safe)],
+  ]
+  const kept = raw.filter(([, amount]) => amount > 0)
+  const percents = largestRemainder(kept.map(([, a]) => a))
+  return {
+    segments: kept.map(([id, amount], i) => ({
+      id,
+      label: BAR_LABELS[id],
+      amount,
+      percent: percents[i]!,
+    })),
+    total: sum(kept.map(([, a]) => a)),
+    inflows,
+    short: Math.max(0, -safe),
+  }
 }

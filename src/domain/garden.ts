@@ -1,7 +1,7 @@
 // The garden (PLAN §4.5): progress that only grows. Points come from OUTCOMES (a balance
 // checked, a bill paid, a day without spending, an impulse skipped), never from how many
 // entries were logged, so there is nothing to farm and nothing to lose.
-import { isSpend } from './reconcile'
+import { txKind } from './ledger'
 import type { BillOccurrence, ImpulseItem, ISODate, NoSpendDay, Transaction } from './types'
 
 export interface GardenOutcomes {
@@ -13,7 +13,10 @@ export interface GardenOutcomes {
   transactions: readonly SpendLike[]
 }
 
-type SpendLike = Pick<Transaction, 'date' | 'amount' | 'fundId' | 'billOccurrenceId' | 'deletedAt'>
+type SpendLike = Pick<
+  Transaction,
+  'date' | 'amount' | 'fundId' | 'debtId' | 'billOccurrenceId' | 'adjust' | 'envelopeId' | 'deletedAt'
+>
 
 /**
  * One point per outcome. Check-ins count once per day: checking in twice isn't progress.
@@ -71,7 +74,9 @@ export function gardenStage(points: number): GardenStage {
 export const keptPoints = (stored: number | undefined, computed: number) =>
   Math.max(stored ?? 0, computed)
 
-/** Days with spending logged (savings moves and bill payments aren't day-to-day spending). */
+/** Days with spending logged (savings moves, debt payments and corrections aren't spending). */
 export function spendDates(txs: readonly SpendLike[]): Set<ISODate> {
-  return new Set(txs.filter((t) => t.deletedAt === undefined && isSpend(t)).map((t) => t.date))
+  return new Set(
+    txs.filter((t) => t.deletedAt === undefined && txKind(t) === 'expense').map((t) => t.date),
+  )
 }

@@ -1,6 +1,7 @@
 // Paydays and paycheck periods (PLAN §3.6). Order of operations matters:
 //   nominal date (from the schedule) -> weekend shift -> PaydayOverride
 // Overrides are keyed by the NOMINAL date so they survive a later weekend-rule change.
+// An income's `from`/`until` (PLAN-v2 §2.1) limit the NOMINAL dates, inclusive.
 import {
   addDays,
   addMonths,
@@ -24,8 +25,13 @@ export interface PayPeriod {
 export interface Payday {
   nominal: ISODate
   date: ISODate
+  /** The date was moved by an override (an amount-only override doesn't count). */
   overridden: boolean
+  /** The override row, when there is one: its amount and skipped flag apply. */
+  override?: PaydayOverride
 }
+
+type ScheduleIncome = Pick<IncomeSource, 'id' | 'schedule' | 'weekendRule' | 'from' | 'until'>
 
 // Furthest a nominal payday can be from its neighbour (a long month) plus a weekend shift.
 const MAX_GAP_DAYS = 31 + 3
@@ -84,26 +90,34 @@ export function nominalPaydays(schedule: PaySchedule, from: ISODate, to: ISODate
  * override onto another payday); both are kept because each one is a separate payment.
  */
 export function paydaysBetween(
-  income: Pick<IncomeSource, 'id' | 'schedule' | 'weekendRule'>,
+  income: ScheduleIncome,
   from: ISODate,
   to: ISODate,
   overrides: readonly PaydayOverride[] = [],
 ): Payday[] {
-  const byNominal = new Map<ISODate, ISODate>()
+  const byNominal = new Map<ISODate, PaydayOverride>()
   let pad = 3
   for (const o of overrides) {
     if (o.incomeId !== income.id) continue
-    byNominal.set(o.originalDate, o.date)
-    pad = Math.max(pad, Math.abs(daysBetween(o.originalDate, o.date)) + 3)
+    byNominal.set(o.originalDate, o)
+    if (o.date !== undefined)
+      pad = Math.max(pad, Math.abs(daysBetween(o.originalDate, o.date)) + 3)
   }
   // Widen the nominal window so a date shifted or moved INTO [from, to) is not missed.
   const nominal = nominalPaydays(income.schedule, addDays(from, -pad), addDays(to, pad))
   const out: Payday[] = []
   for (const n of nominal) {
+    if (income.from !== undefined && n < income.from) continue
+    if (income.until !== undefined && n > income.until) continue
     const override = byNominal.get(n)
-    const date = override ?? applyWeekendRule(n, income.weekendRule)
+    const date = override?.date ?? applyWeekendRule(n, income.weekendRule)
     if (date < from || date >= to) continue
-    out.push({ nominal: n, date, overridden: override !== undefined })
+    out.push({
+      nominal: n,
+      date,
+      overridden: override?.date !== undefined,
+      ...(override ? { override } : {}),
+    })
   }
   return out.sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.nominal < b.nominal ? -1 : 1,
@@ -119,7 +133,7 @@ function searchSpan(
 ) {
   let span = MAX_GAP_DAYS
   for (const o of overrides) {
-    if (o.incomeId === income.id)
+    if (o.incomeId === income.id && o.date !== undefined)
       span = Math.max(span, Math.abs(daysBetween(o.originalDate, o.date)) + MAX_GAP_DAYS)
   }
   if (income.schedule.kind === 'irregular') {
@@ -131,7 +145,7 @@ function searchSpan(
 
 /** First payday strictly after today, or null (irregular schedule with no future date). */
 export function nextPayday(
-  income: Pick<IncomeSource, 'id' | 'schedule' | 'weekendRule'>,
+  income: ScheduleIncome,
   today: ISODate,
   overrides: readonly PaydayOverride[] = [],
 ): ISODate | null {
@@ -143,7 +157,7 @@ export function nextPayday(
 
 /** Latest payday on or before today: the start of the current period. */
 export function previousPayday(
-  income: Pick<IncomeSource, 'id' | 'schedule' | 'weekendRule'>,
+  income: ScheduleIncome,
   today: ISODate,
   overrides: readonly PaydayOverride[] = [],
 ): ISODate | null {
@@ -159,7 +173,7 @@ export function previousPayday(
  * With no past payday (first irregular payment still ahead) the period starts today.
  */
 export function currentPeriod(
-  income: Pick<IncomeSource, 'id' | 'schedule' | 'weekendRule'>,
+  income: ScheduleIncome,
   today: ISODate,
   overrides: readonly PaydayOverride[] = [],
 ): PayPeriod | null {
@@ -169,19 +183,32 @@ export function currentPeriod(
   return { start, end, daysLeft: daysBetween(today, end) }
 }
 
-/** "Monthly mode": the calendar month containing today. */
-export function calendarMonthPeriod(today: ISODate): PayPeriod {
-  const { year, month } = parseISODate(today)
-  const start = makeDate(year, month, 1)
-  const end = addMonths(start, 1)
-  return { start, end, daysLeft: daysBetween(today, end) }
-}
-
-/** The income that defines periods: the active primary, else the first active one. */
+/** v4's rule, kept for the frozen v4 engine: the active primary, else the first active one. */
 export function primaryIncome<T extends Pick<IncomeSource, 'primary' | 'active'>>(
   incomes: readonly T[],
 ): T | undefined {
   return incomes.find((i) => i.active && i.primary) ?? incomes.find((i) => i.active)
+}
+
+const covers = (i: Pick<IncomeSource, 'active' | 'from' | 'until'>, d: ISODate) =>
+  i.active && (i.from === undefined || i.from <= d) && (i.until === undefined || d <= i.until)
+
+/**
+ * The income that is primary on a (nominal) date: the primary chain (PLAN-v2 §1.3, R16).
+ * Among active primaries whose [from, until] covers the date, the one with the latest
+ * `from` (an open start counts as the earliest); otherwise the first active income
+ * covering it. A split leaves `primary` on both halves; their ranges don't overlap.
+ */
+export function primaryAt<T extends Pick<IncomeSource, 'primary' | 'active' | 'from' | 'until'>>(
+  incomes: readonly T[],
+  date: ISODate,
+): T | undefined {
+  let best: T | undefined
+  for (const i of incomes) {
+    if (!i.primary || !covers(i, date)) continue
+    if (best === undefined || (i.from ?? '') > (best.from ?? '')) best = i
+  }
+  return best ?? incomes.find((i) => covers(i, date))
 }
 
 /** Fraction of the period already elapsed, 0..1, for progress rings. */

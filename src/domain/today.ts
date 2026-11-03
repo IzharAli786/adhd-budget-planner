@@ -1,109 +1,94 @@
-// Everything Today shows, from raw rows and today's date. Composes the period, the
-// reconciliation, safe-to-spend and the runway in one pure function, so the screen stays
-// a thin view and the whole chain can be property-tested end to end.
-import { currentPeriod, previousPayday, primaryIncome, type PayPeriod } from './paySchedule'
-import { isSpend, lookbackStart, paydaySinceCheckIn, type CheckInLike } from './reconcile'
+// Everything Today shows, from raw rows and today's date (PLAN-v2 §1.4, §4.1). Composes
+// the period, the period plan, the pace guard and the runway in one pure function, so the
+// screen stays a thin view and the whole chain is property-tested end to end.
+import type { PaydayLine } from './bills'
+import { addDays } from './dates'
+import { paydaysBetweenDates, periodContext, planFor, planWith, txKind } from './ledger'
+import type { LedgerInput, PeriodPlan } from './ledger'
+import type { Cents } from './money'
+import {
+  accountEstimate,
+  guardFrom,
+  paceCheckpoints,
+  PACE_GUARD_BINDS,
+  type Checkpoint,
+  type Guard,
+} from './pace'
+import { daysLeft, periodAt, type Period } from './period'
 import { runway, spentLast7Days, spentOn, type Runway } from './runway'
-import { safeToSpend, type SafeToSpend } from './safeToSpend'
-import type {
-  Bill,
-  BillOccurrence,
-  Envelope,
-  Id,
-  IncomeSource,
-  ISODate,
-  PaydayOverride,
-  SavingsFund,
-  Transaction,
-} from './types'
-import type { BillEntry } from './bills'
-
-export interface TodayInput {
-  today: ISODate
-  incomes: readonly IncomeSource[]
-  paydayOverrides: readonly PaydayOverride[]
-  bills: readonly Bill[]
-  occurrences: readonly BillOccurrence[]
-  transactions: readonly Transaction[]
-  checkIn: CheckInLike | undefined
-  funds?: readonly SavingsFund[]
-  envelopes?: readonly Envelope[]
-  envelopesEnabled?: boolean
-  buffer?: number
-  addedOn?: ReadonlyMap<Id, ISODate>
-}
 
 export type TodayPlan =
-  | { kind: 'no-income' }
+  /** No starting balance yet: Today asks "What's in your account right now?". */
+  | { kind: 'no-start' }
+  /** Payday mode with no next payday: "When is your next pay?". */
   | { kind: 'no-payday' }
-  /** Has a period but no balance yet. `due` feeds the first check-in. */
-  | { kind: 'no-balance'; period: PayPeriod; due: BillEntry[] }
   | {
       kind: 'ready'
-      period: PayPeriod
-      lookback: ISODate
-      safe: SafeToSpend
+      period: Period
+      plan: PeriodPlan
       runway: Runway
-      paydaySinceCheckIn: boolean
+      /** Advice under the hero; binds only when PACE_GUARD_BINDS. */
+      guard: Guard | null
+      /** For "Can this fit?" (runway.canFit) and the math sheet's "Before your pay". */
+      checkpoints: Checkpoint[]
+      /** The next pay on the primary chain (any income when there is none), not skipped. */
+      nextPayday: PaydayLine | null
+      /** What the account should hold now (pace.accountEstimate). */
+      accountEstimate: Cents
     }
 
-export function planToday(input: TodayInput): TodayPlan {
-  const { today, incomes, paydayOverrides, checkIn } = input
-  const income = primaryIncome(incomes)
-  if (!income) return { kind: 'no-income' }
-  const period = currentPeriod(income, today, paydayOverrides)
-  if (!period) return { kind: 'no-payday' }
+export interface TodayOptions {
+  /** Defaults to PACE_GUARD_BINDS; tests flip it to check I7 both ways. */
+  guardBinds?: boolean
+}
 
-  // Before the first check-in, "since the last check-in" means since this period began.
-  const anchor: CheckInLike = checkIn ?? { at: '', date: today, balance: 0 }
-  const lookback = lookbackStart(
-    anchor.date,
-    checkIn ? previousPayday(income, checkIn.date, paydayOverrides) : period.start,
+export function planToday(input: LedgerInput, opts: TodayOptions = {}): TodayPlan {
+  const { today } = input
+  if (input.plan.startDate === null) return { kind: 'no-start' }
+  const period = periodAt(today, periodContext(input))
+  if (period === null) return { kind: 'no-payday' }
+
+  const plan = planFor(period, input)
+  // The day's allowance is fixed at the start of the day: S0 is S without today's
+  // 'expense' rows. Recomputed, not "S + spent", because spending inside an envelope's
+  // room never lowered S in the first place.
+  const todays = new Set(
+    input.transactions
+      .filter((t) => t.date === today && t.deletedAt === undefined && txKind(t) === 'expense')
+      .map((t) => t.id),
   )
-  const safeWith = (transactions: readonly Transaction[]) =>
-    safeToSpend({
-      today,
-      period,
-      checkIn: anchor,
-      lookback,
-      transactions,
-      bills: input.bills,
-      occurrences: input.occurrences,
-      funds: input.funds,
-      envelopes: input.envelopes,
-      envelopesEnabled: input.envelopesEnabled,
-      buffer: input.buffer,
-      addedOn: input.addedOn,
-    })
-  const safe = safeWith(input.transactions)
-  if (!checkIn) return { kind: 'no-balance', period, due: safe.dueEntries }
+  const plan0 = todays.size === 0 ? plan : planWith(period, input, todays)
+  const safe = plan.safe ?? 0
+  const s0 = plan0.safe ?? 0
+  const days = daysLeft(period, today)
+  const perDay = s0 > 0 ? Math.floor(s0 / days) : 0
 
-  // The day's allowance is fixed at the start of the day (PLAN §4.2): safe-to-spend as it
-  // was before today's spending. Recomputed rather than "safe + spentToday", because with
-  // envelopes on, money spent inside an envelope's room never lowered safe-to-spend.
-  const spentTodayRows = new Set(safe.counted.filter((t) => t.date === today && isSpend(t)))
-  const startOfDaySafe =
-    spentTodayRows.size === 0
-      ? safe.total
-      : safeWith(input.transactions.filter((t) => !spentTodayRows.has(t))).total
+  const checkpoints = paceCheckpoints(input, period, plan0.reserved)
+  const guard = guardFrom(checkpoints, perDay)
+  const binds = opts.guardBinds ?? PACE_GUARD_BINDS
 
   return {
     kind: 'ready',
     period,
-    lookback,
-    safe,
+    plan,
     runway: runway({
-      safeToSpend: safe.total,
-      spentToday: spentOn(safe.counted, today),
-      daysLeft: period.daysLeft,
+      safeToSpend: safe,
+      startOfDaySafe: s0,
+      spentToday: spentOn(input.transactions, today),
+      daysLeft: days,
       spentLast7Days: spentLast7Days(input.transactions, today),
-      startOfDaySafe,
+      guardPerDay: binds && guard ? guard.perDay : null,
     }),
-    paydaySinceCheckIn: paydaySinceCheckIn(period.start, checkIn.date),
+    guard,
+    checkpoints,
+    nextPayday: upcomingPay(input),
+    accountEstimate: accountEstimate(input) ?? 0,
   }
 }
 
-/** Unpaid manual bills dated before today, for the "Did Rent go out?" card. */
-export function overdueManual(due: readonly BillEntry[], today: ISODate): BillEntry[] {
-  return due.filter((e) => !e.autopay && e.date < today)
+/** The first payday after today that isn't skipped: the primary chain's, else any. */
+function upcomingPay(input: LedgerInput): PaydayLine | null {
+  const from = addDays(input.today, 1)
+  const ahead = paydaysBetweenDates(input, from, addDays(from, 400)).filter((p) => !p.skipped)
+  return ahead.find((p) => p.primary) ?? ahead[0] ?? null
 }

@@ -2,10 +2,10 @@
 // Pure, from the same rows as the rest of Look back; the range is already clipped to the
 // history, so the numbers agree with the year's tiles and table.
 import { daysBetween, minDate } from './dates'
-import { isDebtPayment, paidBillsIn, type DateRange } from './insights'
+import { owedNow, type DebtPayment } from './debt'
 import type { Cents } from './money'
 import { fundSaved } from './savings'
-import type { Bill, BillOccurrence, Debt, Id, ISODate, SavingsFund, Transaction } from './types'
+import type { DateRange, Debt, Id, ISODate, SavingsFund, Transaction } from './types'
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0)
 const within = (date: ISODate, r: DateRange) => date >= r.start && date < r.end
@@ -48,8 +48,9 @@ export function fundsInRange(
 export interface DebtYear {
   id: Id
   name: string
-  /** Minimums marked paid plus payments logged against it, over the range. */
+  /** Payments logged against it plus minimums paid without one, over the range. */
   paidInRange: Cents
+  /** Still owed today (debt.owedNow): an estimate, interest ignored. */
   owed: Cents
   aprBps: number
 }
@@ -67,24 +68,19 @@ export interface DebtsYear {
   interestEstimate: Cents
 }
 
+/** `payments` from ledger.allDebtPayments: each one is stored once (R6). */
 export function debtsInRange(
   debts: readonly Debt[],
-  bills: readonly Bill[],
-  occurrences: readonly BillOccurrence[],
-  transactions: readonly Transaction[],
+  payments: readonly DebtPayment[],
   range: DateRange,
   today: ISODate,
 ): DebtsYear {
-  const paidBills = paidBillsIn(bills, occurrences, range)
-  // isDebtPayment leaves out a payment logged for a bill occurrence: that is the paid bill.
-  const payments = live(transactions).filter((t) => isDebtPayment(t) && within(t.date, range))
+  const inRange = payments.filter((p) => within(p.date, range))
   const rows = live(debts).map((d) => ({
     id: d.id,
     name: d.name,
-    paidInRange:
-      sum(paidBills.filter((e) => e.debtId === d.id).map((e) => e.amount)) -
-      sum(payments.filter((t) => t.debtId === d.id).map((t) => t.amount)),
-    owed: Math.max(0, d.balance),
+    paidInRange: sum(inRange.filter((p) => p.debtId === d.id).map((p) => p.amount)),
+    owed: owedNow(d, payments, today),
     aprBps: d.aprBps,
   }))
   const owed = sum(rows.map((r) => r.owed))

@@ -1,133 +1,196 @@
-// Look back (retrospective): money in and out per month or per pay period, and what was
-// carried into each payday. Pure; the screen and the printed report pass the same rows.
+// Look back (retrospective): money in and out per period, and what each period carried in
+// and left over. Pure; the screen and the printed report pass the same rows.
 //
-// Steady never sees the bank, so this is rebuilt from what was entered: paydays on the
-// schedule (only the ones already past), logged spending, bills marked paid, moves into
-// savings and debt payments. Check-ins anchor the carry-over where there is one.
-import { paydayEntriesBetween } from './bills'
+// The rule (PLAN-v2 §3, R12): before the start of tracking, a CASH basis (what really
+// moved: paid bills, past paydays, logged entries), because the plan didn't exist yet.
+// From the start on, ACCRUAL, the same numbers as Today and Plan. The current period is
+// "planned to <end>" with no leftover yet. Savings and debt never enter `net` (A2); they
+// get their own columns.
+import { effectiveStatus } from './bills'
 import { addDays, makeDate, maxDate, minDate } from './dates'
-import { isDebtPayment, isEverydaySpend, paidBillsIn, type DateRange } from './insights'
+import {
+  accrualTotals,
+  allDebtPayments,
+  entriesBetween,
+  paydaysBetweenDates,
+  periodContext,
+  planFor,
+  transactionsBetween,
+  txKind,
+  type FlowTotals,
+  type LedgerInput,
+} from './ledger'
 import type { Cents } from './money'
-import { currentPeriod, paydaysBetween, primaryIncome } from './paySchedule'
-import type {
-  BalanceCheckIn,
-  Bill,
-  BillOccurrence,
-  IncomeSource,
-  Instant,
-  ISODate,
-  PaydayOverride,
-  Transaction,
-} from './types'
+import { periodsIn, type Period } from './period'
+import type { BalanceCheckIn, DateRange, ISODate } from './types'
 
-export interface ReviewInput {
-  today: ISODate
-  incomes: readonly IncomeSource[]
-  paydayOverrides: readonly PaydayOverride[]
-  bills: readonly Bill[]
-  occurrences: readonly BillOccurrence[]
-  transactions: readonly Transaction[]
-  checkIns: readonly Pick<BalanceCheckIn, 'at' | 'date' | 'balance'>[]
-  /** Carry-overs saved at each payday moment (meta.periodClose). */
-  periodClose?: PeriodCloseLog
-  /** First day with history; paydays before it are not counted. Defaults to historyStart. */
-  since?: ISODate
+export type CheckInLike = Pick<BalanceCheckIn, 'at' | 'date' | 'balance'>
+
+export interface ReviewInput extends LedgerInput {
+  /** v4's balance check-ins: read-only history (they only widen where history starts). */
+  checkIns?: readonly CheckInLike[]
 }
 
-/** Saved at the payday moment, keyed by the payday, so Look back shows what was seen then. */
-export interface PeriodClose {
-  carried: Cents
-  at: Instant
-}
-export type PeriodCloseLog = Record<ISODate, PeriodClose>
-
-export interface Flows {
-  /** Paydays already past, plus other money logged as coming in (refunds, gifts). */
-  incomeIn: Cents
-  /** Everyday spending logged. */
-  spending: Cents
-  /** Bills marked paid, debt minimums excluded (those are in debtPaid). */
-  billsPaid: Cents
-  /** Debt minimums marked paid, plus payments logged against a debt. */
-  debtPaid: Cents
-  /** spending + billsPaid + debtPaid. */
-  moneyOut: Cents
-  /** Net moves into savings (a withdrawal lowers it, so it can be negative). */
-  saved: Cents
-  /** incomeIn − moneyOut − saved: how much the spending account grew (or shrank). */
+export interface PeriodTotals extends FlowTotals {
+  /** income + corrections − bills − spending. */
   net: Cents
 }
 
-export interface Carry {
-  amount: Cents
-  /** 'saved' at the payday moment, worked out from a 'check-in' in that period, or rolled
-   *  forward through the logged 'flows' from an earlier check-in. */
-  source: 'saved' | 'check-in' | 'flows'
+/** Kept apart from the totals above (A2). */
+export interface KeptApart {
+  /** Net moved into savings (a withdrawal lowers it). */
+  saved: Cents
+  /** Every debt payment: logged payments and paid minimums. */
+  debtPaid: Cents
 }
 
-export interface PeriodSummary extends Flows, DateRange {
-  /** Per pay period only: money carried in at its payday, null when there is no balance
-   *  to start from. Months have no carry-over. */
-  carried?: Carry | null
+export interface PeriodRow extends PeriodTotals, KeptApart {
+  period: Period
+  /** 'cash' before tracking started, 'accrual' from the start on. */
+  basis: 'cash' | 'accrual'
+  /** Holds today: "planned to <end>", leftover null. */
+  current: boolean
+  /** Null before tracking. */
+  carriedIn: Cents | null
+  /** Null before tracking and for the current period. */
+  leftover: Cents | null
 }
-
-export type ReviewMode = 'month' | 'payday'
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0)
 const within = (date: ISODate, r: DateRange) => date >= r.start && date < r.end
 
 /**
- * The first day Steady knows about: the earliest check-in or logged entry (today if there
- * is none). A pay schedule has no start date, so without this an install from last week
- * would show a whole year of salary that was never tracked here.
+ * The first day Steady knows about: the start of tracking, the first check-in or the first
+ * logged entry, whichever is earliest (today when there is none). A pay schedule has no
+ * start date, so without this an install from last week would show a year of salary.
  */
-export function historyStart(input: Pick<ReviewInput, 'today' | 'transactions' | 'checkIns'>) {
-  let first = input.today
-  for (const c of input.checkIns) if (c.date < first) first = c.date
+export function historyStart(input: ReviewInput): ISODate {
+  let first = input.plan.startDate ?? input.today
+  if (input.today < first) first = input.today
+  for (const c of input.checkIns ?? []) if (c.date < first) first = c.date
   for (const t of input.transactions)
     if (t.deletedAt === undefined && t.date < first) first = t.date
   return first
 }
 
 /**
- * Money in and out over [start, end). Paydays count from the start of the history up to
- * today: future ones haven't come, and ones before Steady was used were never tracked.
+ * What really moved over a range, before tracking (R12): paydays already past, paid plain
+ * bills by their date (entries dated before the bill was added are left out: they were
+ * ticked during setup), logged income, spending and corrections.
  */
-export function flowsIn(input: ReviewInput, whole: DateRange): Flows {
-  // Clipped to the history for every kind of flow, not only paydays: bills ticked paid
-  // during setup are dated before it, and counting them without the pay that covered
-  // them would make a first month look like a loss.
-  const range = { start: maxDate(whole.start, input.since ?? historyStart(input)), end: whole.end }
-  if (range.start >= range.end) return totalFlows([])
-  const txs = input.transactions.filter((t) => t.deletedAt === undefined && within(t.date, range))
-  const payEnd = minDate(range.end, addDays(input.today, 1))
-  const pay =
-    range.start < payEnd
-      ? sum(
-          paydayEntriesBetween(input.incomes, input.paydayOverrides, range.start, payEnd).map(
-            (p) => p.amount,
-          ),
-        )
-      : 0
-  const everyday = txs.filter(isEverydaySpend)
-  const otherIn = sum(everyday.filter((t) => t.amount > 0).map((t) => t.amount))
-  const spending = 0 - sum(everyday.filter((t) => t.amount < 0).map((t) => t.amount))
-  const paid = paidBillsIn(input.bills, input.occurrences, range)
-  const billsPaid = sum(paid.filter((e) => e.debtId === undefined).map((e) => e.amount))
-  const debtPaid =
-    sum(paid.filter((e) => e.debtId !== undefined).map((e) => e.amount)) -
-    sum(txs.filter(isDebtPayment).map((t) => t.amount))
-  const saved = 0 - sum(txs.filter((t) => t.fundId !== undefined).map((t) => t.amount))
-  const incomeIn = pay + otherIn
-  const moneyOut = spending + billsPaid + debtPaid
+export function cashTotals(range: DateRange, input: ReviewInput): FlowTotals {
+  const out: FlowTotals = { income: 0, corrections: 0, bills: 0, spending: 0 }
+  const r = { start: maxDate(range.start, historyStart(input)), end: range.end }
+  if (r.start >= r.end) return out
+  const payEnd = minDate(r.end, addDays(input.today, 1))
+  if (r.start < payEnd)
+    for (const p of paydaysBetweenDates(input, r.start, payEnd)) if (!p.skipped) out.income += p.amount
+  for (const t of transactionsBetween(input, r.start, r.end)) {
+    const k = txKind(t)
+    if (k === 'income') out.income += t.amount
+    else if (k === 'adjustment') out.corrections += t.amount
+    else if (k === 'expense' || k === 'refund') out.spending -= t.amount
+  }
+  for (const e of entriesBetween(input, r.start, r.end)) {
+    if (e.debtId !== undefined || effectiveStatus(e, input.today) !== 'paid') continue
+    const added = input.addedOn?.get(e.billId)
+    if (added !== undefined && e.date < added) continue
+    out.bills += e.amount
+  }
+  return out
+}
+
+/** Savings moves and debt payments dated in the range, up to today. */
+export function keptApart(range: DateRange, input: ReviewInput): KeptApart {
+  const r = { start: range.start, end: minDate(range.end, addDays(input.today, 1)) }
+  if (r.start >= r.end) return { saved: 0, debtPaid: 0 }
+  const saved = -sum(
+    transactionsBetween(input, r.start, r.end)
+      .filter((t) => t.fundId !== undefined)
+      .map((t) => t.amount),
+  )
+  const debtPaid = sum(
+    allDebtPayments(input)
+      .filter((p) => within(p.date, r))
+      .map((p) => p.amount),
+  )
+  return { saved, debtPaid }
+}
+
+const withNet = (t: FlowTotals): PeriodTotals => ({
+  ...t,
+  net: t.income + t.corrections - t.bills - t.spending,
+})
+
+/**
+ * One row per period (month or pay period, per the plan setting) overlapping the range,
+ * from the start of the history up to today: a review never invents the past or the
+ * future. With roll over on, each row's leftover is the next row's carriedIn (I5).
+ */
+export function periodRows(range: DateRange, input: ReviewInput): PeriodRow[] {
+  const since = historyStart(input)
+  const start = input.plan.startDate
+  return periodsIn(range, periodContext(input))
+    .filter((p) => p.start <= input.today && p.end > since)
+    .map((period): PeriodRow => {
+      const current = within(input.today, period)
+      const apart = keptApart(period, input)
+      if (start === null || period.end <= start)
+        return {
+          period,
+          basis: 'cash',
+          current,
+          ...withNet(cashTotals(period, input)),
+          ...apart,
+          carriedIn: null,
+          leftover: null,
+        }
+      const plan = planFor(period, input)
+      return {
+        period,
+        basis: 'accrual',
+        current,
+        ...withNet({
+          income: plan.income.total,
+          corrections: plan.corrections.total,
+          bills: plan.bills.total,
+          spending: plan.expenses.total,
+        }),
+        ...apart,
+        carriedIn: plan.carriedIn,
+        leftover: current ? null : plan.leftover,
+      }
+    })
+}
+
+/**
+ * Money in and out over any range: cash before the start, accrual from it (the same split
+ * as the rows, so a report for a period says what its row says).
+ */
+export function flowsBetween(range: DateRange, input: ReviewInput): PeriodTotals {
+  const start = input.plan.startDate
+  if (start === null) return withNet(cashTotals(range, input))
+  const before = cashTotals({ start: range.start, end: minDate(range.end, start) }, input)
+  const after = accrualTotals(range, input)
+  return withNet({
+    income: before.income + after.income,
+    corrections: before.corrections + after.corrections,
+    bills: before.bills + after.bills,
+    spending: before.spending + after.spending,
+  })
+}
+
+/** Column totals for the year tiles and the table footer. */
+export function totalRows(rows: readonly (PeriodTotals & KeptApart)[]): PeriodTotals & KeptApart {
+  const total = (k: keyof (PeriodTotals & KeptApart)) => sum(rows.map((r) => r[k]))
   return {
-    incomeIn,
-    spending,
-    billsPaid,
-    debtPaid,
-    moneyOut,
-    saved,
-    net: incomeIn - moneyOut - saved,
+    income: total('income'),
+    corrections: total('corrections'),
+    bills: total('bills'),
+    spending: total('spending'),
+    net: total('net'),
+    saved: total('saved'),
+    debtPaid: total('debtPaid'),
   }
 }
 
@@ -136,137 +199,9 @@ export const yearRange = (year: number): DateRange => ({
   end: makeDate(year + 1, 1, 1),
 })
 
-/** The twelve calendar months of a year. */
-export function monthRanges(year: number): DateRange[] {
-  return Array.from({ length: 12 }, (_, i) => ({
-    start: makeDate(year, i + 1, 1),
-    end: i === 11 ? makeDate(year + 1, 1, 1) : makeDate(year, i + 2, 1),
-  }))
-}
-
-/**
- * Pay periods of the primary income that START in [from, to), each running to the next
- * payday. The last one may end after `to`: a period belongs where its payday falls.
- */
-export function payPeriodRanges(
-  input: Pick<ReviewInput, 'incomes' | 'paydayOverrides'>,
-  span: DateRange,
-): DateRange[] {
-  const income = primaryIncome(input.incomes)
-  if (!income) return []
-  // Look a little past `to` so the last period knows where it ends.
-  const dates = [
-    ...new Set(
-      paydaysBetween(income, span.start, addDays(span.end, 400), input.paydayOverrides).map(
-        (p) => p.date,
-      ),
-    ),
-  ]
-  const out: DateRange[] = []
-  for (let i = 0; i + 1 < dates.length && dates[i]! < span.end; i++)
-    out.push({ start: dates[i]!, end: dates[i + 1]! })
-  return out
-}
-
-/** The pay period before the one containing `date`, for "‹ previous period" on Plan. */
-export function previousPayPeriod(
-  input: Pick<ReviewInput, 'incomes' | 'paydayOverrides'>,
-  periodStart: ISODate,
-): DateRange | null {
-  const income = primaryIncome(input.incomes)
-  if (!income) return null
-  const p = currentPeriod(income, addDays(periodStart, -1), input.paydayOverrides)
-  return p && p.start < periodStart ? { start: p.start, end: p.end } : null
-}
-
-/**
- * What was in the account just before the pay landed on `payday`.
- * 1. The amount saved at that payday's moment, if there is one.
- * 2. Else the first check-in in that pay period, minus what came and went from the payday
- *    up to it (the pay included).
- * 3. Else the last check-in before the payday, plus what came and went since.
- * A check-in is taken to include everything dated on or before its day.
- */
-export function carryOver(
-  input: ReviewInput,
-  payday: ISODate,
-  periodEnd: ISODate | null = null,
-): Carry | null {
-  const saved = input.periodClose?.[payday]
-  if (saved) return { amount: saved.carried, source: 'saved' }
-  // Before the history starts there is no way to know what came in at that payday.
-  if (payday < (input.since ?? historyStart(input))) return null
-  const sorted = [...input.checkIns].sort((a, b) =>
-    a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.at < b.at ? -1 : a.at > b.at ? 1 : 0,
-  )
-  const first = sorted.find((c) => c.date >= payday && (periodEnd === null || c.date < periodEnd))
-  // The latest one on that day: a second check-in the same day corrects the first.
-  const inPeriod = first && sorted.findLast((c) => c.date === first.date)
-  if (inPeriod) {
-    const since = flowsIn(input, { start: payday, end: addDays(inPeriod.date, 1) })
-    return { amount: inPeriod.balance - since.net, source: 'check-in' }
-  }
-  const before = sorted.filter((c) => c.date < payday).at(-1)
-  if (before) {
-    const since = flowsIn(input, { start: addDays(before.date, 1), end: payday })
-    return { amount: before.balance + since.net, source: 'flows' }
-  }
-  return null
-}
-
-/**
- * One row per month, or per pay period, for a year (or any range). Only rows between the
- * start of the history and today: a review never invents the past or the future.
- */
-export function periodSummaries(
-  span: number | DateRange,
-  mode: ReviewMode,
-  input: ReviewInput,
-): PeriodSummary[] {
-  const range = typeof span === 'number' ? yearRange(span) : span
-  const ranges =
-    mode === 'month'
-      ? typeof span === 'number'
-        ? monthRanges(span)
-        : monthsIn(range)
-      : payPeriodRanges(input, range)
-  const since = input.since ?? historyStart(input)
-  return ranges
-    .filter((r) => r.start <= input.today && r.end > since)
-    .map((r) => ({
-      ...r,
-      ...flowsIn(input, r),
-      ...(mode === 'payday' ? { carried: carryOver(input, r.start, r.end) } : {}),
-    }))
-}
-
-function monthsIn(range: DateRange): DateRange[] {
-  const out: DateRange[] = []
-  const first = Number(range.start.slice(0, 4))
-  const last = Number(range.end.slice(0, 4))
-  for (let y = first; y <= last; y++)
-    for (const m of monthRanges(y)) if (m.end > range.start && m.start < range.end) out.push(m)
-  return out
-}
-
-/** Column totals for the year tiles and the table footer. */
-export function totalFlows(rows: readonly Flows[]): Flows {
-  const total = (k: keyof Flows) => sum(rows.map((r) => r[k]))
-  return {
-    incomeIn: total('incomeIn'),
-    spending: total('spending'),
-    billsPaid: total('billsPaid'),
-    debtPaid: total('debtPaid'),
-    moneyOut: total('moneyOut'),
-    saved: total('saved'),
-    net: total('net'),
-  }
-}
-
-/** Years Look back can show: from the start of the history up to this year. Bills paid
- *  before it are not counted (see flowsIn), so they open no empty year either. */
+/** Years Look back can show: from the start of the history up to this year. */
 export function reviewYears(input: ReviewInput): number[] {
   const thisYear = Number(input.today.slice(0, 4))
-  const first = Math.min(thisYear, Number((input.since ?? historyStart(input)).slice(0, 4)))
+  const first = Math.min(thisYear, Number(historyStart(input).slice(0, 4)))
   return Array.from({ length: thisYear - first + 1 }, (_, i) => first + i)
 }

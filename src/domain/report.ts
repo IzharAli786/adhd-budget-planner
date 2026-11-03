@@ -1,29 +1,38 @@
 // Reports (More > Reports): everything that happened between two dates, as one plain,
 // serialisable object the PDF renderer (and the on-screen preview) reads. Pure.
 //
-// The money numbers are Look back's (review.ts flowsIn) for the same days, so a report
-// for October says exactly what Look back's October row says. Lists (bills, funds,
-// debts, where it went) use the same span flowsIn counts: from the start of the history,
-// so a table never lists a bill the totals above it leave out.
+// The money numbers are Look back's (review.ts flowsBetween) for the same days: cash
+// before the start of tracking, accrual from it (PLAN-v2 §3, R12), so a report for
+// October says exactly what Look back's October row says. Savings and debt are their own
+// blocks and never part of "Left over" (A2). Lists (bills, funds, debts, where it went)
+// use the same span: from the start of the history, so a table never lists a bill the
+// totals above it leave out.
 //
 // Dates here are INCLUSIVE on both ends (a person picks "1 Oct to 31 Oct"); the domain
 // ranges underneath are [start, end), so `end` is the day after `to`.
-import { addedOnMap, billEntriesBetween, paydayEntriesBetween, type BillEntry } from './bills'
+import { effectiveStatus, type BillEntry } from './bills'
 import { addDays, addMonths, daysBetween, isValidISODate, maxDate, minDate } from './dates'
 import { debtsInRange } from './yearSummary'
 import {
   CATEGORY_NAMES,
-  isDebtPayment,
-  isEverydaySpend,
   spendByCategory,
   spendByEnvelope,
   spendOutsideEnvelopes,
   type CategoryId,
   type DateRange,
 } from './insights'
-import type { Cents } from './money'
-import { isSpend } from './reconcile'
-import { flowsIn, historyStart, payPeriodRanges, type ReviewInput } from './review'
+import {
+  allDebtPayments,
+  budgetBalance,
+  entriesBetween,
+  paydaysBetweenDates,
+  periodContext,
+  slot,
+  txKind,
+} from './ledger'
+import { largestRemainder, type Cents } from './money'
+import { periodAt } from './period'
+import { flowsBetween, historyStart, type ReviewInput } from './review'
 import type {
   Bill,
   Debt,
@@ -78,23 +87,26 @@ export interface BalancePoint {
 }
 
 export interface ReportSummary {
-  /** Paydays (as Look back counts them) plus other money logged as coming in. */
+  /** Paydays and other money logged as coming in (Look back's "Money in"). */
   moneyIn: Cents
-  /** spending + billsPaid + debtPaid; a bill and the entry that paid it count once. */
-  moneyOut: Cents
-  /** Everyday spending only. */
+  /** Plain bills: paid ones before the start, every one dated in the range from it. */
+  bills: Cents
+  /** Everyday spending, net of refunds. */
   spending: Cents
-  /** Bills marked paid, debt minimums excluded (they are in debtPaid). */
-  billsPaid: Cents
-  debtPaid: Cents
+  /** Drift corrections, signed. */
+  corrections: Cents
+  /** moneyIn + corrections − bills − spending: Look back's "Left over". */
+  leftOver: Cents
+  /** The Savings block: kept apart from the money above (A2). */
   savedToFunds: Cents
   takenFromFunds: Cents
-  /** moneyIn − moneyOut − (savedToFunds − takenFromFunds): Look back's "Left over". */
-  leftOver: Cents
-  /** The latest check-in on or before `from`; null when there is none (never invented). */
-  startBalance: BalancePoint | null
-  /** The latest check-in on or before `to`. */
-  endBalance: BalancePoint | null
+  /** The Debt block: payments and paid minimums in the range. */
+  debtPaid: Cents
+  /** "Plan balance (savings and debt kept apart)" at the start of `from`; null before
+   *  tracking started. */
+  planBalanceStart: Cents | null
+  /** The same at the end of `to`. */
+  planBalanceEnd: Cents | null
 }
 
 export interface CategoryRow {
@@ -118,11 +130,12 @@ export interface ReportBill {
   amount: Cents
   autopay: boolean
   envelope?: string
-  /** A debt's minimum: the summary counts it under debt paid, not bills. */
+  /** A debt's minimum: it belongs to the Debt block, never to the bills total. */
   debt?: string
 }
 
 export interface ReportBills {
+  /** Paid, or autopay dated on or before today (decision 25). */
   paid: ReportBill[]
   skipped: ReportBill[]
   /** Dated in the range, neither paid nor skipped. */
@@ -131,7 +144,14 @@ export interface ReportBills {
 }
 
 export type TransactionKind =
-  'Spending' | 'Income' | 'Into savings' | 'From savings' | 'Debt payment' | 'Bill payment'
+  | 'Spending'
+  | 'Refund'
+  | 'Income'
+  | 'Correction'
+  | 'Into savings'
+  | 'From savings'
+  | 'Debt payment'
+  | 'Bill payment'
 
 export interface ReportTransaction {
   date: ISODate
@@ -184,12 +204,13 @@ export interface Report {
   summary: ReportSummary
   paydays: ReportPayday[]
   byCategory: CategoryRow[]
-  /** 'envelope' when envelopes are on, else four plain kinds (as Insights). */
+  /** 'envelope' when envelopes are on, else the plain kinds (as Insights). */
   categoryMode: 'envelope' | 'kind'
   bills: ReportBills
   transactions: ReportTransaction[]
   funds: ReportFund[]
   debts: ReportDebt[]
+  /** v4's balance check-ins in the range: a legacy table, printed only when there are rows. */
   checkIns: BalancePoint[]
   notes: ReportNote[]
   noSpendDays: { count: number; dates: ISODate[] }
@@ -206,29 +227,7 @@ const byDate = (a: { date: ISODate }, b: { date: ISODate }) =>
   a.date < b.date ? -1 : a.date > b.date ? 1 : 0
 
 /** Kinds keep one series colour each, as in Insights (features/review/insightRows). */
-const KIND_SERIES: Record<CategoryId, number> = { everyday: 1, bills: 2, savings: 3, debt: 4 }
-
-/**
- * Whole percents that add up to exactly 100 (largest remainder): each row gets its
- * floor, then the rows that lost the most to rounding get the leftover points. Plain
- * rounding can give 99 or 101, which a reader notices.
- */
-export function largestRemainder(amounts: readonly number[], total = 100): number[] {
-  const all = sum(amounts)
-  if (all <= 0) return amounts.map(() => 0)
-  const exact = amounts.map((a) => (a / all) * total)
-  const out = exact.map(Math.floor)
-  let left = total - sum(out)
-  const order = exact
-    .map((x, i) => ({ i, r: x - Math.floor(x) }))
-    .sort((a, b) => b.r - a.r || a.i - b.i)
-  for (const { i } of order) {
-    if (left <= 0) break
-    out[i]! += 1
-    left--
-  }
-  return out
-}
+const KIND_SERIES: Record<CategoryId, number> = { everyday: 1, bills: 2 }
 
 /** Where the money went: the Insights rows for the range, biggest first, zeros left out. */
 function categories(input: ReportInput, range: DateRange) {
@@ -237,7 +236,7 @@ function categories(input: ReportInput, range: DateRange) {
   let rows: { name: string; colorToken?: string; amount: Cents }[]
   if (input.envelopesEnabled && envelopes.length > 0) {
     rows = [
-      ...spendByEnvelope(txs, occurrences, bills, envelopes, range).map((r) => ({
+      ...spendByEnvelope(txs, occurrences, bills, envelopes, range, input.today).map((r) => ({
         name: r.name,
         colorToken:
           r.envelopeId === null
@@ -245,14 +244,14 @@ function categories(input: ReportInput, range: DateRange) {
             : (envelopes.find((e) => e.id === r.envelopeId)?.color ?? 'accent'),
         amount: r.actual,
       })),
-      ...spendOutsideEnvelopes(txs, occurrences, bills, envelopes, range).map((r) => ({
+      ...spendOutsideEnvelopes(occurrences, bills, envelopes, range, input.today).map((r) => ({
         name: r.name,
         colorToken: `chart-${KIND_SERIES[r.id]}`,
         amount: r.actual,
       })),
     ]
   } else {
-    rows = spendByCategory(txs, occurrences, bills, live(input.funds), range).map((r) => ({
+    rows = spendByCategory(txs, occurrences, bills, range, input.today).map((r) => ({
       name: r.name,
       colorToken: `chart-${KIND_SERIES[r.id]}`,
       amount: r.actual,
@@ -265,21 +264,19 @@ function categories(input: ReportInput, range: DateRange) {
   return positive.map((r, i): CategoryRow => ({ ...r, share: shares[i]! }))
 }
 
-function latestOnOrBefore(checkIns: ReportInput['checkIns'], date: ISODate): BalancePoint | null {
-  let best: ReportInput['checkIns'][number] | undefined
-  for (const c of checkIns) {
-    if (c.date > date) continue
-    // A later check-in on the same day corrects the earlier one (as in carryOver).
-    if (!best || c.date > best.date || (c.date === best.date && c.at > best.at)) best = c
-  }
-  return best ? { date: best.date, balance: best.balance } : null
-}
+const KIND_LABEL = {
+  income: 'Income',
+  expense: 'Spending',
+  refund: 'Refund',
+  adjustment: 'Correction',
+  debt: 'Debt payment',
+  billPayment: 'Bill payment',
+} as const
 
 function transactionKind(t: Transaction): TransactionKind {
-  if (t.fundId !== undefined) return t.amount < 0 ? 'Into savings' : 'From savings'
-  if (t.billOccurrenceId !== undefined) return 'Bill payment'
-  if (isDebtPayment(t)) return 'Debt payment'
-  return t.amount < 0 ? 'Spending' : 'Income'
+  const k = txKind(t)
+  if (k === 'saving') return t.amount < 0 ? 'Into savings' : 'From savings'
+  return KIND_LABEL[k]
 }
 
 /**

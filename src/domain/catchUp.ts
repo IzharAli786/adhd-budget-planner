@@ -2,13 +2,13 @@
 // was open, today, and what safe-to-spend currently counts.
 //
 // Short gap (7 days or less): one summary card with counts.
-// Fresh start (more than 7 days): one balance replaces the whole gap. Reconstructing
-// three weeks of spending would be a chore nobody finishes, and the bank balance already
-// contains all of it, so no transactions are invented.
-import type { BillEntry } from './bills'
+// Fresh start (more than 7 days, PLAN-v2 §3): no balance question. Past manual bills can
+// be marked paid in one go (bookkeeping: under accrual that never moves the number;
+// autopay ones already read as paid), waited-out 48h items are archived, and the screen
+// offers an optional correction or "Start fresh from today". No transactions invented.
+import { effectiveStatus, type BillEntry } from './bills'
 import { daysBetween } from './dates'
 import { expiredImpulse } from './impulse'
-import { checkInPlan } from './reconcile'
 import type { Id, ImpulseItem, Instant, ISODate } from './types'
 
 export const SHORT_GAP_MAX_DAYS = 7
@@ -39,9 +39,7 @@ export interface ShortGap {
 export interface FreshStart {
   mode: 'fresh'
   daysAway: number
-  /** Past autopay bills: the new balance already has them, so they are marked paid. */
-  autoPaid: BillEntry[]
-  /** Past manual bills: "Mark all paid", minus the exceptions the user picks. */
+  /** Past manual bills still unpaid: "Mark all paid", minus the exceptions the user picks. */
   ask: BillEntry[]
   /** Waited-out 48h items, archived quietly (never decided for the user). */
   archive: Id[]
@@ -61,20 +59,26 @@ export function catchUp(input: CatchUpInput): CatchUp {
   const expired = expiredImpulse(input.impulse, input.now)
 
   if (daysAway > SHORT_GAP_MAX_DAYS) {
-    const plan = checkInPlan(input.due, today)
     return {
       mode: 'fresh',
       daysAway,
-      autoPaid: plan.autoPaid,
-      ask: plan.ask,
+      ask: settlePastBills(input.due, today),
       archive: expired.map((i) => i.id),
     }
   }
 
   const billsCameDue = input.due.filter(
-    (e) => e.status === 'due' && e.date > lastOpened && e.date <= today,
+    (e) => effectiveStatus(e, today) === 'due' && e.date > lastOpened && e.date <= today,
   ).length
   const paydayPassed = input.periodStart > lastOpened && input.periodStart <= today
   if (billsCameDue === 0 && !paydayPassed && expired.length === 0) return NONE
   return { mode: 'short', daysAway, billsCameDue, paydayPassed, expiredImpulse: expired.length }
+}
+
+/**
+ * Bills dated on or before today that still read as unpaid (manual ones: autopay ones
+ * already read as paid, decision 25). Marking them paid is bookkeeping: S never moves.
+ */
+export function settlePastBills(entries: readonly BillEntry[], today: ISODate): BillEntry[] {
+  return entries.filter((e) => e.date <= today && effectiveStatus(e, today) === 'due')
 }

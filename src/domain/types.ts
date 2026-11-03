@@ -9,6 +9,12 @@ export type ISODate = string
 export type Instant = string
 export type Id = string
 
+/** [start, end): end is exclusive, like a period ending on the next payday. */
+export interface DateRange {
+  start: ISODate
+  end: ISODate
+}
+
 export type WeekendRule = 'before' | 'after' | 'none'
 export type DayOfMonth = number | 'last'
 
@@ -26,13 +32,26 @@ export interface IncomeSource {
   weekendRule: WeekendRule
   primary: boolean
   active: boolean
+  /**
+   * Nominal dates, inclusive (PLAN-v2 §2.1). A pay edit "from this period on" splits the
+   * income: the old row gets `until`, the new one `from`, so closed periods keep their pay.
+   */
+  from?: ISODate
+  until?: ISODate
 }
 
+/**
+ * One payday changed (PLAN-v2 decision 10): moved (`date`), a different amount, or
+ * skipped. Keyed by the NOMINAL date. An amount-only override has no `date`, so it never
+ * undoes the weekend shift.
+ */
 export interface PaydayOverride {
   id: string // `${incomeId}|${originalDate}`
   incomeId: Id
   originalDate: ISODate
-  date: ISODate
+  date?: ISODate
+  amount?: Cents
+  skipped?: true
 }
 
 export type Recurrence =
@@ -76,6 +95,11 @@ export interface Envelope {
   color: string
   sort: number
   deletedAt?: Instant
+  /**
+   * Budgets before an edit, sorted by `until` (PLAN-v2 §2.1, R19), so a past period keeps
+   * the budget it had. `budget` is the current one.
+   */
+  pastBudgets?: { until: ISODate; amount: Cents }[]
 }
 
 export interface Transaction {
@@ -87,7 +111,10 @@ export interface Transaction {
   fundId?: Id
   debtId?: Id
   billOccurrenceId?: string
-  inBalance?: boolean // backdated, already in bank balance
+  /** v4 only (check-ins). Never written by v5 and ignored by the money model. */
+  inBalance?: boolean
+  /** A drift correction (PLAN-v2 R8): signed, counts in safe to spend on its date. */
+  adjust?: true
   createdAt: Instant
   deletedAt?: Instant
 }
@@ -148,6 +175,8 @@ export interface Note {
   periodStart?: ISODate
   text: string
   updatedAt: Instant
+  /** Ticked in Coming up (PLAN-v2 decision 11). */
+  doneAt?: Instant
 }
 
 /** Notes are a few words; the cap only stops a pasted essay (or an edited backup). */

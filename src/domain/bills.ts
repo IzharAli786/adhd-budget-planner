@@ -3,7 +3,7 @@
 // Recurrence. Pure: callers pass today and the rows they read.
 import { addDays, makeDate, parseISODate } from './dates'
 import type { Cents } from './money'
-import { paydaysBetween } from './paySchedule'
+import { paydaysBetween, primaryAt } from './paySchedule'
 import { expandOccurrences, ruleDates, seriesStart, type Occurrence } from './recurrence'
 import type {
   Bill,
@@ -20,6 +20,20 @@ export interface BillEntry extends Occurrence {
   name: string
   autopay: boolean
   debtId?: Id
+}
+
+/** What a view shows for an entry (PLAN-v2 decision 25). */
+export type EffectiveStatus = 'due' | 'paid' | 'skipped'
+
+/**
+ * An autopay entry dated on or before today reads as paid in every view: the bank took
+ * it, and nothing writes that down any more (no check-ins, R4). Nothing is stored.
+ */
+export function effectiveStatus(
+  e: Pick<BillEntry, 'status' | 'autopay' | 'date'>,
+  today: ISODate,
+): EffectiveStatus {
+  return e.status === 'due' && e.autopay && e.date <= today ? 'paid' : e.status
 }
 
 /** Every bill's occurrences whose effective date is in [from, to), sorted by date then name. */
@@ -137,34 +151,47 @@ export function groupByDate<T extends { date: ISODate }>(items: readonly T[]): M
   return map
 }
 
-export interface PaydayEntry {
+export interface PaydayLine {
   incomeId: Id
   name: string
+  /** After the override's amount, if any. A skipped payday keeps it but counts as 0. */
   amount: Cents
+  /** On the primary chain (paySchedule.primaryAt at its nominal date): a period boundary. */
   primary: boolean
   /** The schedule's date, which identifies the payday (and keys its override). */
   nominal: ISODate
+  /** Effective date: override date, else the weekend-shifted nominal date. */
   date: ISODate
+  /** The date was moved by an override. */
   overridden: boolean
+  /** "Skip this payday": still a period boundary when primary, never money. */
+  skipped: boolean
 }
+/** The name before v5; same shape. */
+export type PaydayEntry = PaydayLine
 
-/** Paydays of every active income in [from, to), sorted by date then name. */
+/**
+ * Paydays of every active income whose effective date is in [from, to), sorted by date
+ * then name, with from/until, override amounts and skips applied (skipped ones are kept
+ * and flagged, so a calendar can show them; money code must leave them out).
+ */
 export function paydayEntriesBetween(
   incomes: readonly IncomeSource[],
   overrides: readonly PaydayOverride[],
   from: ISODate,
   to: ISODate,
-): PaydayEntry[] {
-  const out: PaydayEntry[] = []
+): PaydayLine[] {
+  const out: PaydayLine[] = []
   for (const income of incomes) {
     if (!income.active) continue
-    for (const p of paydaysBetween(income, from, to, overrides)) {
+    for (const { override, ...p } of paydaysBetween(income, from, to, overrides)) {
       out.push({
         incomeId: income.id,
         name: income.name,
-        amount: income.amount,
-        primary: income.primary,
+        amount: override?.amount ?? income.amount,
+        primary: primaryAt(incomes, p.nominal)?.id === income.id,
         ...p,
+        skipped: override?.skipped === true,
       })
     }
   }
