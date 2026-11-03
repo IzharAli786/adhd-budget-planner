@@ -1,5 +1,5 @@
 import { missingStarters } from '../../domain/categories'
-import type { Envelope, Id } from '../../domain/types'
+import type { Cents, Envelope, Id } from '../../domain/types'
 import { db } from '../schema'
 import { mutate } from '../undo'
 import { softRepo } from './softRepo'
@@ -77,5 +77,23 @@ export function reorderEnvelopes(ids: Id[]) {
       const env = await repo.load(w, id)
       if (env.sort !== sort) await w.put('envelopes', { ...env, sort })
     }
+  })
+}
+
+/**
+ * "Budget for November": sets the budget from `month` ('YYYY-MM') on. Earlier months keep
+ * what they had; later months follow until they have their own. One undo step.
+ */
+export function setEnvelopeBudgetFrom(id: Id, month: string, budget: Cents) {
+  return mutate('Change budget', ['envelopes'], async (w) => {
+    const env = (await w.get('envelopes', id)) as Envelope | undefined
+    if (!env) throw new Error(`No envelope ${id}`)
+    const monthBudgets = { ...env.monthBudgets, [month]: budget }
+    // Later months that were only following this one keep following it.
+    for (const k of Object.keys(monthBudgets))
+      if (k > month && monthBudgets[k] === budget) delete monthBudgets[k]
+    const next: Envelope = { ...env, monthBudgets }
+    await w.put('envelopes', next)
+    return next
   })
 }

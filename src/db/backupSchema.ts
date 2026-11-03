@@ -104,6 +104,8 @@ export const rowSchemas = {
     id,
     name: z.string(),
     budget: amount,
+    // Per-month budgets ('YYYY-MM' -> amount); optional, so older files simply lack it.
+    monthBudgets: z.optional(z.record(z.string().check(z.regex(/^\d{4}-\d{2}$/)), amount)),
     isDefault: z.boolean(),
     color: z.string(),
     sort: int,

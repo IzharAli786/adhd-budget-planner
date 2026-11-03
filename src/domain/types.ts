@@ -71,7 +71,13 @@ export interface BillOccurrence {
 export interface Envelope {
   id: Id
   name: string
+  /** The budget for any month with no entry in monthBudgets on or before it. */
   budget: Cents
+  /**
+   * "Budget for November": a budget set for a month ('YYYY-MM') applies to that month and
+   * every later month until the next entry. Earlier months keep theirs, so history holds.
+   */
+  monthBudgets?: Record<string, Cents>
   isDefault: boolean
   color: string
   sort: number

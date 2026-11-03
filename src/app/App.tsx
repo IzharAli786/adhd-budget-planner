@@ -12,7 +12,10 @@ import { InstallGate } from '../features/install/InstallGate'
 import { InstallScreen } from '../features/install/InstallScreen'
 import { HelpScreen } from '../features/more/HelpScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
-import { PlanScreen } from '../features/plan/PlanScreen'
+import { HomeScreen } from '../features/home/HomeScreen'
+import { EnvelopesScreen } from '../features/envelopes/EnvelopesScreen'
+import { GettingStartedScreen } from '../features/start/GettingStartedScreen'
+import { SavingsScreen } from '../features/savings/SavingsScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
 import { MoneyBasicsScreen } from '../features/settings/MoneyBasicsScreen'
 import { ReviewScreen } from '../features/review/ReviewScreen'
@@ -57,10 +60,44 @@ export function App() {
                       <Route index element={<TodayScreen />} />
                       <Route path="bills" element={<BillsScreen />} />
                       <Route
-                        path="plan"
+                        path="home"
                         element={
                           <FullOnly>
-                            <PlanScreen />
+                            <HomeScreen />
+                          </FullOnly>
+                        }
+                      />
+                      <Route path="plan" element={<Navigate to="/home" replace />} />
+                      <Route path="getting-started" element={<GettingStartedScreen />} />
+                      <Route
+                        path="savings"
+                        element={
+                          <FullOnly>
+                            <SavingsScreen />
+                          </FullOnly>
+                        }
+                      />
+                      <Route
+                        path="debt"
+                        element={
+                          <FullOnly>
+                            <DebtsScreen />
+                          </FullOnly>
+                        }
+                      />
+                      <Route
+                        path="envelopes"
+                        element={
+                          <FullOnly>
+                            <EnvelopesScreen />
+                          </FullOnly>
+                        }
+                      />
+                      <Route
+                        path="review"
+                        element={
+                          <FullOnly>
+                            <ReviewScreen />
                           </FullOnly>
                         }
                       />
@@ -80,8 +117,8 @@ export function App() {
                       <Route path="more/transactions" element={<TransactionsScreen />} />
                       <Route path="more/deleted" element={<RecentlyDeletedScreen />} />
                       <Route path="more/wait" element={<ImpulseScreen />} />
-                      <Route path="more/debts" element={<DebtsScreen />} />
-                      <Route path="more/review" element={<ReviewScreen />} />
+                      <Route path="more/debts" element={<Navigate to="/debt" replace />} />
+                      <Route path="more/review" element={<Navigate to="/review" replace />} />
                       <Route path="more/reports" element={<ReportsScreen />} />
                       <Route path="more/install" element={<InstallScreen embedded />} />
                       {IS_DEMO && <Route path="more/bring" element={<BringSetupScreen />} />}

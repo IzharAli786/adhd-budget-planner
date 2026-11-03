@@ -12,6 +12,7 @@
 //
 // Savings moves and debt payments (and debt minimum bills) live in their own sections and
 // never touch this number, income, or spending totals (locked decision A2).
+import { budgetFor } from './categories'
 import { billEntriesBetween, paydayEntriesBetween, type BillEntry, type PaydayEntry } from './bills'
 import { addMonths, daysBetween, makeDate, maxDate, parseISODate } from './dates'
 import type { Cents } from './money'
@@ -439,15 +440,16 @@ export function envelopesUsage(
       nsum(mine.filter((t) => t.date > today).map((t) => t.amount)) +
       sum(linked.filter((e) => e.status === 'due' && e.date > today).map((e) => e.amount))
     const used = spent + linkedDue
+    const budget = budgetFor(env, period.start)
     return {
       id: env.id,
       name: env.name,
       color: env.color,
-      budget: env.budget,
+      budget,
       spent,
       linkedDue,
-      reserved: Math.max(0, env.budget - used),
-      over: env.budget > 0 ? Math.max(0, used - env.budget) : 0,
+      reserved: Math.max(0, budget - used),
+      over: budget > 0 ? Math.max(0, used - budget) : 0,
     }
   })
 }

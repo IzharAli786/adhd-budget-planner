@@ -127,13 +127,14 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   return (
     <QuickAddContext.Provider value={api}>
       {children}
-      {!onToday && (
+      {/* On every screen, Today included: Today no longer has its own field. */}
+      {(
         <button
           type="button"
           onClick={openSheet}
-          aria-label="Quick add"
+          aria-label="Track spending"
           aria-keyshortcuts="n"
-          title="Quick add (n)"
+          title="Track spending (n)"
           className={cx(
             'print-hide fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center gap-2 rounded-full',
             'bg-accent text-accent-contrast shadow-card transition-[filter,transform] hover:brightness-105 active:scale-95',
@@ -145,7 +146,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
         >
           <Icon name="plus" size={26} strokeWidth={2.2} />
           <span aria-hidden="true" className="hidden font-medium lg:inline">
-            Quick add
+            Track spending
           </span>
         </button>
       )}

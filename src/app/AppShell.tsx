@@ -13,6 +13,12 @@ import { UpdateToast } from './UpdateToast'
 
 const WIDE = new Set([
   '/',
+  '/home',
+  '/envelopes',
+  '/savings',
+  '/debt',
+  '/review',
+  '/getting-started',
   '/bills',
   '/plan',
   '/goals',

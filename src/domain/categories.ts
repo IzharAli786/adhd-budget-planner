@@ -3,6 +3,21 @@
 // change recolours every envelope, and contrast.test.ts checks each against every surface.
 import type { Envelope } from './types'
 
+/** 'YYYY-MM' of a date: the key for Envelope.monthBudgets. */
+export const monthKey = (date: string) => date.slice(0, 7)
+
+/** The envelope's budget for the month containing `date` (see Envelope.monthBudgets). */
+export function budgetFor(
+  env: { budget: number; monthBudgets?: Record<string, number> },
+  date: string,
+): number {
+  const key = monthKey(date)
+  let best: string | null = null
+  for (const k of Object.keys(env.monthBudgets ?? {}))
+    if (k <= key && (best === null || k > best)) best = k
+  return best === null ? env.budget : env.monthBudgets![best]!
+}
+
 export const ENVELOPE_COLORS = [
   'clay',
   'sage',

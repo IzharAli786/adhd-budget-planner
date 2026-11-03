@@ -30,10 +30,11 @@ export function TabBar() {
       <div className="md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain md:[scrollbar-width:none]">
         <ul className="mx-auto flex max-w-md md:max-w-none md:flex-col md:gap-1 md:px-3">
           {tabs.map((tab) => (
-            <li key={tab.to} className="flex-1 md:flex-none">
+            // Phones keep five in thumb reach; the side rail lists every section.
+            <li key={tab.to} className={cx('flex-1 md:block md:flex-none', !tab.phone && 'hidden')}>
               <NavLink
                 to={tab.to}
-                end={tab.to === '/'}
+                end={tab.to === '/' || tab.to === '/more'}
                 className={({ isActive }) =>
                   cx(
                     'group flex min-h-14 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium transition-colors',
