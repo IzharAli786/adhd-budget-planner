@@ -12,7 +12,8 @@ export const textButton =
 
 /**
  * One row on an Envelopes card: name over its date on the left, the amount in the display
- * face, then the row's actions in a fixed-width slot so every amount lines up.
+ * face, then the row's actions in a fixed-width slot so every amount lines up. The amount
+ * and actions sit on the name's line; the date has the line below to itself.
  */
 export function EntryLine({
   name,
@@ -29,7 +30,7 @@ export function EntryLine({
   actions: ReactNode
 }) {
   return (
-    <li className="flex min-h-16 items-center gap-2 border-t border-line py-3 first:border-t-0 sm:gap-3">
+    <li className="flex min-h-16 items-start gap-2 border-t border-line py-3 first:border-t-0 sm:gap-3">
       <div className="min-w-0 flex-1">
         <p className="flex min-w-0 items-center gap-2">
           <span className="truncate font-semibold">{name}</span>
@@ -41,10 +42,12 @@ export function EntryLine({
         </p>
         <p className="mt-0.5 text-sm text-muted">{sub}</p>
       </div>
-      <span className="shrink-0 font-display text-[1.0625rem] font-semibold tabular-nums sm:text-lg">
+      <span className="shrink-0 font-display text-lg leading-6 font-bold tabular-nums sm:text-[1.1875rem]">
         {amount}
       </span>
-      <div className="-mr-2.5 flex w-[5.75rem] shrink-0 items-center justify-end">{actions}</div>
+      <div className="-my-2.5 -mr-2.5 flex w-[5.75rem] shrink-0 items-center justify-end">
+        {actions}
+      </div>
     </li>
   )
 }

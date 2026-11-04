@@ -37,7 +37,7 @@ export function IncomeCard({
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 
   return (
-    <section aria-labelledby={titleId} className="card p-5 sm:px-8 sm:pt-7 sm:pb-6">
+    <section aria-labelledby={titleId} className="card p-5 sm:px-6 sm:pt-6 sm:pb-5">
       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <h2 id={titleId} className="type-display text-[1.375rem] leading-tight">
           Income

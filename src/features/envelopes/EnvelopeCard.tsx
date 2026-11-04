@@ -58,7 +58,7 @@ export function EnvelopeCard({
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 
   return (
-    <section aria-labelledby={titleId} className="card p-5 sm:px-8 sm:pt-7 sm:pb-6">
+    <section aria-labelledby={titleId} className="card p-5 sm:px-6 sm:pt-6 sm:pb-5">
       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <h2 id={titleId} className="min-w-0 type-display text-[1.375rem] leading-tight break-words">
           {env.name}
@@ -206,7 +206,7 @@ function BudgetRow({
   }
 
   return (
-    <div className="mt-3 sm:mt-4">
+    <div className="mt-2">
       <label htmlFor={inputId} className="text-sm font-semibold text-muted">
         Budget for {monthName}
       </label>
@@ -246,7 +246,7 @@ function BudgetRow({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(share * 100)}
-            className="h-3 overflow-hidden rounded-full bg-accent-soft"
+            className="h-3.5 overflow-hidden rounded-full bg-accent-soft"
           >
             <div
               className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
