@@ -1,7 +1,7 @@
 import { lastDayOfMonth, parseISODate } from '../../domain/dates'
 import type { DayOfMonth, ISODate } from '../../domain/types'
 
-export type EntryKind = 'expense' | 'income' | 'bill' | 'saving' | 'debt'
+export type EntryKind = 'expense' | 'refund' | 'income' | 'bill' | 'saving' | 'debt'
 
 export const ENTRY_KINDS: readonly { value: EntryKind; label: string; hint: string }[] = [
   { value: 'expense', label: 'Expense', hint: 'Money spent. Counts against safe to spend.' },
@@ -18,6 +18,16 @@ export const ENTRY_KINDS: readonly { value: EntryKind; label: string; hint: stri
     hint: 'Paid off a debt. Lowers what you owe, never lowers safe to spend.',
   },
 ]
+
+/**
+ * Money back into one envelope (a return, a refund). Offered only on an envelope's own
+ * "+ Add spend" sheet, so it's always a deliberate choice: "Got money" is never a refund.
+ */
+export const REFUND_KIND = {
+  value: 'refund',
+  label: 'Refund',
+  hint: 'Money back into this envelope, like a return. Lowers what it has spent and adds to safe to spend.',
+} as const satisfies { value: EntryKind; label: string; hint: string }
 
 /** The day to repeat on: "last" when the date is the month's last day (31 Jan → 28 Feb). */
 export function dayOfMonthOf(date: ISODate): DayOfMonth {

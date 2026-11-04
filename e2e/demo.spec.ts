@@ -48,7 +48,7 @@ test('sample data opens a filled-in Today', async ({ page }) => {
   // Months of history behind it, and still a calm, positive number for today.
   expect(await heroCents(page)).toBeGreaterThan(0)
   // Greeted by name, with the money laid out; never a backup chore in the demo.
-  await expect(page.getByRole('heading', { level: 1, name: /, Sam$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Hi Sam' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Coming up' })).toBeVisible()
   await expect(page.getByText('Save a backup')).toHaveCount(0)
   expect(await seriousViolations(page)).toEqual([])

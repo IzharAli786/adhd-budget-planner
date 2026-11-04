@@ -33,7 +33,7 @@ export function TodayScreen() {
     // A size container: the hero and tiles switch layout on this column's width, which on
     // a tablet is still phone-narrow while the viewport is wide (see Dashboard.tsx).
     <div className="@container/today">
-      <TodayHeader now={now} />
+      <TodayHeader />
       {!model.loaded || !model.plan || !ready ? (
         <div aria-hidden="true" className="card-hero h-48 animate-pulse" />
       ) : (
@@ -43,13 +43,13 @@ export function TodayScreen() {
   )
 }
 
-/** "Good evening, Sam": the page title, following the clock as the app stays open. */
-function TodayHeader({ now }: { now: Instant }) {
+/** "Hi Sam" (or "Hi there" with no name set): the page title. */
+function TodayHeader() {
   const { displayName } = useAppSettings().settings
   return (
     <header className="mb-6 @xl/today:mb-7">
       <h1 className="type-display text-[1.75rem] leading-[1.1] @xl/today:text-[1.875rem]">
-        {greeting(new Date(now).getHours(), displayName)}
+        {greeting(displayName)}
       </h1>
       <p className="mt-1.5 text-body text-muted">Your money at a glance.</p>
     </header>

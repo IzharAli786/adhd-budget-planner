@@ -63,7 +63,12 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
     document.getElementById(amountId)?.focus()
   }, [amountId])
 
-  const showEnvelopes = settings.envelopesEnabled && (envelopes?.length ?? 0) > 0
+  // Envelopes are for spending only. "Got money" is always income: an envelope here used
+  // to turn it into a refund (lowering that envelope's spending instead of adding to Money
+  // in), and the note-based suggestion picked one without being asked. Refunds now have
+  // their own explicit choice on the envelope's "+ Add spend" sheet.
+  const showEnvelopes =
+    kind === 'spend' && settings.envelopesEnabled && (envelopes?.length ?? 0) > 0
   const suggested = showEnvelopes && note ? suggestEnvelope(note, recent ?? []) : null
   const chosenEnvelope = envelopeId ?? suggested
   const chips = frequentEntries(recent ?? [], 4)

@@ -281,6 +281,40 @@ describe('envelopes: budget vs actual', () => {
     expect(safeToSpend(input).total).toBe(safeToSpend({ ...input, envelopesEnabled: false }).total)
   })
 
+  it('a refund bigger than the month’s spending brings an envelope to zero, never below', () => {
+    const r = safeToSpend({
+      ...input,
+      transactions: [
+        tx(-3160, '2026-11-02', { envelopeId: 'food' }),
+        tx(10000, '2026-11-05', { envelopeId: 'food' }),
+      ],
+    })
+    const food = r.envelopes.find((e) => e.id === 'food')!
+    expect(food.spent).toBe(0)
+    expect(food.reserved).toBeLessThanOrEqual(food.budget)
+    // Safe to spend still gets the whole refund back.
+    const without = safeToSpend({
+      ...input,
+      transactions: [tx(-3160, '2026-11-02', { envelopeId: 'food' })],
+    })
+    expect(r.total - without.total).toBe(10000)
+    // And the chart never shows a negative or missing-by-accident slice.
+    expect(r.distribution.every((d) => d.amount > 0)).toBe(true)
+  })
+
+  it('the chart’s slices add up to the money that has gone out so far', () => {
+    const r = safeToSpend({
+      ...input,
+      today: '2026-11-25',
+      bills: [...input.bills, bill('phone', 3000, 20)],
+      transactions: [tx(-500), tx(-700, '2026-11-06', { envelopeId: 'food' })],
+    })
+    const chart = r.distribution.reduce((a, d) => a + d.amount, 0)
+    // Rent (home) and the veg box (food) are linked; Phone is a bill outside any envelope.
+    expect(chart).toBe(100000 + 4000 + 3000 + 500 + 700)
+    expect(r.distribution.find((d) => d.id === 'bills')?.amount).toBe(3000)
+  })
+
   it('over budget is reported, never with no budget set', () => {
     const r = safeToSpend({
       ...input,

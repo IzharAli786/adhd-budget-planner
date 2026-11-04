@@ -120,7 +120,7 @@ describe('sample data in the app', () => {
     await seedReadyInstall()
     render(<App />)
     // Today: greeted by name, with this month's safe to spend as a real number.
-    expect(await screen.findByRole('heading', { level: 1, name: /, Sam$/ })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Hi Sam' })).toBeTruthy()
     const tiles = within(await screen.findByRole('list', { name: 'At a glance' }))
     const safe = tiles.getByText(/safe to spend$/).closest('li')!
     expect(safe.querySelector('p:last-child')!.textContent).toMatch(/\d/)

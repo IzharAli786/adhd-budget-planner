@@ -14,7 +14,7 @@ import { MoneyInput } from '../../ui/MoneyInput'
 import { Sheet } from '../../ui/Sheet'
 import { Switch } from '../../ui/Switch'
 import { useFormat } from './format'
-import { ENTRY_KINDS, type EntryKind } from './entryKinds'
+import { ENTRY_KINDS, REFUND_KIND, type EntryKind } from './entryKinds'
 
 /**
  * "Add to this day" (PLAN-v2 item 2): one form for everything that can sit on a date.
@@ -92,6 +92,11 @@ function AddEntryForm({
   const debt = debts?.find((x) => x.id === (debtId ?? debts[0]?.id))
   const missing = kind === 'saving' && !fund ? 'fund' : kind === 'debt' && !debt ? 'debt' : null
 
+  // Refund sits next to Expense, and only when this sheet was opened from an envelope.
+  const kinds = initialEnvelope
+    ? [ENTRY_KINDS[0]!, REFUND_KIND, ...ENTRY_KINDS.slice(1)]
+    : ENTRY_KINDS
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setTried(true)
@@ -125,6 +130,19 @@ function AddEntryForm({
         ...(kind === 'expense' && envelopeId ? { envelopeId } : {}),
       })
       undoToast(`Added ${what || (kind === 'expense' ? 'expense' : 'income')}`)
+    } else if (kind === 'refund') {
+      // Positive and tagged: the envelope's spending goes down, safe to spend goes up.
+      // Always into an envelope (the one this sheet was opened from, unless another was
+      // picked): an untagged positive entry would be income, not a refund.
+      const into = envelopeId ?? initialEnvelope
+      const env = envelopes?.find((x) => x.id === into)
+      await addTransaction({
+        date,
+        amount,
+        note: what || 'Refund',
+        ...(into ? { envelopeId: into } : {}),
+      })
+      undoToast(`Refund of ${f.money(amount)}${env ? ` into ${env.name}` : ''}`)
     } else if (kind === 'saving' && fund) {
       await addToFund(fund, amount, date)
       undoToast(`Saved ${f.money(amount)} for ${fund.name}`)
@@ -145,7 +163,7 @@ function AddEntryForm({
       <fieldset>
         <legend className="mb-2 text-sm font-medium">What is it?</legend>
         <div className="flex flex-wrap gap-2">
-          {ENTRY_KINDS.map((k) => (
+          {kinds.map((k) => (
             <Chip
               key={k.value}
               selected={kind === k.value}
@@ -155,14 +173,14 @@ function AddEntryForm({
             </Chip>
           ))}
         </div>
-        <p className="mt-2 text-sm text-muted">{ENTRY_KINDS.find((k) => k.value === kind)?.hint}</p>
+        <p className="mt-2 text-sm text-muted">{kinds.find((k) => k.value === kind)?.hint}</p>
       </fieldset>
 
       {missing ? (
         <p className="card-quiet p-4 text-body">
           {missing === 'fund' ? 'No savings funds yet. ' : 'No debts listed yet. '}
-          <Link to={missing === 'fund' ? '/goals' : '/more/debts'} className={textLinkClass}>
-            {missing === 'fund' ? 'Start a fund in Goals' : 'Add a debt'}
+          <Link to={missing === 'fund' ? '/savings' : '/debt'} className={textLinkClass}>
+            {missing === 'fund' ? 'Start a fund in Savings' : 'Add a debt'}
           </Link>
         </p>
       ) : (
@@ -176,7 +194,7 @@ function AddEntryForm({
             error={tried && !amount ? 'Enter an amount' : undefined}
           />
 
-          {(kind === 'expense' || kind === 'income' || kind === 'debt') && (
+          {(kind === 'expense' || kind === 'refund' || kind === 'income' || kind === 'debt') && (
             <Field id={noteId} label={kind === 'debt' ? 'Note (optional)' : 'What for'}>
               <input
                 id={noteId}
@@ -186,9 +204,11 @@ function AddEntryForm({
                 placeholder={
                   kind === 'expense'
                     ? 'Groceries, coffee, car insurance…'
-                    : kind === 'income'
-                      ? 'Side job, refund, gift…'
-                      : ''
+                    : kind === 'refund'
+                      ? 'Returned shoes, money back…'
+                      : kind === 'income'
+                        ? 'Side job, gift, money back…'
+                        : ''
                 }
                 onChange={(e) => setNote(e.target.value)}
                 className={inputClass}
@@ -196,23 +216,25 @@ function AddEntryForm({
             </Field>
           )}
 
-          {kind === 'expense' && settings.envelopesEnabled && (envelopes?.length ?? 0) > 0 && (
-            <fieldset>
-              <legend className="mb-1.5 text-sm font-medium">Envelope</legend>
-              <div className="flex flex-wrap gap-2">
-                {envelopes!.map((env) => (
-                  <Chip
-                    key={env.id}
-                    selected={envelopeId === env.id}
-                    leading={<EnvelopeDot color={env.color} />}
-                    onClick={() => setEnvelopeId(envelopeId === env.id ? undefined : env.id)}
-                  >
-                    {env.name}
-                  </Chip>
-                ))}
-              </div>
-            </fieldset>
-          )}
+          {(kind === 'expense' || kind === 'refund') &&
+            settings.envelopesEnabled &&
+            (envelopes?.length ?? 0) > 0 && (
+              <fieldset>
+                <legend className="mb-1.5 text-sm font-medium">Envelope</legend>
+                <div className="flex flex-wrap gap-2">
+                  {envelopes!.map((env) => (
+                    <Chip
+                      key={env.id}
+                      selected={envelopeId === env.id}
+                      leading={<EnvelopeDot color={env.color} />}
+                      onClick={() => setEnvelopeId(envelopeId === env.id ? undefined : env.id)}
+                    >
+                      {env.name}
+                    </Chip>
+                  ))}
+                </div>
+              </fieldset>
+            )}
 
           {kind === 'saving' && funds && funds.length > 1 && (
             <Picker legend="Into which fund?" items={funds} value={fund?.id} onChange={setFundId} />

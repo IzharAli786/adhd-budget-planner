@@ -59,7 +59,7 @@ describe('Quick add sheet', () => {
     expect(screen.queryByRole('dialog', { name: 'Track spending' })).toBeNull()
   })
 
-  it('a backdated entry asks whether it is already in the balance', async () => {
+  it('a backdated entry is saved straight away, with no bank-balance question', async () => {
     await r.addCheckIn(50000, '2026-11-04', new Date(2026, 10, 4, 9, 0).toISOString())
     window.history.replaceState(null, '', '/more')
     render(<App />)
@@ -68,13 +68,44 @@ describe('Quick add sheet', () => {
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '30')
     await userEvent.click(within(sheet).getByRole('button', { name: 'Yesterday' }))
     await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
-    const ask = await screen.findByRole('dialog', { name: 'Is this already in your bank balance?' })
-    await userEvent.click(within(ask).getByRole('button', { name: 'Yes, it’s in there' }))
     await waitFor(async () =>
       expect(await r.listTransactions()).toEqual([
-        expect.objectContaining({ amount: -3000, date: '2026-11-03', inBalance: true }),
+        expect.objectContaining({ amount: -3000, date: '2026-11-03' }),
       ]),
     )
+    expect(screen.queryByRole('dialog', { name: /already in your bank balance/ })).toBeNull()
+    expect((await r.listTransactions())[0]!.inBalance).toBeUndefined()
+  })
+
+  it('"Got money" is always income: no envelope picker, never a hidden refund', async () => {
+    await r.updateSettings({ envelopesEnabled: true })
+    await r.ensureDefaultEnvelope()
+    const food = await r.addEnvelope({ name: 'Groceries', budget: 20000, color: 'sage' })
+    // Earlier spending with this note: the sheet used to auto-pick Groceries from it.
+    await r.addTransaction({
+      date: '2026-11-02',
+      amount: -3160,
+      note: 'Groceries',
+      envelopeId: food.id,
+    })
+    window.history.replaceState(null, '', '/more')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
+    // Spending offers envelopes; "Got money" does not.
+    // Envelopes load from the database a moment after the sheet opens.
+    expect(await within(sheet).findByRole('group', { name: 'Envelope' })).toBeTruthy()
+    await userEvent.click(within(sheet).getByRole('radio', { name: 'Got money' }))
+    expect(within(sheet).queryByRole('group', { name: 'Envelope' })).toBeNull()
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '100')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: /What for/ }), 'Groceries')
+    expect(within(sheet).queryByText(/Suggested from what you logged before/)).toBeNull()
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Add it' }))
+    await waitFor(async () => {
+      const got = (await r.listTransactions()).find((t) => t.amount === 10000)
+      expect(got).toBeTruthy()
+      expect(got!.envelopeId).toBeUndefined()
+    })
   })
 
   it('a recent chip logs again in one tap', async () => {

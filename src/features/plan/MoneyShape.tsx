@@ -6,7 +6,7 @@ import { DATA_COLOR, tint } from '../../ui/dataColors'
 import { envelopeColor } from '../../ui/EnvelopeDot'
 import { Icon } from '../../ui/Icon'
 import type { Formatters } from '../bills/format'
-import { percentLabel, percents } from '../home/percents'
+import { shareLabel } from '../home/percents'
 
 // Data colours (ui/dataColors): the same kind of money is the same colour on every chart.
 const BILLS = DATA_COLOR.bills
@@ -160,31 +160,65 @@ export function IncomeVsSpending({
 }
 
 /**
- * "Spending distribution": where the money went so far this period, by envelope (bills
- * outside any envelope get their own slice), in the envelopes' own order. Savings and debt
- * payments are not spending, so they are not in it. The list carries every number; the
- * ring is decoration.
+ * "Spending distribution": where this period's money went, one slice per envelope (bills
+ * outside any envelope get their own slice). Savings and debt payments are not spending,
+ * so they are not in it.
+ *
+ * Read as: the legend IS the chart. Slices and legend share one order, biggest first, so
+ * the largest slice starts at 12 o'clock and the eye can pair them without hunting; a thin
+ * gap separates neighbours whose colours are close. Each percent is its own amount's share,
+ * rounded honestly (see percents.ts). For the current period it counts only what has
+ * happened so far, and says so, so it never looks like it disagrees with "Money out".
  */
-export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters }) {
+export function SpendingDonut({
+  safe,
+  f,
+  when,
+  soFar = false,
+}: {
+  safe: SafeToSpend
+  f: Formatters
+  /** "in November", "this pay period". */
+  when: string
+  /** The current period: only what has happened so far is counted. */
+  soFar?: boolean
+}) {
   const order = new Map(safe.envelopes.map((e, i) => [e.id, i]))
   const rank = (id: string) => order.get(id) ?? order.size
-  const rows = [...safe.distribution].sort((a, b) => rank(a.id) - rank(b.id))
+  const rows = [...safe.distribution]
+    .filter((r) => r.amount > 0)
+    .sort((a, b) => b.amount - a.amount || rank(a.id) - rank(b.id))
   const total = sum(rows.map((r) => r.amount))
-  if (total <= 0) return <p className="text-body text-muted">Nothing spent yet.</p>
-  const pct = percents(rows.map((r) => r.amount))
+  if (total <= 0)
+    return (
+      <p className="text-body text-muted">
+        {soFar ? `Nothing spent yet ${when}.` : `Nothing was spent ${when}.`}
+      </p>
+    )
   const R = 52
   const C = 2 * Math.PI * R
+  // A hair of card between slices, so two close colours never read as one slice.
+  const gap = rows.length > 1 ? 1.6 : 0
   const lens = rows.map((r) => (r.amount / total) * C)
   const starts = lens.map((_, i) => sum(lens.slice(0, i)))
   return (
     <div>
+      <p className="text-body">
+        <span className="text-muted">{soFar ? `Spent so far ${when}` : `Spent ${when}`}</span>{' '}
+        <span className="amount font-semibold">{f.money(total)}</span>
+      </p>
+      {soFar && (
+        <p className="mt-0.5 text-caption text-muted">
+          Bills and spending still to come join the chart on their date.
+        </p>
+      )}
       <svg
         viewBox="0 0 140 140"
         aria-hidden="true"
-        className="h-44 w-44 shrink-0 -rotate-90 @xl:h-52 @xl:w-52"
+        className="mt-5 h-44 w-44 shrink-0 -rotate-90 @xl:h-52 @xl:w-52"
       >
         {rows.map((r, i) => {
-          const len = lens[i]!
+          const visible = Math.max(0.01, lens[i]! - gap)
           return (
             <circle
               key={r.id}
@@ -194,14 +228,14 @@ export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters })
               fill="none"
               stroke={colorOf(r)}
               strokeWidth="22"
-              strokeDasharray={`${len} ${C - len}`}
-              strokeDashoffset={-starts[i]!}
+              strokeDasharray={`${visible} ${C - visible}`}
+              strokeDashoffset={-(starts[i]! + gap / 2)}
             />
           )
         })}
       </svg>
       <ul aria-label="Spending distribution" className="mt-6 divide-y divide-line">
-        {rows.map((r, i) => (
+        {rows.map((r) => (
           <li key={r.id} className="flex items-center gap-3 py-3">
             <span
               aria-hidden="true"
@@ -210,7 +244,7 @@ export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters })
             />
             <span className="min-w-0 flex-1 truncate text-body">{r.name}</span>
             <span className="shrink-0 amount text-body">
-              {f.money(r.amount)} · {percentLabel(r.amount, pct[i]!)}
+              {f.money(r.amount)} · {shareLabel(r.amount, total)}
             </span>
           </li>
         ))}

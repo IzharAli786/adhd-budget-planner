@@ -155,7 +155,7 @@ describe('Home', () => {
     expect(within(list).queryByText(/over plan/)).toBeNull()
   })
 
-  it('spending distribution lists envelopes in order with their share', async () => {
+  it('spending distribution: biggest first, each with its own honest share', async () => {
     await seedEnvelopes()
     goto('/home')
     render(<App />)
@@ -164,7 +164,24 @@ describe('Home', () => {
       within(list)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Food€25.00 · 25%', 'Fun€75.00 · 75%'])
+    ).toEqual(['Fun€75.00 · 75%', 'Food€25.00 · 25%'])
+  })
+
+  it('spending distribution says what it counts: so far this month, or the whole month', async () => {
+    await seedEnvelopes()
+    // Some October spending, so the picker can step back to a finished month.
+    await r.addTransaction({ date: '2026-10-12', amount: -4200, note: 'shop' })
+    goto('/home')
+    render(<App />)
+    const card = await screen.findByRole('region', { name: 'Spending distribution' })
+    expect(card.textContent).toMatch(/Spent so far in November\s*€100\.00/)
+    expect(card.textContent).toContain('still to come join the chart on their date')
+    await userEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Spending distribution' }).textContent).toMatch(
+        /Spent in October\s*€42\.00/,
+      ),
+    )
   })
 
   it('spending distribution never calls real money 0%', async () => {
@@ -179,7 +196,7 @@ describe('Home', () => {
       within(list)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Food€0.25 · <1%', 'Fun€75.00 · 100%'])
+    ).toEqual(['Fun€75.00 · 100%', 'Food€0.25 · <1%'])
   })
 
   it('left to spend: safe to spend as the number, the bar is the money in, savings and debt in it', async () => {

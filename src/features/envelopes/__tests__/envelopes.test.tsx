@@ -254,6 +254,41 @@ describe('Envelopes', () => {
     expect(await within(card).findByText('€37.00 spent')).toBeTruthy()
   })
 
+  it('a refund is its own choice on the envelope, and never makes its spending negative', async () => {
+    const { food } = await seedEnvelopes()
+    await open()
+    const card = await screen.findByRole('region', { name: 'Food' })
+    expect(await within(card).findByText('€25.00 spent')).toBeTruthy()
+    await userEvent.click(within(card).getByRole('button', { name: 'Add spend to Food' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Add to this day' })
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Refund' }))
+    expect(within(sheet).getByText(/Money back into this envelope/)).toBeTruthy()
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '100')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'What for' }), 'returned')
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Add' }))
+    await waitFor(async () =>
+      expect((await r.listTransactions()).find((t) => t.note === 'returned')).toMatchObject({
+        amount: 10000,
+        envelopeId: food.id,
+      }),
+    )
+    // $25 spent, then $100 back: the envelope reads $0 spent, never "−$75".
+    expect(await within(card).findByText('€0.00 spent')).toBeTruthy()
+    expect(card.textContent).not.toMatch(/[−-]€/)
+  })
+
+  it('the Calendar’s own add sheet has no Refund choice: only an envelope offers it', async () => {
+    window.history.replaceState(null, '', '/bills')
+    render(<App />)
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Wednesday,? 4 November|^Today, Wednesday/ }),
+    )
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to this day' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Add to this day' })
+    expect(within(sheet).getByRole('button', { name: 'Expense' })).toBeTruthy()
+    expect(within(sheet).queryByRole('button', { name: 'Refund' })).toBeNull()
+  })
+
   it('“+ Add spend” on another month starts on that month’s first day', async () => {
     await seedEnvelopes()
     goto('/envelopes?month=2026-12')

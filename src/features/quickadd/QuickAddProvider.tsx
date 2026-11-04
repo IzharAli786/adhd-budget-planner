@@ -8,14 +8,11 @@ import {
   type ReactNode,
 } from 'react'
 import { useUndoToast } from '../../app/useUndoToast'
-import { useCheckIns, useEnvelopes } from '../../db/hooks'
+import { useEnvelopes } from '../../db/hooks'
 import { useAppSettings } from '../../app/SettingsProvider'
 import { addTransaction } from '../../db/repos'
-import { askIfInBalance } from '../../domain/reconcile'
 import type { Cents, Id, ISODate } from '../../domain/types'
-import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { Dialog } from '../../ui/Dialog'
 import { Icon } from '../../ui/Icon'
 import { useFormat } from '../bills/format'
 import { QuickAddSheet } from './QuickAddSheet'
@@ -37,27 +34,22 @@ interface QuickAddApi {
 
 const QuickAddContext = createContext<QuickAddApi | null>(null)
 
-type Pending = { entry: NewEntry; resolve: (inBalance: boolean | null) => void }
-
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
 
 /**
- * One place that logs money, used by Today's field, the sheet and the one-tap chips, so
- * they all ask the same backdating question and show the same undo toast.
+ * One place that logs money, used by the "Track spending" sheet and its one-tap chips, so
+ * they all save the same way and show the same undo toast.
  */
 export function QuickAddProvider({ children }: { children: ReactNode }) {
   const f = useFormat()
   const undoToast = useUndoToast()
-  const checkIns = useCheckIns()
-  const checkIn = checkIns?.at(-1)
   const envelopes = useEnvelopes()
   const { settings } = useAppSettings()
   const showEnvelopes = settings.envelopesEnabled && !settings.simpleMode
-  // Spending inside an envelope's budget uses room already held back, so "until payday"
-  // doesn't move. Naming the budget in the toast says why. Untagged spending uses the
-  // default envelope (Everyday), as safe-to-spend counts it.
+  // The toast names the budget the spending came out of. Untagged spending uses the default
+  // envelope (Everyday), the same as the envelope totals count it.
   const budgetOf = useCallback(
     (entry: NewEntry) => {
       if (!showEnvelopes || entry.amount >= 0 || !envelopes) return null
@@ -69,26 +61,17 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
     [showEnvelopes, envelopes],
   )
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [pending, setPending] = useState<Pending | null>(null)
 
   const save = useCallback(
     async (entry: NewEntry) => {
-      let inBalance = false
-      // A backdated entry may already be in the balance the user typed (PLAN §4.1).
-      if (askIfInBalance(entry.date, checkIn)) {
-        const answer = await new Promise<boolean | null>((resolve) =>
-          setPending({ entry, resolve }),
-        )
-        setPending(null)
-        if (answer === null) return false
-        inBalance = answer
-      }
+      // No "is this already in your bank balance?" question any more: safe to spend is
+      // built from income, bills and spending, not a bank balance, so the answer changed
+      // nothing. Entries dated before tracking started are left out by date instead.
       await addTransaction({
         date: entry.date,
         amount: entry.amount,
         note: entry.note.trim(),
         ...(entry.envelopeId ? { envelopeId: entry.envelopeId } : {}),
-        ...(inBalance ? { inBalance: true } : {}),
       })
       const what = entry.note.trim() ? ` · ${entry.note.trim()}` : ''
       const from = budgetOf(entry)
@@ -97,7 +80,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       )
       return true
     },
-    [checkIn, f, undoToast, budgetOf],
+    [f, undoToast, budgetOf],
   )
 
   const openSheet = useCallback(() => setSheetOpen(true), [])
@@ -145,23 +128,6 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
         </button>
       }
       <QuickAddSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
-      <Dialog
-        open={pending !== null}
-        onClose={() => pending?.resolve(null)}
-        title="Is this already in your bank balance?"
-        description={
-          pending &&
-          `It’s dated ${f.dayLong(pending.entry.date)}, before your last balance update. If your bank already shows it, Steady won’t take it off again.`
-        }
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => pending?.resolve(false)}>
-              No, not yet
-            </Button>
-            <Button onClick={() => pending?.resolve(true)}>Yes, it’s in there</Button>
-          </>
-        }
-      />
     </QuickAddContext.Provider>
   )
 }

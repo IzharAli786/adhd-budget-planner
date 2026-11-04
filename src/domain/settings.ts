@@ -32,7 +32,7 @@ export interface Settings {
   appBadge: boolean | null
   /** Low-energy Today (PLAN §5): the number and one card, nothing else. */
   justToday: boolean
-  /** Optional first name for Today's greeting. Empty = "Good morning" on its own. */
+  /** Optional first name for Today's greeting ("Hi Sam"). Empty = "Hi there". */
   displayName: string
   /** A custom accent (#rrggbb) that passed the contrast check, or null for the theme's. */
   accent: string | null

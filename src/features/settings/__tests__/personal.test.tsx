@@ -36,7 +36,7 @@ describe('Settings: name and accent', () => {
     })
     window.history.replaceState(null, '', '/')
     const { unmount } = render(<App />)
-    expect(await screen.findByText('Good morning')).toBeTruthy()
+    expect(await screen.findByText('Hi there')).toBeTruthy()
     unmount()
 
     window.history.replaceState(null, '', '/more/settings')
@@ -47,7 +47,7 @@ describe('Settings: name and accent', () => {
 
     window.history.replaceState(null, '', '/')
     render(<App />)
-    expect(await screen.findByText('Good morning, Sam')).toBeTruthy()
+    expect(await screen.findByText('Hi Sam')).toBeTruthy()
   })
 
   it('accepts a readable accent and applies it to the page', async () => {

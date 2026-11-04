@@ -5,8 +5,8 @@ import { addFirstBill, ensureFullMode, logExpense, unlockAndSetup } from './help
 const SCREENS: { path: string; heading: string | RegExp }[] = [
   { path: '/getting-started', heading: 'Getting started' },
   { path: '/home', heading: 'Home' },
-  // Today's title is the greeting ("Good evening", or "Good evening, Sam").
-  { path: '/', heading: /^Good (morning|afternoon|evening)/ },
+  // Today's title is the greeting ("Hi Sam", or "Hi there" with no name set).
+  { path: '/', heading: /^Hi / },
   { path: '/bills', heading: 'Calendar' },
   { path: '/goals', heading: 'Goals' },
   { path: '/savings', heading: 'Savings' },

@@ -164,7 +164,12 @@ export function HomeScreen() {
               <div className="space-y-10 @2xl:grid @2xl:grid-cols-2 @2xl:items-start @2xl:gap-8 @2xl:space-y-0">
                 <Block id="dist-title" title="Spending distribution">
                   <div className="card p-5 @xl:p-7">
-                    <SpendingDonut safe={money} f={f} />
+                    <SpendingDonut
+                      safe={money}
+                      f={f}
+                      when={month ? `in ${short}` : 'this pay period'}
+                      soFar={current}
+                    />
                   </div>
                 </Block>
                 <Block id="left-title" title="Left to spend">

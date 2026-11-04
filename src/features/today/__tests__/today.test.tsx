@@ -79,7 +79,7 @@ describe('Today', () => {
     await start(84250)
     render(<App />)
     const h1 = await screen.findByRole('heading', { level: 1 })
-    expect(h1.textContent).toBe('Good afternoon, Sam')
+    expect(h1.textContent).toBe('Hi Sam')
     expect(screen.getByText('Your money at a glance.')).toBeTruthy()
     // One title on the page: the greeting is it.
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)

@@ -266,7 +266,15 @@ export function safeToSpend(input: LedgerInput): SafeToSpend {
   const usage = envelopesUsage(input, envelopes)
   const liveEnvelope = new Set(envelopes.map((e) => e.id))
   const envelopeOfBill = new Map(input.bills.map((b) => [b.id, b.envelopeId]))
-  const billsSoFar = flows.billEntries.filter((e) => e.status === 'paid' || e.date <= today)
+  // The chart's slices all cover the whole period, like the envelope actuals (a budget
+  // belongs to its month), so bills outside any envelope use the same range.
+  const periodBills = billEntriesBetween(
+    input.bills,
+    input.occurrences,
+    period.start,
+    period.end,
+  ).filter((e) => e.debtId === undefined && e.status !== 'skipped')
+  const billsSoFar = periodBills.filter((e) => e.status === 'paid' || e.date <= today)
   const looseBills = sum(
     billsSoFar
       .filter((e) => {
@@ -286,7 +294,15 @@ export function safeToSpend(input: LedgerInput): SafeToSpend {
           {
             id: 'spending',
             name: 'Spending',
-            amount: nsum(flows.spending.filter((t) => t.date <= today).map((t) => t.amount)),
+            amount: Math.max(
+              0,
+              nsum(
+                live(input.transactions)
+                  .filter((t) => within(t.date, period) && t.date <= today)
+                  .filter((t) => isSpendKind(txKind(t)))
+                  .map((t) => t.amount),
+              ),
+            ),
           },
         ]
   )
@@ -433,12 +449,16 @@ export function envelopesUsage(
   return envelopes.map((env) => {
     const mine = txs.filter((t) => envelopeHome(t, envelopes) === env.id)
     const linked = entries.filter((e) => billEnvelope.get(e.billId) === env.id)
-    const spent =
+    const rawSpent =
       nsum(mine.filter((t) => t.date <= today).map((t) => t.amount)) +
       sum(linked.filter((e) => e.status === 'paid' || e.date <= today).map((e) => e.amount))
-    const linkedDue =
+    const rawDue =
       nsum(mine.filter((t) => t.date > today).map((t) => t.amount)) +
       sum(linked.filter((e) => e.status === 'due' && e.date > today).map((e) => e.amount))
+    // A refund can't make an envelope's spending negative: it brings the envelope back to
+    // zero at most (the whole refund still adds to safe to spend through the expenses line).
+    const spent = Math.max(0, rawSpent)
+    const linkedDue = Math.max(0, rawDue + Math.min(0, rawSpent))
     const used = spent + linkedDue
     const budget = budgetFor(env, period.start)
     return {

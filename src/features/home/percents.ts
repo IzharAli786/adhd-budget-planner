@@ -1,24 +1,20 @@
 /**
- * Whole-number percentages that add up to exactly 100 (largest remainder): each share is
- * rounded down, then the points left over go to the shares that lost the most.
- * [1, 1, 1] is [34, 33, 33], never [33, 33, 33] (99) or [34, 34, 34] (102).
+ * A slice's share of the whole, rounded on its own: 0.44% stays under 1%, 1.29% is 1%.
+ *
+ * Deliberately NOT largest-remainder rounding. Forcing the list to total exactly 100
+ * pushes small slices up by a point to absorb the rounding (a $9.30 slice read "1%", the
+ * same as one three times its size), which makes the chart look arbitrary. Each figure
+ * here is the nearest whole percent of its own amount, so the list can total 99 or 101,
+ * which is how money charts normally read.
  */
-export function percents(values: readonly number[]): number[] {
-  const total = values.reduce((a, b) => a + b, 0)
-  if (total <= 0) return values.map(() => 0)
-  const raw = values.map((v) => (v / total) * 100)
-  const out = raw.map(Math.floor)
-  let left = 100 - out.reduce((a, b) => a + b, 0)
-  // Ties keep their order, so the first of equal shares gets the extra point.
-  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0])
-  for (const [, i] of order) {
-    if (left <= 0) break
-    out[i]! += 1
-    left -= 1
-  }
-  return out
+export function sharePercent(amount: number, total: number): number {
+  if (total <= 0 || amount <= 0) return 0
+  return Math.round((amount / total) * 100)
 }
 
-/** "25%", or "<1%" for money that is there but rounds to nothing: never "0%" for it. */
-export const percentLabel = (amount: number, pct: number) =>
-  amount > 0 && pct === 0 ? '<1%' : `${pct}%`
+/** "25%", or "<1%" for money that is there but under half a percent: never "0%" for it. */
+export function shareLabel(amount: number, total: number): string {
+  if (amount <= 0 || total <= 0) return '0%'
+  const pct = (amount / total) * 100
+  return pct < 0.5 ? '<1%' : `${Math.round(pct)}%`
+}
