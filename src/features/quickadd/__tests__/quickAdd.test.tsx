@@ -21,21 +21,21 @@ afterEach(() => {
 })
 
 describe('Quick add sheet', () => {
-  it('the floating + is on other tabs, not on Today', async () => {
+  it('the floating "Track spending" button is on every screen, Today included', async () => {
     window.history.replaceState(null, '', '/')
     render(<App />)
-    await screen.findByRole('heading', { name: 'Today' })
-    expect(screen.queryByRole('button', { name: 'Quick add' })).toBeNull()
-    await userEvent.click(screen.getByRole('link', { name: 'Calendar' }))
-    expect(await screen.findByRole('button', { name: 'Quick add' })).toBeTruthy()
+    // Today has no field of its own any more, so the button is how spending gets logged.
+    expect(await screen.findByRole('button', { name: 'Track spending' })).toBeTruthy()
+    await userEvent.click(screen.getAllByRole('link', { name: 'Calendar' })[0]!)
+    expect(await screen.findByRole('button', { name: 'Track spending' })).toBeTruthy()
   })
 
   it('`n` opens it amount-first and saves an expense', async () => {
     window.history.replaceState(null, '', '/bills')
     render(<App />)
-    await screen.findByRole('button', { name: 'Quick add' })
+    await screen.findByRole('button', { name: 'Track spending' })
     await userEvent.keyboard('n')
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     const amount = within(sheet).getByRole('textbox', { name: 'Amount' })
     await waitFor(() => expect(document.activeElement).toBe(amount))
     expect(amount.getAttribute('inputmode')).toBe('decimal')
@@ -47,7 +47,7 @@ describe('Quick add sheet', () => {
         expect.objectContaining({ amount: -420, note: 'Bus', date: '2026-11-04' }),
       ]),
     )
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Quick add' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Track spending' })).toBeNull())
   })
 
   it('`n` does nothing while typing', async () => {
@@ -56,15 +56,15 @@ describe('Quick add sheet', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Add your pay' }))
     const income = await screen.findByRole('dialog', { name: 'Add income' })
     await userEvent.type(within(income).getByRole('textbox', { name: 'Name' }), 'Nina')
-    expect(screen.queryByRole('dialog', { name: 'Quick add' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Track spending' })).toBeNull()
   })
 
   it('a backdated entry asks whether it is already in the balance', async () => {
     await r.addCheckIn(50000, '2026-11-04', new Date(2026, 10, 4, 9, 0).toISOString())
     window.history.replaceState(null, '', '/more')
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Quick add' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '30')
     await userEvent.click(within(sheet).getByRole('button', { name: 'Yesterday' }))
     await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
@@ -81,8 +81,8 @@ describe('Quick add sheet', () => {
     await r.addTransaction({ date: '2026-11-03', amount: -320, note: 'Coffee' })
     window.history.replaceState(null, '', '/bills')
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Quick add' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     await userEvent.click(
       await within(sheet).findByRole('button', { name: 'Log Coffee €3.20 again' }),
     )
@@ -96,8 +96,8 @@ describe('Quick add sheet', () => {
     await r.updateEnvelope(everyday.id, { budget: 5000 })
     window.history.replaceState(null, '', '/bills')
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Quick add' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
     await userEvent.type(within(sheet).getByRole('textbox', { name: /What for/ }), 'coffee')
     await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
@@ -108,8 +108,8 @@ describe('Quick add sheet', () => {
     vi.setSystemTime(new Date(2026, 10, 4, 23, 59))
     window.history.replaceState(null, '', '/bills')
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Quick add' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '5')
     vi.setSystemTime(new Date(2026, 10, 5, 0, 1))
     await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))

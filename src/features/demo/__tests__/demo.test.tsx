@@ -115,20 +115,28 @@ describe('demo gate', () => {
 })
 
 describe('sample data in the app', () => {
-  it('gives Today a real number and fills Bills and Goals', async () => {
+  it('fills Today, the Calendar, Savings, Debt and Goals', async () => {
     await seedDemo(NOW)
     await seedReadyInstall()
     render(<App />)
-    expect(await screen.findByText('You can spend today')).toBeTruthy()
-    expect(screen.getByText(/safe to\s+spend in/)).toBeTruthy()
+    // Today: greeted by name, with this month's safe to spend as a real number.
+    expect(await screen.findByRole('heading', { level: 1, name: /, Sam$/ })).toBeTruthy()
+    const tiles = within(await screen.findByRole('list', { name: 'At a glance' }))
+    const safe = tiles.getByText(/safe to spend$/).closest('li')!
+    expect(safe.querySelector('p:last-child')!.textContent).toMatch(/\d/)
 
     await userEvent.click(screen.getAllByRole('link', { name: 'Calendar' })[0]!)
     expect(await screen.findAllByText('Rent')).not.toHaveLength(0)
     expect(screen.getAllByText('Phone').length).toBeGreaterThan(0)
 
-    await userEvent.click(screen.getAllByRole('link', { name: 'Goals' })[0]!)
+    await userEvent.click(screen.getAllByRole('link', { name: 'Savings' })[0]!)
     expect(await screen.findByText('52-week challenge')).toBeTruthy()
-    expect(screen.getAllByText('Credit card').length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getAllByRole('link', { name: 'Debt' })[0]!)
+    expect((await screen.findAllByText('Credit card')).length).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getAllByRole('link', { name: 'Goals' })[0]!)
+    expect(await screen.findByText('Two weeks by the sea')).toBeTruthy()
     expect(screen.getByText('Still want it?')).toBeTruthy()
   })
 })

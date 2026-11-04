@@ -9,20 +9,28 @@ export interface SetupOptions {
   balance?: string
 }
 
-/** The hero number on Today ("€46.67"), as cents. The app always shows two decimals. */
+/**
+ * Today's main number: the "{Month} safe to spend" tile, the first tile in "At a glance"
+ * ("€46.67"). Today no longer has a per-day hero; this tile is what spending moves.
+ */
 export function hero(page: Page): Locator {
-  return page.getByRole('region', { name: 'Today’s number' }).locator('p[aria-live="polite"]')
+  return safeTile(page).locator('p').last()
+}
+
+function safeTile(page: Page): Locator {
+  return page.getByRole('list', { name: 'At a glance' }).getByRole('listitem').first()
 }
 
 /**
- * Signed: the hero never shows a minus, it says "€5.00 short" or "€5.00 over". Reading
- * that as +500 would let a "lowers by exactly" check pass on a number that went the
- * wrong way past zero.
+ * Signed: a short month reads "{Month} short by €5.00" with a plain amount. Reading that
+ * as +500 would let a "lowers by exactly" check pass on a number that went the wrong way
+ * past zero.
  */
 export async function heroCents(page: Page): Promise<number> {
   const text = (await hero(page).textContent()) ?? ''
   const cents = Number(text.replace(/[^\d]/g, ''))
-  return /\b(short|over)\b/.test(text) ? -cents : cents
+  const label = (await safeTile(page).textContent()) ?? ''
+  return /\bshort\b/.test(label) ? -cents : cents
 }
 
 /** Unlock with the dev code and answer the four setup steps, ending on Today. */
@@ -55,15 +63,28 @@ export async function answerSetup(page: Page, opts: SetupOptions = {}) {
   await expect(hero(page)).toHaveText(/\d/)
 }
 
-export function quickAdd(page: Page): Locator {
-  return page.getByRole('textbox', { name: /Quick add/ })
-}
-
+/**
+ * Logs spending the way a person does now: the floating "Track spending" button, then
+ * amount, what for and (from an "@tag" in the text) the envelope. Accepts the short form
+ * "23.50 market @groceries" so specs stay readable. Returns Today's number before it.
+ */
 export async function logExpense(page: Page, text: string) {
   const before = await heroCents(page)
-  await quickAdd(page).fill(text)
-  await quickAdd(page).press('Enter')
-  await expect(quickAdd(page)).toHaveValue('')
+  const m = /^([\d.,]+)\s*(.*?)(?:\s+@(\S+))?$/.exec(text.trim())
+  if (!m) throw new Error(`logExpense: can't read "${text}"`)
+  const [, amount, note, tag] = m
+  await page.getByRole('button', { name: 'Track spending' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Track spending' })
+  await sheet.getByLabel('Amount').fill(amount!)
+  if (note) await sheet.getByLabel(/What for/).fill(note)
+  if (tag)
+    await sheet
+      .getByRole('group', { name: 'Envelope' })
+      .getByRole('button', { name: new RegExp(`^${tag}`, 'i') })
+      .first()
+      .click()
+  await sheet.getByRole('button', { name: 'Log it' }).click()
+  await expect(sheet).toBeHidden()
   return before
 }
 

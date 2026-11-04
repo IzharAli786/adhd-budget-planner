@@ -28,29 +28,62 @@ beforeEach(async () => {
 afterEach(cleanup)
 
 describe('tabs in Simple and Full mode (PLAN §5)', () => {
-  it('new installs show every tab, in thumb order', async () => {
+  it('new installs show every section, in the order the planner is used', async () => {
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Calendar', 'Goals', 'More']))
+    await waitFor(() =>
+      expect(tabNames()).toEqual([
+        'Getting started',
+        'Home',
+        'Today',
+        'Calendar',
+        'Goals',
+        'Savings',
+        'Debt',
+        'Envelopes',
+        'Yearly review',
+        'Settings',
+        'More',
+      ]),
+    )
   })
 
-  it('Simple mode shows Today, Calendar, More', async () => {
+  it('Simple mode keeps setup, Today, Calendar, Settings and More', async () => {
     await updateSettings({ simpleMode: true })
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Calendar', 'More']))
+    await waitFor(() =>
+      expect(tabNames()).toEqual(['Getting started', 'Today', 'Calendar', 'Settings', 'More']),
+    )
   })
 
-  it('Full mode adds Plan and Goals in thumb order', async () => {
+  it('Full mode adds Home, Goals, Savings, Debt, Envelopes and Yearly review', async () => {
     await updateSettings({ simpleMode: false })
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Plan', 'Calendar', 'Goals', 'More']))
+    await waitFor(() =>
+      expect(tabNames()).toEqual([
+        'Getting started',
+        'Home',
+        'Today',
+        'Calendar',
+        'Goals',
+        'Savings',
+        'Debt',
+        'Envelopes',
+        'Yearly review',
+        'Settings',
+        'More',
+      ]),
+    )
   })
 
   it.each([
     ['/', 'Today'],
     ['/bills', 'Calendar'],
     ['/more', 'More'],
-    ['/more/settings', 'More'],
+    ['/more/settings', 'Settings'],
     ['/more/backup', 'More'],
+    ['/home', 'Home'],
+    ['/envelopes', 'Envelopes'],
+    ['/getting-started', 'Getting started'],
   ])('%s marks the %s tab with aria-current="page"', async (path, tab) => {
     await renderAt(path)
     await waitFor(() => {
@@ -67,12 +100,15 @@ describe('tabs in Simple and Full mode (PLAN §5)', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/'))
   })
 
-  it.each(['/plan', '/goals'])('%s opens directly in Full mode', async (path) => {
-    await updateSettings({ simpleMode: false })
-    await renderAt(path)
-    await waitFor(() => expect(tabNames()).toContain('Goals'))
-    expect(window.location.pathname).toBe(path)
-  })
+  it.each(['/home', '/goals', '/envelopes', '/savings', '/debt', '/review'])(
+    '%s opens directly in Full mode',
+    async (path) => {
+      await updateSettings({ simpleMode: false })
+      await renderAt(path)
+      await waitFor(() => expect(tabNames()).toContain('Goals'))
+      expect(window.location.pathname).toBe(path)
+    },
+  )
 
   it('switching back to Simple while on Goals leaves the hidden screen', async () => {
     await updateSettings({ simpleMode: false })
@@ -80,16 +116,31 @@ describe('tabs in Simple and Full mode (PLAN §5)', () => {
     await waitFor(() => expect(tabNames()).toContain('Goals'))
     await act(() => updateSettings({ simpleMode: true }))
     await waitFor(() => expect(window.location.pathname).toBe('/'))
-    expect(tabNames()).toEqual(['Today', 'Calendar', 'More'])
+    expect(tabNames()).toEqual(['Getting started', 'Today', 'Calendar', 'Settings', 'More'])
+  })
+
+  it('/plan, /more/debts and /more/review go to their new sections', async () => {
+    await updateSettings({ simpleMode: false })
+    for (const [from, to] of [
+      ['/plan', '/home'],
+      ['/more/debts', '/debt'],
+      ['/more/review', '/review'],
+    ] as const) {
+      cleanup()
+      await renderAt(from)
+      await waitFor(() => expect(window.location.pathname).toBe(to))
+    }
   })
 
   it('the More toggle turns on Simple mode and it persists', async () => {
     await renderAt('/more')
     await userEvent.click(await screen.findByRole('switch', { name: 'Show more tools' }))
-    await waitFor(() => expect(tabNames()).not.toContain('Plan'))
+    await waitFor(() => expect(tabNames()).not.toContain('Home'))
     cleanup()
     await renderAt('/')
-    await waitFor(() => expect(tabNames()).toEqual(['Today', 'Calendar', 'More']))
+    await waitFor(() =>
+      expect(tabNames()).toEqual(['Getting started', 'Today', 'Calendar', 'Settings', 'More']),
+    )
   })
 
   it('unknown paths fall back to Today', async () => {

@@ -50,7 +50,7 @@ export function AppShell() {
     <QuickAddProvider>
       <CatchUpProvider>
         {/* No room kept for the side rail on paper: the rail itself is hidden in print. */}
-        <div className="min-h-dvh md:pl-24 lg:pl-56 print:pl-0!">
+        <div className="min-h-dvh md:pl-24 lg:pl-60 print:pl-0!">
           <a
             href="#main"
             className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-surface focus:px-4 focus:py-2"
@@ -66,6 +66,9 @@ export function AppShell() {
               'mx-auto w-full max-w-md px-4 pt-[max(env(safe-area-inset-top),1.25rem)] pb-[calc(10rem+env(safe-area-inset-bottom))] min-[400px]:px-5',
               'md:max-w-2xl md:px-10 md:pt-12 md:pb-16',
               wide && 'lg:max-w-6xl lg:px-12',
+              // Anchored next to the side rail, not centred: on a very wide screen the
+              // spare room sits on the right, where the eye doesn't start.
+              'lg:mx-0',
             )}
           >
             {offlineAt === pathname && <OfflineNote onDismiss={() => setOfflineAt(null)} />}

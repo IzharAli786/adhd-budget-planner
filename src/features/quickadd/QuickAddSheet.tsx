@@ -30,7 +30,7 @@ const resolveDay = (day: Day, today: ISODate): ISODate =>
 /** Floating + and the `n` key open this: amount first, everything else optional. */
 export function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose} title="Quick add">
+    <Sheet open={open} onClose={onClose} title="Track spending">
       {/* Mounted only while open, so every opening starts from a clean form. */}
       {open && <QuickAddForm onDone={onClose} />}
     </Sheet>

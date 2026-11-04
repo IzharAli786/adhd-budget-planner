@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../../app/App'
@@ -69,14 +69,20 @@ describe('first-run setup (PLAN §5)', () => {
     // The balance answered is the starting balance, added once to the first month.
     expect(await r.getSettings()).toMatchObject({ startDate: '2026-10-31', startingBalance: 84250 })
     // Today runs on the answers (en-GB, so £). Sat 31 Oct is the last day of the month,
-    // so the whole starting balance is today's (the first pay lands in November).
-    const hero = async () =>
-      (await screen.findByRole('region', { name: 'Today’s number' })).querySelector('[aria-live]')!
-    await waitFor(async () => expect((await hero()).textContent).toBe('£842.50'))
-    // No bills yet, so the deferred setup task is the one card.
-    expect(await screen.findByText('Add your rent')).toBeTruthy()
-    await userEvent.type(screen.getByRole('textbox', { name: /Quick add/ }), '12 coffee{Enter}')
-    await waitFor(async () => expect((await hero()).textContent).toBe('£830.50'))
+    // so October's safe to spend is the whole starting balance (the first pay is in November).
+    const safeTile = async () => {
+      const tiles = within(await screen.findByRole('list', { name: 'At a glance' }))
+      const item = tiles.getByText('October safe to spend').closest('li')!
+      return item.querySelector('p:last-child')!.textContent
+    }
+    await waitFor(async () => expect(await safeTile()).toBe('£842.50'))
+    // Spending is logged with the "Track spending" button and comes straight off it.
+    await userEvent.click(screen.getByRole('button', { name: 'Track spending' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
+    await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
+    await userEvent.type(within(sheet).getByRole('textbox', { name: /What for/ }), 'coffee')
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
+    await waitFor(async () => expect(await safeTile()).toBe('£830.50'))
   })
 
   it('detects locale and currency from the device, shown as one editable line', async () => {

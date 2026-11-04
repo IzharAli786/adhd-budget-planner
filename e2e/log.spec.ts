@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
-import { ensureFullMode, quickAdd, unlockAndSetup } from './helpers'
+import { ensureFullMode, logExpense, unlockAndSetup } from './helpers'
 
 test('common categories, an @tag chip, the log filter and a CSV export', async ({
   page,
@@ -12,23 +12,15 @@ test('common categories, an @tag chip, the log filter and a CSV export', async (
   await unlockAndSetup(page)
   await ensureFullMode(page)
 
-  await page.goto('/plan')
-  // Envelopes are on from setup.
+  await page.goto('/envelopes')
+  // Envelopes are on from setup, with Everyday ready: the starter offer is right there.
   await page.getByRole('button', { name: 'Start with common categories' }).click()
   await expect(page.getByRole('heading', { name: 'Eating out' })).toBeVisible()
 
   await page.goto('/')
-  await quickAdd(page).fill('12 lunch @ea')
-  await page
-    .getByRole('group', { name: 'Envelopes' })
-    .getByRole('button', { name: 'Tag Eating out' })
-    .click()
-  await expect(quickAdd(page)).toHaveValue('12 lunch @eating ')
-  await quickAdd(page).press('Enter')
-  await expect(quickAdd(page)).toHaveValue('')
-  await quickAdd(page).fill('3 =1+2 bus')
-  await quickAdd(page).press('Enter')
-  await expect(quickAdd(page)).toHaveValue('')
+  await logExpense(page, '12 lunch @eating')
+  // A note that a spreadsheet would run as a formula: the CSV must neutralise it.
+  await logExpense(page, '3 =1+2 bus')
 
   await page.goto('/more/transactions')
   const totals = page.getByRole('region', { name: 'Totals' })

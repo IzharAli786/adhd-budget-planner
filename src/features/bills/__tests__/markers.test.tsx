@@ -53,7 +53,8 @@ describe('calendar markers', () => {
       days.getByRole('button', { name: /^Friday,? 20 November/ }).getAttribute('aria-label'),
     ).toMatch(/1 bill, debt minimum$/)
     // Savings ride on the payday ring: no mark or legend entry of their own (less clutter).
-    expect(screen.queryByText('Savings')).toBeNull()
+    // Scoped to the page: the navigation has a "Savings" section of its own.
+    expect(within(screen.getByRole('main')).queryByText('Savings')).toBeNull()
     expect(screen.getByText('Debt minimum')).toBeTruthy()
 
     await userEvent.click(days.getByRole('button', { name: /^Friday,? 13 November/ }))

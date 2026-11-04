@@ -47,30 +47,34 @@ test('sample data opens a filled-in Today', async ({ page }) => {
   await expect(hero(page)).toHaveText(/\d/)
   // Months of history behind it, and still a calm, positive number for today.
   expect(await heroCents(page)).toBeGreaterThan(0)
-  // The first thing to do is something to try, not a backup chore.
-  const card = page.getByRole('region', { name: 'Try logging “12 coffee”' })
-  await expect(card).toBeVisible()
+  // Greeted by name, with the money laid out; never a backup chore in the demo.
+  await expect(page.getByRole('heading', { level: 1, name: /, Sam$/ })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Coming up' })).toBeVisible()
   await expect(page.getByText('Save a backup')).toHaveCount(0)
   expect(await seriousViolations(page)).toEqual([])
 })
 
-test('sample data fills Plan’s charts and Look back', async ({ page }) => {
+test('sample data fills Home’s charts and the Yearly review', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   await page.getByRole('button', { name: /Look around with sample data/ }).click()
   await expect(hero(page)).toHaveText(/\d/)
 
-  // Plan: budget vs actual, where the money went and what's left, from one engine.
-  await page.getByRole('link', { name: 'Plan' }).first().click()
-  await expect(page.getByRole('list', { name: /^Budget vs actual/ })).toBeVisible()
+  // Home: budget vs actuals, where the money went and what's left, from one engine.
+  await page.getByRole('link', { name: 'Home' }).first().click()
+  await expect(page.getByRole('list', { name: /^Budget vs\.? actual/ })).toBeVisible()
   const dist = page.getByRole('list', { name: 'Spending distribution' })
   await expect(dist.getByText('Rent & housing')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Left to spend' })).toBeVisible()
   expect(await seriousViolations(page)).toEqual([])
 
-  // Look back: months of money in and out, carry-over per payday, savings and debt.
+  // Yearly review: months of money in and out, carry-over per payday, savings and debt.
+  // On a phone it isn't in the bottom bar: More lists every section that isn't.
   await page.getByRole('link', { name: 'More' }).first().click()
-  await page.getByRole('link', { name: /Look back/ }).click()
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /Yearly review/ })
+    .click()
   await expect(page.getByRole('region', { name: 'Savings this year' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Debt this year' })).toBeVisible()
   // A good year: money left over, and the two payoff orders really differ in cost.
@@ -91,11 +95,15 @@ test('sample data fills Plan’s charts and Look back', async ({ page }) => {
   await chart.getByRole('button').last().click()
   await expect(chart.getByText('In', { exact: true })).toBeVisible()
   // Life goals from the sample household, one linked to the holiday fund.
-  await page.getByRole('link', { name: 'Goals' }).first().click()
+  await page.getByRole('link', { name: 'More' }).first().click()
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Goals/ })
+    .click()
   const goals = page.getByRole('region', { name: 'Life goals' })
   await expect(goals.getByRole('heading', { name: 'Two weeks by the sea' })).toBeVisible()
   await expect(goals.getByRole('progressbar', { name: 'Summer holiday progress' })).toBeVisible()
-  await page.goBack()
+  await page.goto('/review')
   await page.getByRole('radio', { name: 'Per payday' }).click()
   await expect(page.getByText(/You carried .+ into this payday\./)).toBeVisible()
   expect(await seriousViolations(page)).toEqual([])

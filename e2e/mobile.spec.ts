@@ -12,35 +12,30 @@ async function box(locator: Locator) {
   return b
 }
 
-test('Plan stays short on a phone: secondary sections fold, and remember it', async ({ page }) => {
+test('Home on a phone: the charts in the competitor’s order, one column, nothing sideways', async ({
+  page,
+}) => {
   await unlockAndSetup(page)
   await fullMode(page)
-  await page.goto('/plan')
-  await expect(page.getByRole('region', { name: 'This period at a glance' })).toBeVisible()
-  for (const name of ['Can this fit?']) {
-    const fold = page.getByRole('region', { name }).getByRole('button', { name, exact: true })
-    await expect(fold).toHaveAttribute('aria-expanded', 'false')
-  }
-  const note = page.getByRole('region', { name: 'Note for this month' })
-  await expect(note.getByRole('button', { name: 'Note for this month' })).toHaveAttribute(
-    'aria-expanded',
-    'false',
+  await page.goto('/home')
+  const titles = page.getByRole('main').getByRole('heading', { level: 2 })
+  await expect(titles).toHaveText([
+    'Income vs spending',
+    /^Budget vs\. actuals/,
+    'Spending distribution',
+    'Left to spend',
+    /^Notes for this/,
+  ])
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   )
-  // Open one; it stays open after a reload, the others stay folded.
-  const fit = page.getByRole('region', { name: 'Can this fit?' })
-  await fit.getByRole('button', { name: 'Can this fit?' }).click()
-  await expect(fit.getByRole('textbox', { name: 'Price' })).toBeVisible()
-  await page.reload()
-  await expect(
-    page.getByRole('region', { name: 'Can this fit?' }).getByRole('textbox', { name: 'Price' }),
-  ).toBeVisible()
+  expect(overflow).toBeLessThanOrEqual(0)
 })
 
-test('an envelope opens its entries this period, and the log filtered to it', async ({ page }) => {
+test('an envelope card lists its own entries this month, with Edit and ×', async ({ page }) => {
   await unlockAndSetup(page)
   await fullMode(page)
-  await page.goto('/plan')
-  // Envelopes are on from setup, with Everyday ready: the starter offer is right there.
+  await page.goto('/envelopes')
   await page.getByRole('button', { name: 'Start with common categories' }).click()
   await expect(page.getByRole('heading', { name: 'Groceries' })).toBeVisible()
 
@@ -48,28 +43,25 @@ test('an envelope opens its entries this period, and the log filtered to it', as
   await logExpense(page, '23.50 market @groceries')
   await logExpense(page, '4 coffee')
 
-  await page.goto('/plan')
-  await page.getByRole('button', { name: 'Groceries', exact: true }).click()
-  const sheet = page.getByRole('dialog', { name: 'Groceries' })
-  const list = sheet.getByRole('list', { name: 'Groceries entries' })
+  await page.goto('/envelopes')
+  const card = page.getByRole('region', { name: 'Groceries' })
+  const list = card.getByRole('list', { name: /^Groceries in / })
   await expect(list.getByRole('listitem')).toHaveCount(1)
   await expect(list).toContainText('market')
-  await expect(sheet).toContainText(/[€£$]23\.50/)
-  await sheet.getByRole('link', { name: 'See all in log' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeVisible()
-  await expect(
-    page.getByRole('group', { name: 'Envelope' }).getByRole('button', { name: 'Groceries' }),
-  ).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: /market/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /coffee/ })).toHaveCount(0)
+  await expect(card).toContainText(/[€£$]23\.50/)
+  await expect(list.getByRole('button', { name: 'Edit market' })).toBeVisible()
+  await expect(list.getByRole('button', { name: 'Delete market' })).toBeVisible()
+  // Untagged spending lands in Everyday, not Groceries.
+  await expect(card).not.toContainText('coffee')
 })
 
 test('touch targets and lines that must not break at 390px', async ({ page }) => {
   await unlockAndSetup(page)
   await logExpense(page, '5 tea')
-  // "See the math" sits on one line.
-  const math = page.getByRole('button', { name: 'See the math' })
-  expect((await box(math)).height).toBeLessThanOrEqual(48)
+  // The floating "Track spending" button is a full-size target.
+  const track = await box(page.getByRole('button', { name: 'Track spending' }))
+  expect(track.width).toBeGreaterThanOrEqual(44)
+  expect(track.height).toBeGreaterThanOrEqual(44)
 
   await fullMode(page)
   await page.goto('/goals')
@@ -120,11 +112,11 @@ test.describe('a phone on its side', () => {
   test('the side rail scrolls, and the + never covers the last tab', async ({ page }) => {
     await unlockAndSetup(page)
     await fullMode(page)
-    await page.goto('/plan')
+    await page.goto('/home')
     const nav = page.getByRole('navigation', { name: 'Main' })
     const last = nav.getByRole('link', { name: 'More' })
     await last.scrollIntoViewIfNeeded()
-    const plus = page.getByRole('button', { name: 'Quick add' })
+    const plus = page.getByRole('button', { name: 'Track spending' })
     const a = await box(last)
     const b = await box(plus)
     const overlaps =
