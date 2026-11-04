@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { useUndoToast } from '../../app/useUndoToast'
 import { isValidISODate } from '../../domain/dates'
 import type { Cents, ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
@@ -11,6 +10,7 @@ import { MoneyInput } from '../../ui/MoneyInput'
 import { PageHeader } from '../../ui/PageHeader'
 import { Segmented } from '../../ui/Segmented'
 import { Switch } from '../../ui/Switch'
+import { useToast } from '../../ui/Toast'
 import { useFormat } from '../bills/format'
 import { LocalePickers } from '../setup/LocaleLine'
 import { useTodayModel, type TodayModel } from '../today/useTodayModel'
@@ -38,7 +38,7 @@ export function MoneyBasicsScreen() {
 function BasicsForm({ model, today }: { model: TodayModel; today: ISODate }) {
   const { settings, update } = useAppSettings()
   const f = useFormat()
-  const undoToast = useUndoToast()
+  const toast = useToast()
   const plan = model.plan?.kind === 'ready' ? model.plan : null
   const startDate = settings.startDate ?? plan?.start.date ?? today
   const [balance, setBalance] = useState<Cents | null>(
@@ -53,8 +53,18 @@ function BasicsForm({ model, today }: { model: TodayModel; today: ISODate }) {
 
   async function save() {
     if (!isValidISODate(date)) return
+    const before = {
+      startingBalance: settings.startingBalance,
+      startDate: settings.startDate,
+      buffer: settings.buffer,
+    }
     await update({ startingBalance: balance ?? 0, startDate: date, buffer: buffer ?? 0 })
-    undoToast('Saved your money basics')
+    // Undo puts back exactly what these fields held (settings are not in the undo log).
+    toast.show({
+      message: 'Saved your money basics',
+      duration: 10_000,
+      action: { label: 'Undo', onAction: () => void update(before) },
+    })
   }
 
   return (

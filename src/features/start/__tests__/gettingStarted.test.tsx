@@ -49,6 +49,8 @@ describe('Getting started: the numbers everything is built on', () => {
     expect(labels).toContain('Japanese Yen — JPY')
     expect(labels).toContain('Euro — EUR')
     expect((select as HTMLSelectElement).value).toBe('EUR')
+    // Nothing is saved yet, so nothing limits the choice.
+    expect(screen.queryByText(/same decimals/)).toBeNull()
 
     await userEvent.selectOptions(select, 'USD')
     await waitFor(async () =>
@@ -60,6 +62,33 @@ describe('Getting started: the numbers everything is built on', () => {
     )
     // The amount field follows: no decimals for yen.
     expect((await balanceField()).getAttribute('placeholder')).toBe('0')
+  })
+
+  it('once an amount is saved, only offers currencies that keep its value', async () => {
+    await r.addFund({ name: 'Cushion', perPeriod: 0, openingSaved: 12000, target: 40000 })
+    render(<App />)
+    const select = await screen.findByRole('combobox', { name: 'Your currency' })
+    const labels = [...select.querySelectorAll('option')].map((o) => o.textContent)
+    expect(labels).toContain('US Dollar — USD')
+    expect(labels).toContain('Euro — EUR')
+    // Yen has no decimals: 12000 would read ¥12,000 instead of €120.00.
+    expect(labels).not.toContain('Japanese Yen — JPY')
+    expect(labels.length).toBeGreaterThan(1)
+    const hint = screen.getByText(/same decimals/)
+    expect(select.getAttribute('aria-describedby')).toContain(hint.id)
+
+    await userEvent.selectOptions(select, 'USD')
+    await waitFor(async () =>
+      expect(await r.getSettings()).toMatchObject({ currency: 'USD', decimals: 2 }),
+    )
+  })
+
+  it('a starting balance counts as a saved amount too', async () => {
+    await r.updateSettings({ startDate: '2026-11-01', startingBalance: 10000 })
+    render(<App />)
+    const select = await screen.findByRole('combobox', { name: 'Your currency' })
+    const labels = [...select.querySelectorAll('option')].map((o) => o.textContent)
+    expect(labels).not.toContain('Japanese Yen — JPY')
   })
 
   it('saves the starting balance when the field is left, starting this month if unset', async () => {
@@ -77,6 +106,45 @@ describe('Getting started: the numbers everything is built on', () => {
       }),
     )
     expect(await screen.findByText('Starting balance saved')).toBeTruthy()
+  })
+
+  it('Undo on the saved toast puts the balance back and leaves other changes alone', async () => {
+    await r.updateSettings({ startDate: '2026-10-15', startingBalance: 40000 })
+    // An unrelated, earlier change that is still in the undo log.
+    await r.addTransaction({ date: '2026-11-03', amount: -1777, note: 'Earlier spend' })
+    const before = (await r.listTransactions()).length
+    render(<App />)
+    const field = (await balanceField()) as HTMLInputElement
+    await userEvent.clear(field)
+    await userEvent.type(field, '4321{Enter}')
+    await waitFor(async () => expect((await r.getSettings()).startingBalance).toBe(432100))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(async () =>
+      expect(await r.getSettings()).toMatchObject({
+        startingBalance: 40000,
+        startDate: '2026-10-15',
+      }),
+    )
+    await waitFor(() => expect(field.value).toBe('400.00'))
+    expect(await r.listTransactions()).toHaveLength(before)
+  })
+
+  it('Undo of a first starting balance clears it again', async () => {
+    render(<App />)
+    const field = (await balanceField()) as HTMLInputElement
+    await userEvent.type(field, '250{Enter}')
+    await waitFor(async () =>
+      expect(await r.getSettings()).toMatchObject({
+        startingBalance: 25000,
+        startDate: '2026-11-01',
+      }),
+    )
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(async () =>
+      expect(await r.getSettings()).toMatchObject({ startingBalance: 0, startDate: null }),
+    )
+    await waitFor(() => expect(field.value).toBe(''))
   })
 
   it('Enter saves too, and keeps a start date that is already set', async () => {
@@ -183,11 +251,11 @@ describe('Getting started: how each section works', () => {
     ).toEqual(['Today', 'Calendar', 'Settings'])
   })
 
-  it('ends with a way to the rest of the money settings', async () => {
+  it('ends with the guide: nothing follows it in the page', async () => {
     render(<App />)
-    await userEvent.click(await screen.findByRole('link', { name: /More money settings/ }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Money basics' })).toBeTruthy()
-    expect(window.location.pathname).toBe('/more/basics')
+    const guide = await screen.findByRole('region', { name: 'How each section works' })
+    expect(guide.nextElementSibling).toBeNull()
+    expect(screen.queryByRole('link', { name: /money settings/i })).toBeNull()
   })
 })
 
