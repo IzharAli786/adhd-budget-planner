@@ -79,8 +79,35 @@
   --accent: var(--l-accent);
   --accent-soft: var(--l-accent-soft);
   --accent-contrast: #ffffff;
-  --danger-soft: #f6e3dd;
   --shadow: 0 1px 2px rgb(31 30 28 / 0.04), 0 8px 24px -12px rgb(31 30 28 / 0.12);
+  /*
+   * Status tones: what state something is in (never which envelope, never an action).
+   * Theme-independent: one light set, one dark set. Each is fg (text, icon), bg (soft
+   * fill) and border (a decorative ring, never the only cue). contrast.test.ts holds fg
+   * to 4.5:1 on its fill, the surface and the background in every theme and mode.
+   */
+  --tone-neutral-fg: #57524b;
+  --tone-neutral-bg: #f1eee9;
+  --tone-neutral-border: #ddd8d0;
+  --tone-progress-fg: #7c4a0b;
+  --tone-progress-bg: #fcefd9;
+  --tone-progress-border: #f0d3a1;
+  --tone-success-fg: #2b6a40;
+  --tone-success-bg: #e3f1e6;
+  --tone-success-border: #b8dbc1;
+  --tone-attention-fg: #a2372b;
+  --tone-attention-bg: #fde7e2;
+  --tone-attention-border: #f3c1b6;
+  --tone-info-fg: #285c88;
+  --tone-info-bg: #e2edf7;
+  --tone-info-border: #b9d3ea;
+  /* State edges (unchecked box, switch, selected segment): 3:1 on every surface. */
+  --control-border: #8a857d;
+  /* The check on the inverted toast (dark in light mode, light in dark mode). */
+  --toast-success: #96d3a6;
+  /* Empty part of a bar or ring; resolves per mode because --text and --surface do. */
+  --track: color-mix(in oklab, var(--text) 10%, var(--surface));
+  --selected-bg: var(--surface);
   /* Chart series (Insights, Look back): calm, theme-neutral, each at least 4.5:1 on any
      surface so slices and bars read without relying on the legend alone. */
   --chart-1: #3d6e8f;
@@ -102,8 +129,25 @@
     --accent: var(--d-accent);
     --accent-soft: var(--d-accent-soft);
     --accent-contrast: var(--d-bg);
-    --danger-soft: #3d2622;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    --tone-neutral-fg: #d2ccc2;
+    --tone-neutral-bg: #393631;
+    --tone-neutral-border: #4e4a44;
+    --tone-progress-fg: #f2c27e;
+    --tone-progress-bg: #3d301c;
+    --tone-progress-border: #5c4626;
+    --tone-success-fg: #96d3a6;
+    --tone-success-bg: #1f3828;
+    --tone-success-border: #2f5139;
+    --tone-attention-fg: #f6a99d;
+    --tone-attention-bg: #45241f;
+    --tone-attention-border: #66352d;
+    --tone-info-fg: #9cc7ea;
+    --tone-info-bg: #1e3346;
+    --tone-info-border: #2e4b66;
+    --control-border: #857f76;
+    --toast-success: #2b6a40;
+    --selected-bg: color-mix(in oklab, var(--text) 12%, var(--surface));
     --chart-1: #8ab6d4;
     --chart-2: #c7a0d2;
     --chart-3: #8fc495;
@@ -122,8 +166,26 @@
   --accent: var(--d-accent);
   --accent-soft: var(--d-accent-soft);
   --accent-contrast: var(--d-bg);
-  --danger-soft: #3d2622;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  /* The same values as the media block above; contrast.test.ts keeps them equal. */
+  --tone-neutral-fg: #d2ccc2;
+  --tone-neutral-bg: #393631;
+  --tone-neutral-border: #4e4a44;
+  --tone-progress-fg: #f2c27e;
+  --tone-progress-bg: #3d301c;
+  --tone-progress-border: #5c4626;
+  --tone-success-fg: #96d3a6;
+  --tone-success-bg: #1f3828;
+  --tone-success-border: #2f5139;
+  --tone-attention-fg: #f6a99d;
+  --tone-attention-bg: #45241f;
+  --tone-attention-border: #66352d;
+  --tone-info-fg: #9cc7ea;
+  --tone-info-bg: #1e3346;
+  --tone-info-border: #2e4b66;
+  --control-border: #857f76;
+  --toast-success: #2b6a40;
+  --selected-bg: color-mix(in oklab, var(--text) 12%, var(--surface));
   --chart-1: #8ab6d4;
   --chart-2: #c7a0d2;
   --chart-3: #8fc495;
@@ -134,6 +196,11 @@
 }
 :root[data-theme='midnight'] {
   --muted: #a3acc2;
+  /* Neutral leans to Midnight's blue-grey; the other tones are the shared dark set. */
+  --tone-neutral-fg: #c5ccdb;
+  --tone-neutral-bg: #283149;
+  --tone-neutral-border: #3b4766;
+  --control-border: #7c87a0;
 }
 
 /*
@@ -195,7 +262,25 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-contrast: var(--accent-contrast);
-  --color-danger-soft: var(--danger-soft);
+  /* Status tones: text-tone-success, bg-tone-success-bg, ring-tone-success-line, ... */
+  --color-tone-neutral: var(--tone-neutral-fg);
+  --color-tone-neutral-bg: var(--tone-neutral-bg);
+  --color-tone-neutral-line: var(--tone-neutral-border);
+  --color-tone-progress: var(--tone-progress-fg);
+  --color-tone-progress-bg: var(--tone-progress-bg);
+  --color-tone-progress-line: var(--tone-progress-border);
+  --color-tone-success: var(--tone-success-fg);
+  --color-tone-success-bg: var(--tone-success-bg);
+  --color-tone-success-line: var(--tone-success-border);
+  --color-tone-attention: var(--tone-attention-fg);
+  --color-tone-attention-bg: var(--tone-attention-bg);
+  --color-tone-attention-line: var(--tone-attention-border);
+  --color-tone-info: var(--tone-info-fg);
+  --color-tone-info-bg: var(--tone-info-bg);
+  --color-tone-info-line: var(--tone-info-border);
+  --color-control: var(--control-border);
+  --color-track: var(--track);
+  --color-selected: var(--selected-bg);
   --shadow-card: var(--shadow);
   --font-sans: 'Inter Variable', system-ui, sans-serif;
   --font-display: 'Fraunces Variable', 'Fraunces Fallback', ui-serif, Georgia, serif;
@@ -262,13 +347,43 @@
   letter-spacing: -0.015em;
 }
 
-/* Small uppercase label above a group. One style for every section in the app. */
+/* Small uppercase label above a list group (not a section title: see section-title). */
 @utility eyebrow {
   font-size: 0.75rem;
   line-height: 1rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* Level-1 section title: Today, Home, Goals, Debt, Getting started, envelope card names. */
+@utility section-title {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variant-numeric: lining-nums;
+  font-size: 1.375rem;
+  line-height: 1.2;
+  font-weight: 560;
+  letter-spacing: -0.015em;
+}
+
+/* Serif card title (Getting started cards and the other competitor-mirrored cards). */
+@utility card-title {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variant-numeric: lining-nums;
+  font-size: 1.125rem;
+  line-height: 1.35;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+/* Serif list amount (Coming up, envelope rows, income rows, donut legend): one weight. */
+@utility amount {
+  font-family: var(--font-display);
+  font-variant-numeric: lining-nums;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /*
@@ -337,6 +452,28 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline-offset: 0;
+}
+/* Box-like inputs (checkbox, radio) keep a gap between the box and the ring. */
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline-offset: 2px;
+}
+/* An invalid field says so in its focus ring too, not only in its border. */
+[aria-invalid='true']:focus-visible {
+  outline-color: var(--tone-attention-fg);
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--tone-attention-fg) 18%, transparent);
+}
+/* The inverted toast: the accent ring measured 1.7-3.1:1 there; the page colour is ~15:1. */
+.toast :focus-visible {
+  outline-color: var(--bg);
+  box-shadow: none;
+}
+/* Phones: a focused control never hides under the tab bar and the floating button. */
+@media (max-width: 47.999rem) {
+  html {
+    scroll-padding-top: calc(var(--demo-banner-h, 0px) + 1rem);
+    scroll-padding-bottom: calc(9.25rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* Midnight is the premium dark: a deep blue field with a faint glow from the top. */
@@ -491,6 +628,12 @@ dialog.sheet[open] {
     --chart-4: #a35a35;
     --chart-5: #7a6524;
     --chart-6: #5b6573;
+    --tone-neutral-fg: #57524b;
+    --tone-progress-fg: #7c4a0b;
+    --tone-success-fg: #2b6a40;
+    --tone-attention-fg: #a2372b;
+    --tone-info-fg: #285c88;
+    --track: #e8e8e8;
     color-scheme: light;
   }
   html {
