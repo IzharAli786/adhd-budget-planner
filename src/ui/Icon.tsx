@@ -40,6 +40,8 @@ const PATHS = {
   edit: 'M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4',
   skip: 'M6 5l8 7-8 7M18 5v14',
   list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  // Sections and tools (More's "Show more tools"): four rounded tiles.
+  grid: 'M5 4h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM15 4h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM5 14h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1ZM15 14h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1Z',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4',
   note: 'M6 4h12a1 1 0 0 1 1 1v10l-5 5H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM14 20v-4a1 1 0 0 1 1-1h4M8.5 9h7M8.5 12.5h4',
   up: 'M6 15l6-6 6 6',
@@ -92,10 +94,11 @@ export type IconWeight = 'regular' | 'bold'
 export const strokeFor = (size: number, weight: IconWeight = 'regular') =>
   ((weight === 'bold' ? (size <= 14 ? 1.75 : 2) : size <= 14 ? 1.25 : 1.5) * 24) / size
 
-interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
+// No strokeWidth: the weight comes from size and `weight`, so every glyph matches.
+interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name' | 'strokeWidth'> {
   name: IconName
-  /** One of IconSize (12, 14, 16, 18, 20, 22); 22 by default. */
-  size?: number
+  /** On the optical scale only; 22 by default. */
+  size?: IconSize
   /** 'bold' for the active tab, a check inside a filled box, the floating +. */
   weight?: IconWeight
 }

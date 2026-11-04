@@ -1,8 +1,10 @@
 import { useId } from 'react'
 import type { PaydayEntry } from '../../domain/bills'
 import type { ISODate, Transaction } from '../../domain/types'
+import { Button } from '../../ui/Button'
+import { TAG } from '../../ui/status'
 import { useFormat } from '../bills/format'
-import { CalendarLink, EntryActions, EntryLine, textButton } from './EntryLine'
+import { CalendarLink, EntryActions, EntryLine } from './EntryLine'
 
 type Row =
   | { kind: 'payday'; date: ISODate; payday: PaydayEntry }
@@ -37,26 +39,21 @@ export function IncomeCard({
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 
   return (
-    <section aria-labelledby={titleId} className="card p-5 sm:px-6 sm:pt-6 sm:pb-5">
+    <section aria-labelledby={titleId} className="card p-5 sm:p-6">
       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2 id={titleId} className="type-display text-[1.375rem] leading-tight">
+        <h2 id={titleId} className="section-title">
           Income
         </h2>
-        <div className="-mx-2.5 flex shrink-0 items-center">
-          <button type="button" onClick={onAdd} className={textButton}>
-            <span aria-hidden="true" className="mr-1">
-              +
-            </span>
+        <div className="-mx-3 flex shrink-0 items-center">
+          <Button variant="text" icon="plus" onClick={onAdd}>
             Add income
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="mt-4">
         <p className="text-sm font-semibold text-muted">Money in for {monthName}</p>
-        <p className="mt-0.5 font-display text-[1.75rem] leading-tight font-semibold tabular-nums">
-          {f.money(total)}
-        </p>
+        <p className="mt-0.5 type-display text-[1.75rem] leading-tight">{f.money(total)}</p>
       </div>
 
       {rows.length > 0 ? (
@@ -66,9 +63,10 @@ export function IncomeCard({
               <EntryLine
                 key={`${row.payday.incomeId}|${row.payday.nominal}`}
                 name={row.payday.name}
-                tag="Payday"
+                tag={TAG.payday}
                 sub={rowDay(row.payday.date)}
                 amount={`+${f.money(row.payday.amount)}`}
+                incoming
                 actions={<CalendarLink label={row.payday.name} to="/bills?view=paydays" />}
               />
             ) : (
@@ -77,6 +75,7 @@ export function IncomeCard({
                 name={row.tx.note || 'Income'}
                 sub={rowDay(row.tx.date)}
                 amount={`+${f.money(row.tx.amount)}`}
+                incoming
                 actions={
                   <EntryActions tx={row.tx} label={row.tx.note || 'Income'} onEdit={onEdit} />
                 }

@@ -15,7 +15,9 @@ import { useNow } from '../../lib/useNow'
 import { Button } from '../../ui/Button'
 import { Field, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
+import { IconButton } from '../../ui/IconButton'
 import { MoneyInput } from '../../ui/MoneyInput'
+import { Notice } from '../../ui/Notice'
 import { useToast } from '../../ui/Toast'
 import { useFormat } from '../bills/format'
 import { useQuickAdd } from '../quickadd/QuickAddProvider'
@@ -52,9 +54,11 @@ export function ImpulseList() {
         </section>
       )}
       {saved > 0 && (
-        <p className="rounded-3xl bg-accent-soft px-5 py-4 text-body">
-          <span className="font-semibold tabular-nums">{f.money(saved)}</span> saved by waiting.
-        </p>
+        <Notice tone="success" icon="leaf">
+          <p>
+            <span className="font-semibold tabular-nums">{f.money(saved)}</span> saved by waiting.
+          </p>
+        </Notice>
       )}
     </div>
   )
@@ -99,8 +103,7 @@ function AddForm() {
         symbol={f.symbol}
         decimals={f.decimals}
       />
-      <Button type="submit" block disabled={!name.trim() || !amount}>
-        <Icon name="clock" size={18} />
+      <Button type="submit" block icon="clock" disabled={!name.trim() || !amount}>
         Start the 48 hours
       </Button>
     </form>
@@ -114,17 +117,19 @@ function WaitingRow({ item, left }: { item: ImpulseItem; left: string }) {
     <li className="flex min-h-14 items-center gap-3 py-2 pr-2 pl-4">
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{item.name}</span>
-        <span className="block text-sm text-muted">{left}</span>
+        <span className="flex items-center gap-1 text-sm text-muted">
+          <Icon name="clock" size={14} className="shrink-0" />
+          {left}
+        </span>
       </span>
       <span className="font-medium tabular-nums">{f.money(item.amount)}</span>
-      <button
-        type="button"
-        aria-label={`Remove ${item.name}`}
+      <IconButton
+        icon="close"
+        tone="danger"
+        size="sm"
+        label={`Remove ${item.name}`}
         onClick={() => void deleteImpulse(item.id).then(() => undoToast('Removed'))}
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60"
-      >
-        <Icon name="close" size={18} />
-      </button>
+      />
     </li>
   )
 }
@@ -152,10 +157,13 @@ function ReadyCard({ items }: { items: ImpulseItem[] }) {
   return (
     <section
       aria-labelledby="impulse-ready"
-      className="animate-fade-in space-y-4 rounded-3xl bg-accent-soft p-5"
+      className="animate-fade-in space-y-4 rounded-3xl bg-tone-progress-bg p-5 ring-1 ring-tone-progress-line ring-inset"
     >
       <div>
-        <p className="eyebrow text-accent">48 hours are up</p>
+        <p className="flex items-center gap-1.5 eyebrow text-tone-progress">
+          <Icon name="clock" size={14} className="shrink-0" />
+          48 hours are up
+        </p>
         <h3 id="impulse-ready" className="mt-1 text-lg font-medium">
           Still want {items.length === 1 ? 'it' : 'them'}?
         </h3>
@@ -182,7 +190,7 @@ function ReadyCard({ items }: { items: ImpulseItem[] }) {
                 Bought it
               </Button>
               <Button
-                variant="ghost"
+                variant="quiet"
                 onClick={() =>
                   void waitAgain([item.id]).then(() => undoToast('Asking again in 48 hours'))
                 }
@@ -195,7 +203,7 @@ function ReadyCard({ items }: { items: ImpulseItem[] }) {
       </ul>
       {items.length > 1 && (
         // Batch decisions (PLAN §1): coming back to five expired items should take one tap.
-        <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+        <div className="flex flex-wrap gap-2 border-t border-tone-progress-line pt-4">
           <Button
             onClick={() =>
               void decideImpulse(ids, 'skipped').then(() =>
@@ -208,7 +216,7 @@ function ReadyCard({ items }: { items: ImpulseItem[] }) {
             Skip all {items.length}
           </Button>
           <Button
-            variant="ghost"
+            variant="quiet"
             onClick={() => void waitAgain(ids).then(() => undoToast('Asking again in 48 hours'))}
           >
             Ask me later

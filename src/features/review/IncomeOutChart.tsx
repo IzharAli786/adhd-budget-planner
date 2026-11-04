@@ -6,6 +6,7 @@ import { niceMax } from '../../domain/chartScale'
 import type { Cents } from '../../domain/money'
 import { useMediaQuery } from '../../lib/useMediaQuery'
 import { ChartTips } from '../../ui/ChartTips'
+import { DATA_COLOR } from '../../ui/dataColors'
 import type { Formatters } from '../bills/format'
 
 export interface IncomeOutPoint {
@@ -57,8 +58,8 @@ export default function IncomeOutChart({
     title: p.title,
     at: (PAD.left + gw * i + gw / 2) / W,
     lines: [
-      { label: 'In', value: f.money(p.incomeIn), color: 'var(--accent)' },
-      { label: 'Out', value: f.money(p.moneyOut), color: 'var(--muted)' },
+      { label: 'In', value: f.money(p.incomeIn), color: DATA_COLOR.in },
+      { label: 'Out', value: f.money(p.moneyOut), color: DATA_COLOR.out },
     ],
   }))
 
@@ -103,14 +104,14 @@ export default function IncomeOutChart({
                     top={y(p.incomeIn)}
                     bottom={PAD.top + plotH}
                     w={bw}
-                    fill="var(--accent)"
+                    fill={DATA_COLOR.in}
                   />
                   <Bar
                     x={cx + 1}
                     top={y(p.moneyOut)}
                     bottom={PAD.top + plotH}
                     w={bw}
-                    fill="var(--muted)"
+                    fill={DATA_COLOR.out}
                   />
                   {i % every === 0 && (
                     <text x={cx} y={H - 5} fontSize={9.5} fill="var(--muted)" textAnchor="middle">
@@ -126,11 +127,19 @@ export default function IncomeOutChart({
       </div>
       <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted">
         <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true" className="size-2.5 rounded-sm bg-accent" />
+          <span
+            aria-hidden="true"
+            className="size-2.5 rounded-sm"
+            style={{ backgroundColor: DATA_COLOR.in }}
+          />
           Money in
         </span>
         <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true" className="size-2.5 rounded-sm bg-muted" />
+          <span
+            aria-hidden="true"
+            className="size-2.5 rounded-sm"
+            style={{ backgroundColor: DATA_COLOR.out }}
+          />
           Money out
         </span>
         <span>Tap a {unit} to read it</span>

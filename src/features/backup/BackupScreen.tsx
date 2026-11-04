@@ -20,7 +20,8 @@ import { IS_DEMO } from '../../lib/demo'
 import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
-import { Icon } from '../../ui/Icon'
+import { IconTile } from '../../ui/IconTile'
+import { Notice } from '../../ui/Notice'
 import { PageHeader } from '../../ui/PageHeader'
 import { useToast } from '../../ui/Toast'
 import { relativeDays } from './relative'
@@ -95,11 +96,9 @@ export function BackupScreen() {
       />
 
       <div className="space-y-5">
-        <section className="card p-6">
+        <section className="card p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-              <Icon name="share" size={22} />
-            </span>
+            <IconTile icon="download" size="md" />
             <div className="min-w-0 flex-1">
               <h2 className="text-heading">Save a backup</h2>
               <p className="text-body text-muted">
@@ -144,11 +143,9 @@ export function BackupScreen() {
           </div>
         </section>
 
-        <section className="card p-6">
+        <section className="card p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-              <Icon name="list" size={22} />
-            </span>
+            <IconTile icon="list" size="md" />
             <div className="min-w-0 flex-1">
               <h2 className="text-heading">Export for spreadsheets (CSV)</h2>
               <p className="text-body text-muted">
@@ -175,11 +172,9 @@ export function BackupScreen() {
           </div>
         </section>
 
-        <section className="card p-6">
+        <section className="card p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-              <Icon name="upload" size={22} />
-            </span>
+            <IconTile icon="upload" size="md" />
             <div className="min-w-0 flex-1">
               <h2 className="text-heading">Restore from a file</h2>
               <p className="text-body text-muted">
@@ -224,7 +219,7 @@ export function BackupScreen() {
             <Button variant="ghost" onClick={() => setPending(null)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={() => void restore()} disabled={busy}>
+            <Button variant="danger" icon="trash" onClick={() => void restore()} disabled={busy}>
               {busy ? 'Restoring…' : 'Replace my data'}
             </Button>
           </>
@@ -278,7 +273,7 @@ function EraseSection({ backupFile }: { backupFile: File | undefined }) {
   }
 
   return (
-    <section aria-labelledby="erase-title" className="card-quiet p-6">
+    <section aria-labelledby="erase-title" className="card-quiet p-5 sm:p-6">
       <h2 id="erase-title" className="text-heading">
         Erase everything on this device
       </h2>
@@ -286,8 +281,7 @@ function EraseSection({ backupFile }: { backupFile: File | undefined }) {
         Removes all of Steady’s data from this browser. Handy before passing a device on, or to
         start completely fresh.
       </p>
-      <Button variant="danger" className="mt-4" onClick={() => setOpen(true)}>
-        <Icon name="trash" size={18} />
+      <Button variant="danger" icon="trash" className="mt-4" onClick={() => setOpen(true)}>
         Erase everything…
       </Button>
 
@@ -301,7 +295,7 @@ function EraseSection({ backupFile }: { backupFile: File | undefined }) {
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={() => void erase()} disabled={busy}>
+            <Button variant="danger" icon="trash" onClick={() => void erase()} disabled={busy}>
               {busy ? 'Erasing…' : 'Erase everything'}
             </Button>
           </>
@@ -326,9 +320,9 @@ function EraseSection({ backupFile }: { backupFile: File | undefined }) {
           onSaved={() => toast.show({ message: 'Backup saved. Erasing is still up to you.' })}
         />
         {failed && (
-          <p role="alert" className="mt-3 text-sm">
+          <Notice tone="attention" role="alert" className="mt-3">
             Erasing didn’t finish, so nothing was removed. Please try again.
-          </p>
+          </Notice>
         )}
       </Dialog>
     </section>
@@ -349,10 +343,10 @@ export function BackupPreview({ backup }: { backup: ValidBackup }) {
   return (
     <div className="space-y-4">
       {preview.source === 'demo' && (
-        <p className="rounded-2xl bg-accent-soft p-3 text-sm">
+        <Notice tone="info">
           This file comes from the demo. Only your setup (income, bills, envelopes, savings, debts)
           will come across.
-        </p>
+        </Notice>
       )}
       {rows.length > 0 ? (
         <dl className="divide-y divide-line rounded-2xl ring-1 ring-line">

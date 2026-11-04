@@ -7,6 +7,7 @@ import { useCallback, useId, useRef, useState } from 'react'
 import { niceMax } from '../../domain/chartScale'
 import { topCategories } from '../../domain/insights'
 import { useDismissOnOutsideTap } from '../../ui/ChartTips'
+import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import type { Formatters } from '../bills/format'
 import type { InsightRow } from './insightRows'
@@ -97,15 +98,16 @@ export default function InsightsCharts({ rows, f, caption, centerLabel = 'Money 
         <InsightsTable rows={rows} total={total} f={f} caption={caption} totalLabel={centerLabel} />
       </div>
       <div className="flex justify-end print-hide">
-        <button
-          type="button"
+        <Button
+          variant="text"
+          size="sm"
+          bleed
           aria-expanded={showTable}
           aria-controls={tableId}
           onClick={() => setShowTable((s) => !s)}
-          className="-mx-2 min-h-11 rounded-full px-2 text-sm font-medium text-accent"
         >
           {showTable ? 'Show as a chart' : 'Show as a table'}
-        </button>
+        </Button>
       </div>
     </figure>
   )
@@ -273,7 +275,7 @@ function Bar({
             setOpen(false)
           }
         }}
-        className="absolute -inset-x-1.5 -inset-y-1.5 min-h-11 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="absolute -inset-x-1.5 -inset-y-1.5 min-h-11 rounded-xl"
       />
       {(hover || open) && (
         <div

@@ -1,6 +1,18 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import { cx } from './cx'
 
+/**
+ * One option of a segmented control, also used by Envelopes' month tabs. Selected is a
+ * lifted pill with a 3:1 control edge and semibold text, so it reads without colour.
+ */
+export const segmentItemClass = (selected: boolean) =>
+  cx(
+    'min-h-11 flex-1 rounded-full px-3 text-sm whitespace-nowrap transition-colors',
+    selected
+      ? 'bg-selected font-semibold text-text shadow-card ring-1 ring-control'
+      : 'font-medium text-muted hover:text-text',
+  )
+
 interface SegmentedProps<T extends string | number> {
   label: string
   value: T
@@ -61,12 +73,7 @@ export function Segmented<T extends string | number>({
             aria-label={o.name}
             tabIndex={i === tabStop ? 0 : -1}
             onClick={() => onChange(o.value)}
-            className={cx(
-              'min-h-11 flex-1 rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
-              selected
-                ? 'bg-surface text-text shadow-card ring-1 ring-line'
-                : 'text-muted hover:text-text',
-            )}
+            className={segmentItemClass(selected)}
           >
             {o.label}
           </button>

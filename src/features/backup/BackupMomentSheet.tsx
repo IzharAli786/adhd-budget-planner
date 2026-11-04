@@ -1,5 +1,6 @@
 import type { Cents } from '../../domain/money'
 import { Button } from '../../ui/Button'
+import { Notice } from '../../ui/Notice'
 import { Sheet } from '../../ui/Sheet'
 import { useToast } from '../../ui/Toast'
 import { useFormat } from '../bills/format'
@@ -30,9 +31,9 @@ export function BackupMomentSheet({
       description="One tap. Keep the file in Files, iCloud Drive or Google Drive."
     >
       {carried !== null && (
-        <p role="status" className="mb-4 rounded-2xl bg-accent-soft/70 px-4 py-3 text-body">
+        <Notice tone="info" role="status" className="mb-4">
           {carryLine(carried, f.money)}
-        </p>
+        </Notice>
       )}
       {open && <BackupMoment onClose={onClose} />}
     </Sheet>
@@ -51,7 +52,7 @@ function BackupMoment({ onClose }: { onClose: () => void }) {
           onClose()
         }}
       />
-      <Button variant="ghost" block onClick={onClose} className="text-muted">
+      <Button variant="quiet" block onClick={onClose}>
         Not now
       </Button>
     </div>

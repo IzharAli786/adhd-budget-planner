@@ -7,7 +7,7 @@ import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { Chip } from '../../ui/Chip'
 import { DateInput } from '../../ui/DateInput'
-import { Icon } from '../../ui/Icon'
+import { Notice } from '../../ui/Notice'
 import { PageHeader } from '../../ui/PageHeader'
 import { Stat } from '../../ui/Stat'
 import { useFormat, type Formatters } from '../bills/format'
@@ -136,16 +136,16 @@ export function ReportsScreen() {
                 block
                 disabled={!report || current.state === 'working'}
                 aria-busy={current.state === 'working' || undefined}
+                icon="report"
                 onClick={() => void create()}
               >
-                <Icon name="report" size={20} />
                 {current.state === 'working' ? 'Making your report…' : 'Create PDF'}
               </Button>
             )}
             {current.state === 'error' && (
-              <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-body">
+              <Notice tone="attention" role="alert">
                 The PDF couldn’t be made this time. Please try again.
-              </p>
+              </Notice>
             )}
             {/* Always in the page, so the change is announced as it happens. */}
             <p aria-live="polite" className="text-sm text-muted empty:hidden">
@@ -223,13 +223,15 @@ function Ready({ file }: { file: File }) {
       <p className="text-sm text-muted break-all">{file.name}</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         {share && (
-          <Button onClick={() => void shareOrDownload(file)}>
-            <Icon name="share" size={18} />
+          <Button icon="share" onClick={() => void shareOrDownload(file)}>
             Share or save
           </Button>
         )}
-        <Button variant={share ? 'secondary' : 'primary'} onClick={() => download(file)}>
-          <Icon name="download" size={18} />
+        <Button
+          variant={share ? 'secondary' : 'primary'}
+          icon="download"
+          onClick={() => download(file)}
+        >
           Download
         </Button>
       </div>

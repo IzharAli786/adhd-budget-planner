@@ -63,22 +63,20 @@ function Body({
   const [moveTo, setMoveTo] = useState(entry.date)
   const { billId, originalDate } = entry
 
-  async function run(action: Promise<unknown>, message: string) {
+  async function run(action: Promise<unknown>, message: string, tone?: 'success') {
     await action
-    undoToast(message)
+    undoToast(message, tone ? { tone } : undefined)
     onClose()
   }
 
   const pay = () =>
     paidAmount !== null &&
-    void run(markPaid(billId, originalDate, paidAmount), `${entry.name} marked paid`)
+    void run(markPaid(billId, originalDate, paidAmount), `${entry.name} marked paid`, 'success')
 
   return (
     <div className="space-y-5 pb-4">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-4xl font-semibold tracking-tight tabular-nums">
-          {f.money(entry.amount)}
-        </p>
+        <p className="type-display text-4xl leading-none">{f.money(entry.amount)}</p>
         {entry.moved && (
           <p className="text-sm text-muted">Moved from {f.day(entry.originalDate)}</p>
         )}
@@ -96,20 +94,17 @@ function Body({
               hint="Only this payment changes. The bill keeps its usual amount."
             />
           )}
-          <Button block size="lg" onClick={pay} disabled={paidAmount === null}>
-            <Icon name="check" size={20} />
+          <Button block size="lg" icon="check" onClick={pay} disabled={paidAmount === null}>
             {mode === 'amount' && paidAmount !== null
               ? `Mark paid · ${f.money(paidAmount)}`
               : 'Mark paid'}
           </Button>
           {mode === 'view' && (
-            <button
-              type="button"
-              onClick={() => setMode('amount')}
-              className="mx-auto block min-h-11 rounded-full px-4 text-sm font-medium text-accent hover:bg-accent-soft/60"
-            >
-              Paid a different amount?
-            </button>
+            <div className="flex justify-center">
+              <Button variant="text" size="sm" onClick={() => setMode('amount')}>
+                Paid a different amount?
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -169,7 +164,7 @@ function Body({
           )}
           {entry.moved && (
             <ActionRow
-              icon="refresh"
+              icon="undo"
               label={`Back to ${f.day(originalDate)}`}
               onClick={() =>
                 void run(
@@ -200,7 +195,7 @@ function ActionRow({
   label,
   onClick,
 }: {
-  icon: 'calendar' | 'skip' | 'edit' | 'refresh'
+  icon: 'calendar' | 'skip' | 'edit' | 'undo'
   label: string
   onClick: () => void
 }) {
@@ -211,7 +206,7 @@ function ActionRow({
         onClick={onClick}
         className="flex min-h-13 w-full items-center gap-3 px-4 text-left font-medium transition-colors hover:bg-accent-soft/40"
       >
-        <Icon name={icon} size={20} className="text-muted" />
+        <Icon name={icon} size={20} className="shrink-0 text-muted" />
         {label}
       </button>
     </li>

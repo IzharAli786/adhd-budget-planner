@@ -25,7 +25,7 @@ export function GoalsScreen() {
   const noSpend = <NoSpendCard today={today} />
   const impulse = (
     <section aria-labelledby="impulse-title" className="space-y-3">
-      <h2 id="impulse-title" className="px-1 text-heading">
+      <h2 id="impulse-title" className="section-title">
         48-hour list
       </h2>
       <ImpulseList />

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { cx } from './cx'
 import { Icon, type IconName } from './Icon'
+import { IconTile, type IconTileTone } from './IconTile'
 import { SectionHeader } from './Section'
 
 /** An inset grouped list, the iOS Settings pattern people already know. */
@@ -16,6 +17,9 @@ export function ListGroup({ title, children }: { title?: ReactNode; children: Re
 
 interface RowProps {
   icon?: IconName
+  /** The icon tile's fill: accent (a place to go) by default, a tone when the row has one
+      (paydays are always the success tone, as everywhere else). */
+  iconTone?: IconTileTone
   label: ReactNode
   detail?: ReactNode
   /** Internal route; renders a link with a chevron. */
@@ -27,14 +31,10 @@ interface RowProps {
 
 const rowClass = 'flex min-h-14 w-full items-center gap-3.5 px-4 py-2.5 text-left'
 
-export function ListRow({ icon, label, detail, to, onClick, trailing }: RowProps) {
+export function ListRow({ icon, iconTone, label, detail, to, onClick, trailing }: RowProps) {
   const body = (
     <>
-      {icon && (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <Icon name={icon} size={19} />
-        </span>
-      )}
+      {icon && <IconTile icon={icon} tone={iconTone} size="sm" />}
       <span className="min-w-0 flex-1">
         <span className="block font-medium">{label}</span>
         {detail && <span className="block text-sm text-muted">{detail}</span>}

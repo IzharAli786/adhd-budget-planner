@@ -57,7 +57,7 @@ export function MoreScreen() {
 
         <ListGroup>
           <ListRow
-            icon="sparkle"
+            icon="grid"
             label="Show more tools"
             detail="Home, Goals, Savings, Debt, Envelopes and the yearly review. Off for a simpler app."
             trailing={
@@ -103,7 +103,7 @@ export function MoreScreen() {
               not only in the 10 s toast. */}
           {undoLabel ? (
             <ListRow
-              icon="refresh"
+              icon="undo"
               label="Undo last change"
               detail={undoLabel}
               onClick={async () => {
@@ -112,7 +112,7 @@ export function MoreScreen() {
               }}
             />
           ) : (
-            <ListRow icon="refresh" label="Undo last change" detail="Nothing to undo" />
+            <ListRow icon="undo" label="Undo last change" detail="Nothing to undo" />
           )}
           {/* Also under Goals; here so Simple mode, which has no Goals, keeps it. */}
           <ListRow

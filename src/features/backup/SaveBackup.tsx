@@ -3,7 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { prepareBackupFile } from '../../db/backup'
 import { recordBackup } from '../../db/repos'
 import { canShareFile, shareOrDownload, type SaveResult } from '../../lib/share'
-import { Button, buttonClass, type ButtonVariant } from '../../ui/Button'
+import { BUTTON_ICON_SIZE, Button, buttonClass, type ButtonVariant } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
 
@@ -78,9 +78,11 @@ export function SaveFileButton({
 
   const saved = (result: Exclude<SaveResult, 'cancelled'>) => void onSaved?.(result)
 
+  // "download" whether it ends in the share sheet or a download: it saves a file, and the
+  // Backup card's tile shows the same glyph.
   const content = (
     <>
-      <Icon name={share ? 'share' : 'download'} size={20} />
+      <Icon name="download" size={BUTTON_ICON_SIZE[size]} className="shrink-0" />
       {file ? label : 'Preparing…'}
     </>
   )

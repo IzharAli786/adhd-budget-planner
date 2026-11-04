@@ -128,15 +128,17 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
           aria-keyshortcuts="n"
           title="Track spending (n)"
           className={cx(
-            'print-hide fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center gap-2 rounded-full',
+            'print-hide fixed right-5 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full',
             'bg-accent text-accent-contrast shadow-card transition-[filter,transform] hover:brightness-105 active:scale-95',
             // From md up it lives in the side rail, outside the content column, so it can
             // never sit on a card. Above the rail (z-40), below toasts and dialogs.
             'md:right-auto md:bottom-6 md:left-5 md:z-[45]',
-            'lg:left-6 lg:w-48 lg:justify-start lg:rounded-2xl lg:px-4 lg:whitespace-nowrap',
+            'lg:left-6 lg:h-13 lg:w-48 lg:justify-start lg:gap-2.5 lg:px-5 lg:whitespace-nowrap',
           )}
         >
-          <Icon name="plus" size={26} strokeWidth={2.2} />
+          {/* 22 on its own; 20 beside the label, where the label carries the weight. */}
+          <Icon name="plus" size={22} weight="bold" className="lg:hidden" />
+          <Icon name="plus" size={20} weight="bold" className="hidden lg:block" />
           <span aria-hidden="true" className="hidden font-medium lg:inline">
             Track spending
           </span>

@@ -55,7 +55,10 @@ describe('calendar markers', () => {
     // Savings ride on the payday ring: no mark or legend entry of their own (less clutter).
     // Scoped to the page: the navigation has a "Savings" section of its own.
     expect(within(screen.getByRole('main')).queryByText('Savings')).toBeNull()
-    expect(screen.getByText('Debt minimum')).toBeTruthy()
+    // The legend names the diamond (the bill list below also has a "Debt minimum" badge).
+    expect(
+      within(screen.getByRole('region', { name: 'Calendar' })).getByText('Debt minimum'),
+    ).toBeTruthy()
 
     await userEvent.click(days.getByRole('button', { name: /^Friday,? 13 November/ }))
     const payday = await screen.findByRole('dialog', { name: /13 November/ })

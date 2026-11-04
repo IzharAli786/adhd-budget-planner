@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { etsyUrl } from '../../lib/demo'
+import { textLinkClass } from '../../ui/Button'
+import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
 
 /**
@@ -26,10 +28,10 @@ export function DemoBanner() {
           href={etsyUrl()}
           target="_blank"
           rel="noopener"
-          className="inline-flex min-h-11 items-center gap-1 rounded-full px-1 font-medium text-accent"
+          className={cx(textLinkClass, 'inline-flex min-h-11 items-center gap-1')}
         >
           Get the full app on Etsy
-          <Icon name="external" size={14} />
+          <Icon name="external" size={14} className="shrink-0" />
         </a>
       </p>
     </div>

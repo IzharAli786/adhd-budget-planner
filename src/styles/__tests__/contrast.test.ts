@@ -58,7 +58,6 @@ function pairs(theme: string): Pair[] {
     ['dark: text on bg', DARK.text!, tok('d-bg')],
     ['dark: text on surface', DARK.text!, tok('d-surface')],
     ['dark: text on accent-soft', DARK.text!, tok('d-accent-soft')],
-    ['dark: text on danger-soft (danger button)', DARK.text!, DARK['danger-soft']!],
     ['dark: muted on bg', muted, tok('d-bg')],
     ['dark: muted on surface', muted, tok('d-surface')],
     ['dark: muted on accent-soft', muted, tok('d-accent-soft')],
@@ -73,7 +72,6 @@ function pairs(theme: string): Pair[] {
     ['text on bg', LIGHT.text!, tok('l-bg')],
     ['text on surface', LIGHT.text!, tok('l-surface')],
     ['text on accent-soft', LIGHT.text!, tok('l-accent-soft')],
-    ['text on danger-soft (danger button)', LIGHT.text!, LIGHT['danger-soft']!],
     ['muted on bg', LIGHT.muted!, tok('l-bg')],
     ['muted on surface', LIGHT.muted!, tok('l-surface')],
     ['muted on accent-soft', LIGHT.muted!, tok('l-accent-soft')],
@@ -86,10 +84,15 @@ function pairs(theme: string): Pair[] {
 }
 
 it('finds the neutral tokens it checks', () => {
-  for (const key of ['text', 'muted', 'accent-contrast', 'danger-soft'])
+  for (const key of ['text', 'muted', 'accent-contrast', 'control-border', 'toast-success'])
     expect(LIGHT[key]).toBeTruthy()
-  for (const key of ['text', 'muted', 'danger-soft']) expect(DARK[key]).toBeTruthy()
+  for (const key of ['text', 'muted', 'control-border', 'toast-success'])
+    expect(DARK[key]).toBeTruthy()
   expect(MIDNIGHT_MUTED).toBeTruthy()
+})
+
+it('has no danger-soft token: its job moved to the attention tone', () => {
+  expect(css).not.toMatch(/--(color-)?danger-soft/)
 })
 
 it.each([
@@ -187,5 +190,173 @@ describe.each(THEMES)('theme %s: chart colours stand out', (theme) => {
   ]
   it.each(cases)('%s', (_, fg, bg) => {
     expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+// Status tones (design spec §2.1): one light set and one dark set for every theme, with
+// Midnight's own neutral and control edge. Text pairs need 4.5:1; state edges and fills
+// that carry no words (unchecked box, switch knob, progress fill, focus ring) need 3:1.
+const TONES = ['neutral', 'progress', 'success', 'attention', 'info'] as const
+const block = (re: RegExp, what: string) => {
+  const body = re.exec(css)?.[1]
+  if (!body) throw new Error(`No ${what} block in app.css`)
+  return body
+}
+const DARK_MEDIA_BLOCK = block(
+  /@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-mode='light'\]\)\s*\{([^}]*)\}/,
+  'dark media',
+)
+const DARK_FORCED_BLOCK = block(
+  /:root\[data-mode='dark'\],\s*:root\[data-theme='midnight'\]\s*\{([^}]*)\}/,
+  'forced dark',
+)
+const MIDNIGHT = hexes(
+  /:root\[data-theme='midnight'\]\s*\{(\s*--muted:[^}]*)\}/.exec(css)?.[1],
+  'midnight override',
+)
+
+// color-mix(in oklab, a pct%, b): --track and --selected-bg are mixes, not hexes.
+function hexFromOklab([L, A, B]: [number, number, number]) {
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3
+  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3
+  const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3
+  const rgb = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ]
+  return `#${rgb
+    .map((c) => {
+      const v = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055
+      return Math.round(Math.min(1, Math.max(0, v)) * 255)
+        .toString(16)
+        .padStart(2, '0')
+    })
+    .join('')}`
+}
+const mix = (a: string, pct: number, b: string) => {
+  const [x, y] = [oklab(a), oklab(b)]
+  return hexFromOklab(
+    [0, 1, 2].map((i) => x[i]! * pct + y[i]! * (1 - pct)) as [number, number, number],
+  )
+}
+const declared = (body: string, name: string) =>
+  new RegExp(`--${name}:\\s*([^;]+);`).exec(body)?.[1]?.trim()
+
+it('mixes colours the way color-mix(in oklab) does', () => {
+  expect(mix('#000000', 0, '#ffffff')).toBe('#ffffff')
+  expect(mix('#000000', 1, '#ffffff')).toBe('#000000')
+  expect(mix('#3d6e8f', 0.5, '#3d6e8f')).toBe('#3d6e8f')
+})
+
+it('declares the --track and --selected-bg mixes the contrast checks assume', () => {
+  const light = block(/\n:root\s*\{([^}]*)\}/, 'light :root')
+  expect(declared(light, 'track')).toBe('color-mix(in oklab, var(--text) 10%, var(--surface))')
+  expect(declared(light, 'selected-bg')).toBe('var(--surface)')
+  for (const dark of [DARK_MEDIA_BLOCK, DARK_FORCED_BLOCK])
+    expect(declared(dark, 'selected-bg')).toBe(
+      'color-mix(in oklab, var(--text) 12%, var(--surface))',
+    )
+})
+
+it('declares every tone, the control edge and the toast check once per mode', () => {
+  const keys = [
+    ...TONES.flatMap((t) => ['fg', 'bg', 'border'].map((part) => `tone-${t}-${part}`)),
+    'control-border',
+    'toast-success',
+  ]
+  const pick = (palette: Record<string, string>) =>
+    Object.fromEntries(keys.map((k) => [k, palette[k]]))
+  for (const palette of [LIGHT, DARK, hexes(DARK_MEDIA_BLOCK, 'dark media')])
+    for (const k of keys) expect(palette[k], k).toMatch(/^#[0-9a-f]{6}$/i)
+  // The OS-dark block and the forced-dark block must never drift apart.
+  expect(pick(hexes(DARK_MEDIA_BLOCK, 'dark media'))).toEqual(pick(DARK))
+  // Midnight overrides its neutral and control edge (plus --muted), and cools the other
+  // tones' fills toward its navy; their text colours stay the shared dark set.
+  expect(Object.keys(MIDNIGHT).sort()).toEqual(
+    [
+      'control-border',
+      'muted',
+      'tone-attention-bg',
+      'tone-attention-border',
+      'tone-neutral-bg',
+      'tone-neutral-border',
+      'tone-neutral-fg',
+      'tone-progress-bg',
+      'tone-success-bg',
+      'tone-success-border',
+    ].sort(),
+  )
+})
+
+interface ToneMode {
+  mode: 'light' | 'dark'
+  palette: Record<string, string>
+  surface: string
+  bg: string
+  accent: string
+}
+function toneModes(theme: string): ToneMode[] {
+  const t = tokens(theme)
+  const dark: ToneMode = {
+    mode: 'dark',
+    palette: theme === 'midnight' ? { ...DARK, ...MIDNIGHT } : DARK,
+    surface: t['d-surface']!,
+    bg: t['d-bg']!,
+    accent: t['d-accent']!,
+  }
+  if (theme === 'midnight') return [dark]
+  const light: ToneMode = {
+    mode: 'light',
+    palette: LIGHT,
+    surface: t['l-surface']!,
+    bg: t['l-bg']!,
+    accent: t['l-accent']!,
+  }
+  return [light, dark]
+}
+
+describe.each(THEMES)('theme %s: status tones', (theme) => {
+  const text: Pair[] = []
+  const nonText: Pair[] = []
+  for (const { mode, palette, surface, bg, accent } of toneModes(theme)) {
+    const k = (name: string) => {
+      const v = palette[name]
+      if (!v) throw new Error(`${theme} ${mode} is missing --${name}`)
+      return v
+    }
+    for (const tone of TONES) {
+      const fg = k(`tone-${tone}-fg`)
+      const fill = k(`tone-${tone}-bg`)
+      text.push(
+        // Badge text, and (fg on surface) the surface-coloured tick on a solid tone fill.
+        [`${mode}: ${tone} on its own fill`, fg, fill],
+        [`${mode}: ${tone} on surface`, fg, surface],
+        [`${mode}: ${tone} on bg`, fg, bg],
+        // Notice body text and captions sit on the tone fills.
+        [`${mode}: text on the ${tone} fill`, k('text'), fill],
+        [`${mode}: muted on the ${tone} fill`, k('muted'), fill],
+      )
+    }
+    text.push([`${mode}: success check on the inverted toast`, k('toast-success'), k('text')])
+    const control = k('control-border')
+    nonText.push(
+      [`${mode}: control edge on surface`, control, surface],
+      // Also the selected segment's ring on its track (the track is bg); the lifted fill
+      // inside it is a bonus, not the cue.
+      [`${mode}: control edge on bg`, control, bg],
+      [`${mode}: control edge on the neutral fill`, control, k('tone-neutral-bg')],
+      // Text fields (inputClass) use the same edge, so a field is findable in a dark sheet.
+      [`${mode}: text field edge on surface`, control, surface],
+      [`${mode}: text field edge on bg`, control, bg],
+      [`${mode}: accent fill on the progress track`, accent, mix(k('text'), 0.1, surface)],
+      [`${mode}: toast focus ring (page colour) on the toast`, bg, k('text')],
+    )
+  }
+  it.each(text)('%s is 4.5:1', (_, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+  it.each(nonText)('%s is 3:1', (_, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(3)
   })
 })

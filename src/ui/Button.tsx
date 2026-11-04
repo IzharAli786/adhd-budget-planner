@@ -12,14 +12,7 @@ import { Icon, type IconName } from './Icon'
  * - quiet: a compact muted action ("Not now", "Rename", first-step "Delete" + trash).
  * - danger: only the confirm step of a destructive action, always with icon="trash".
  */
-export type ButtonVariant =
-  | 'primary'
-  | 'secondary'
-  | 'pill'
-  | 'ghost'
-  | 'text'
-  | 'quiet'
-  | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'pill' | 'ghost' | 'text' | 'quiet' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 /** The icon size that sits in each button size (Icon's optical scale). */
@@ -42,7 +35,8 @@ const BASE =
 
 // sm is 36px to look at; the invisible band above and below makes the target 44px. It
 // stays on one line; md and lg may wrap a long label at 150% text instead of overflowing.
-const SM_HIT = "whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+const SM_HIT =
+  "whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
 const SIZE: Record<ButtonSize, string> = {
   sm: `h-9 min-w-11 gap-1.5 px-3.5 text-sm font-semibold ${SM_HIT}`,
   md: 'min-h-11 min-w-11 gap-2 px-5 text-center text-body font-medium',

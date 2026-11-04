@@ -70,7 +70,13 @@ describe('Backup: erase everything', () => {
 describe('Backup: save this year as a file', () => {
   it('offers the full backup named for the year', async () => {
     render(<App />)
-    const link = await screen.findByRole('link', { name: 'Save this year as a file' })
+    // The archive is a full export through fake IndexedDB; on a loaded machine that can
+    // take longer than findBy's default second, while the button still says "Preparing…".
+    const link = await screen.findByRole(
+      'link',
+      { name: 'Save this year as a file' },
+      { timeout: 5000 },
+    )
     expect(link.getAttribute('download')).toBe(archiveFileName('2026'))
     expect(archiveFileName('2026')).toBe('steady-2026-archive.json')
   })

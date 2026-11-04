@@ -47,9 +47,11 @@ export function StatusBadge({
   icon?: boolean
   className?: string
 }) {
-  return createElement(
-    Badge,
-    { tone: status.tone, icon: icon ? status.icon : undefined, size, className },
-    status.label,
-  )
+  return createElement(Badge, {
+    tone: status.tone,
+    icon: icon ? status.icon : undefined,
+    size,
+    className,
+    children: status.label,
+  })
 }

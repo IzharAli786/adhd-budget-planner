@@ -22,7 +22,7 @@ export function GardenCard() {
         <p className="eyebrow text-muted">
           Stage {stage.index + 1} of {GARDEN_STAGES.length}
         </p>
-        <h2 id="garden-title" className="mt-0.5 text-heading">
+        <h2 id="garden-title" className="mt-0.5 card-title">
           {stage.name}
         </h2>
         <p className="mx-auto mt-1 max-w-xs text-body text-muted">

@@ -14,7 +14,10 @@ import { parseISODate } from '../../domain/dates'
 import { dateTimeFormat } from '../../domain/intl'
 import { fundSaved } from '../../domain/savings'
 import type { ISODate, LifeGoal, LifeGoalStatus } from '../../domain/types'
+import { buttonClass, textLinkClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
+import { Icon, type IconName } from '../../ui/Icon'
+import { GOAL_STATUS, StatusBadge } from '../../ui/status'
 import { useFormat } from '../bills/format'
 import { useDebtsOwed } from '../debts/useDebtsOwed'
 import type { TodayModel } from './useTodayModel'
@@ -168,7 +171,7 @@ export function GlanceTiles({
       className={cx('grid gap-4 @xl/today:grid-cols-3', loading && 'animate-pulse')}
     >
       <Tile
-        tone="sage"
+        status={short ? 'short' : 'safe'}
         label={`${name} ${short ? 'short by' : 'safe to spend'}`}
         value={f.money(Math.abs(plan.safe.total))}
         hidden={loading}
@@ -187,35 +190,50 @@ export function GlanceTiles({
   )
 }
 
-// The first tile's label is muted like the others, tinted toward the tile's green and
-// pulled a little toward the text colour: at least 5.4:1 on the green tile in every theme,
-// light and dark (plain muted grey dips under 4.5:1 there in dark mode).
-const SAGE_LABEL =
-  'text-[color-mix(in_oklab,color-mix(in_oklab,var(--env-sage)_35%,var(--muted))_85%,var(--text))]'
+// One tinted tile in the row: safe to spend (or short by) carries a status tone, a glyph
+// and its words; the other two stay quiet so the eye lands on the one that matters.
+const TILE_STATUS: Record<'safe' | 'short', { frame: string; label: string; icon: IconName }> = {
+  safe: {
+    frame: 'rounded-3xl bg-tone-success-bg ring-1 ring-tone-success-line ring-inset',
+    label: 'text-tone-success',
+    icon: 'leaf',
+  },
+  short: {
+    frame: 'rounded-3xl bg-tone-attention-bg ring-1 ring-tone-attention-line ring-inset',
+    label: 'text-tone-attention',
+    icon: 'alert',
+  },
+}
 
 function Tile({
   label,
   value,
-  tone,
+  status,
   hidden,
 }: {
   label: string
   value: string
-  tone?: 'sage'
+  /** Safe to spend or short by: the one tinted tile. The others are quiet cards. */
+  status?: 'safe' | 'short'
   hidden: boolean
 }) {
+  const tinted = status ? TILE_STATUS[status] : null
   return (
     <li
       className={cx(
         // Each tile is a container, so its number shrinks with the tile (cqi) and never clips.
-        '@container rounded-3xl px-5 py-4 @4xl/today:px-6',
-        tone === 'sage'
-          ? 'bg-[color-mix(in_oklab,var(--env-sage)_13%,var(--surface))]'
-          : 'bg-[color-mix(in_oklab,var(--accent-soft)_75%,var(--surface))]',
+        '@container px-5 py-4 @4xl/today:px-6',
+        tinted ? tinted.frame : 'card-quiet',
       )}
     >
       <div className={cx(hidden && 'invisible')}>
-        <p className={cx('text-caption font-medium', tone === 'sage' ? SAGE_LABEL : 'text-muted')}>
+        <p
+          className={cx(
+            'text-caption font-medium',
+            tinted ? cx('flex items-center gap-1.5', tinted.label) : 'text-muted',
+          )}
+        >
+          {tinted && <Icon name={tinted.icon} size={14} className="shrink-0" />}
           {label}
         </p>
         <p className="mt-1 font-display text-[clamp(1.25rem,16cqi,2rem)] leading-tight font-semibold tracking-tight whitespace-nowrap">
@@ -226,23 +244,10 @@ function Tile({
   )
 }
 
-const STATUS_LABEL: Record<LifeGoalStatus, string> = {
-  todo: 'Not started',
-  doing: 'In progress',
-  done: 'Done',
-}
 const NEXT_STATUS: Record<LifeGoalStatus, LifeGoalStatus> = {
   todo: 'doing',
   doing: 'done',
   done: 'todo',
-}
-// "In progress" is a warm amber tint; its text is pulled toward the body colour so it
-// passes AA on the tint in both modes. "Not started" stays neutral.
-const PILL: Record<LifeGoalStatus, string> = {
-  todo: 'bg-bg text-muted ring-1 ring-line',
-  doing:
-    'bg-[color-mix(in_oklab,var(--env-amber)_18%,var(--surface))] text-[color-mix(in_oklab,var(--env-amber)_76%,var(--text))]',
-  done: 'bg-[color-mix(in_oklab,var(--env-sage)_16%,var(--surface))] text-text',
 }
 const SHOW_GOALS = 4
 
@@ -283,7 +288,10 @@ export function GoalsInMotion({ goals }: { goals: readonly LifeGoal[] | undefine
     const next = NEXT_STATUS[goal.status]
     const hadFocus = document.activeElement === button
     await setLifeGoalStatus(goal.id, next)
-    undoToast(`${goal.title}: ${STATUS_LABEL[next].toLowerCase()}`)
+    undoToast(
+      `${goal.title}: ${GOAL_STATUS[next].label.toLowerCase()}`,
+      next === 'done' ? { tone: 'success' } : undefined,
+    )
     if (!hadFocus) return
     // A done goal leaves the list: focus the next goal's pill, else the one before it,
     // else the heading. Otherwise the pill stays focused as its row moves up.
@@ -303,7 +311,7 @@ export function GoalsInMotion({ goals }: { goals: readonly LifeGoal[] | undefine
       {open.length === 0 ? (
         <p className="card-quiet px-6 py-5 text-body text-muted">
           Nothing on the go yet. What’s one thing this money is for?{' '}
-          <Link to="/goals" className="font-medium text-accent">
+          <Link to="/goals" className={textLinkClass}>
             Add a goal
           </Link>
         </p>
@@ -311,7 +319,7 @@ export function GoalsInMotion({ goals }: { goals: readonly LifeGoal[] | undefine
         <ul className="card divide-y divide-line px-5 py-2 @xl/today:px-6 @xl/today:py-5">
           {open.slice(0, SHOW_GOALS).map((g, i) => (
             <li key={g.id} className="flex min-h-11 items-center gap-3 @xl/today:gap-4">
-              {/* The pill is small to look at; the button around it is the 44px target. */}
+              {/* The badge is small to look at; the button around it is the 44px target. */}
               <button
                 type="button"
                 ref={(el) => {
@@ -319,22 +327,28 @@ export function GoalsInMotion({ goals }: { goals: readonly LifeGoal[] | undefine
                   else pills.current.delete(g.id)
                 }}
                 onClick={(e) => void cycle(g, i, e.currentTarget)}
-                aria-label={`${g.title}: ${STATUS_LABEL[g.status]}. Change status`}
+                aria-label={`${g.title}: ${GOAL_STATUS[g.status].label}. Change status`}
                 className="group inline-flex min-h-11 shrink-0 items-center rounded-full"
               >
-                <span
-                  className={cx(
-                    'inline-flex min-h-7 items-center rounded-full px-3 text-xs font-semibold whitespace-nowrap transition-[filter] group-hover:brightness-95',
-                    PILL[g.status],
-                  )}
-                >
-                  {STATUS_LABEL[g.status]}
+                {/* md where there's room; sm on a phone, so the goal's name isn't cut. */}
+                <span className="inline-flex @xl/today:hidden">
+                  <StatusBadge
+                    status={GOAL_STATUS[g.status]}
+                    className="transition-[filter] group-hover:brightness-95"
+                  />
+                </span>
+                <span className="hidden @xl/today:inline-flex">
+                  <StatusBadge
+                    status={GOAL_STATUS[g.status]}
+                    size="md"
+                    className="transition-[filter] group-hover:brightness-95"
+                  />
                 </span>
               </button>
               <span className="min-w-0 flex-1 truncate text-body">{g.title}</span>
               {g.targetDate && (
-                // Set in from the edge where there's room: a date to note, not an amount.
-                <span className="shrink-0 text-caption font-medium text-muted tabular-nums @xl/today:pr-6">
+                // On the same right edge as Coming up's amounts.
+                <span className="shrink-0 text-caption font-medium text-muted tabular-nums">
                   {shortDay(g.targetDate)}
                 </span>
               )}
@@ -348,7 +362,7 @@ export function GoalsInMotion({ goals }: { goals: readonly LifeGoal[] | undefine
 
 /**
  * A section title in the display face, with one outlined pill link on the right. The pill
- * is slim to look at; a taller invisible band around it keeps the 44px tap target.
+ * is 36px to look at; the band from Button's sm size keeps the 44px tap target.
  */
 export function Header({
   id,
@@ -366,19 +380,12 @@ export function Header({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2
-        id={id}
-        ref={headingRef}
-        tabIndex={headingRef ? -1 : undefined}
-        className="type-display text-[1.25rem] leading-tight @xl/today:text-[1.375rem]"
-      >
+      <h2 id={id} ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="section-title">
         {title}
       </h2>
-      <Link
-        to={to}
-        className="relative inline-flex h-[2.125rem] shrink-0 items-center rounded-full bg-surface px-3.5 text-caption font-semibold whitespace-nowrap shadow-card ring-1 ring-line transition-colors before:absolute before:inset-x-0 before:-inset-y-[0.3125rem] before:content-[''] hover:bg-accent-soft"
-      >
+      <Link to={to} className={buttonClass('pill', 'sm')}>
         {cta}
+        <Icon name="chevron" size={16} className="shrink-0" />
       </Link>
     </div>
   )

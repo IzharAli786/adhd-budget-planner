@@ -8,8 +8,9 @@ import type {
   WeekendRule,
 } from '../../domain/types'
 import { DateInput } from '../../ui/DateInput'
-import { Field, inputClass } from '../../ui/Field'
-import { Icon } from '../../ui/Icon'
+import { Button } from '../../ui/Button'
+import { Field, FieldError, inputClass } from '../../ui/Field'
+import { IconButton } from '../../ui/IconButton'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { Segmented } from '../../ui/Segmented'
 import { Switch } from '../../ui/Switch'
@@ -220,26 +221,27 @@ export function IncomeForm({ id, income, showPrimary, today, onSubmit }: IncomeF
                 />
               </div>
               {d.expected.length > 1 && (
-                <button
-                  type="button"
+                <IconButton
+                  icon="close"
+                  tone="danger"
+                  size="sm"
+                  label={`Remove payday ${i + 1}`}
                   onClick={() => set({ expected: d.expected.filter((_, j) => j !== i) })}
-                  aria-label={`Remove payday ${i + 1}`}
-                  className="mb-0.5 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60"
-                >
-                  <Icon name="close" size={18} />
-                </button>
+                  className="mb-0.5"
+                />
               )}
             </div>
           ))}
-          {shown.schedule && <p className="text-sm font-medium text-accent">{shown.schedule}</p>}
-          <button
-            type="button"
+          {shown.schedule && <FieldError>{shown.schedule}</FieldError>}
+          <Button
+            variant="text"
+            size="sm"
+            bleed
+            icon="plus"
             onClick={() => set({ expected: [...d.expected, d.expected.at(-1) ?? today] })}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-accent hover:bg-accent-soft/60"
           >
-            <Icon name="plus" size={16} />
             Add a date
-          </button>
+          </Button>
         </fieldset>
       )}
 

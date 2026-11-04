@@ -1,21 +1,26 @@
 import type { SafeToSpend } from '../../domain/safeToSpend'
 import type { ISODate } from '../../domain/types'
-import { envelopeColor } from '../../ui/EnvelopeDot'
+import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
+import { DATA_COLOR, tint } from '../../ui/dataColors'
+import { envelopeColor } from '../../ui/EnvelopeDot'
+import { Icon } from '../../ui/Icon'
 import type { Formatters } from '../bills/format'
 import { percentLabel, percents } from '../home/percents'
 
-const BILLS = 'var(--env-rose)'
-const SPENT = 'var(--env-amber)'
-const IN = 'var(--env-sage)'
-const ENVELOPES = 'var(--env-amber)'
-const DEBT = 'var(--env-rose)'
-const SAVINGS = 'var(--env-ocean)'
-const SAFE_LINE = 'var(--env-sage)'
-const tint = (color: string, pct = 16) => `color-mix(in oklab, ${color} ${pct}%, var(--surface))`
+// Data colours (ui/dataColors): the same kind of money is the same colour on every chart.
+const BILLS = DATA_COLOR.bills
+const SPENT = DATA_COLOR.spending
+const IN = DATA_COLOR.in
+/** Money out as one series (bills plus spending), as on the yearly review's In/Out chart. */
+const OUT = DATA_COLOR.out
+const ENVELOPES = DATA_COLOR.envelopes
+const DEBT = DATA_COLOR.debt
+const SAVINGS = DATA_COLOR.savings
+const SAFE_LINE = DATA_COLOR.free
 const SAFE_FILL = tint(SAFE_LINE)
 /** The empty part of a track: neutral, so it never reads as one of the coloured parts. */
-const TRACK = 'color-mix(in oklab, var(--text) 7%, var(--surface))'
+const TRACK = 'var(--track)'
 
 const colorOf = (d: { id: string; color?: string }) =>
   d.id === 'bills' ? BILLS : d.id === 'spending' ? SPENT : envelopeColor(d.color)
@@ -73,7 +78,7 @@ export function IncomeVsSpending({
       label: 'Money out',
       amount: moneyOut,
       done: past ? moneyOut : clamp(outSoFar, moneyOut),
-      color: SPENT,
+      color: OUT,
       hint: `Bills ${f.money(safe.bills)} · spending ${f.money(spent)}`,
     },
   ]
@@ -101,12 +106,19 @@ export function IncomeVsSpending({
                     backgroundColor: r.color,
                   }}
                 />
+                {/* Still to come: a lighter body with a dashed edge in the series colour
+                    (as "Still free" and the planned bars are drawn), so its edge is 3:1
+                    against the track even when the whole bar is still to come. */}
                 {toCome > 0 && (
                   <div
-                    className="h-full rounded-r-full"
+                    className={cx(
+                      'h-full border-[1.5px] border-dashed',
+                      r.done > 0 ? 'rounded-r-full border-l-0' : 'rounded-full',
+                    )}
                     style={{
                       width: `${(toCome / scale) * 100}%`,
-                      backgroundColor: tint(r.color, 45),
+                      backgroundColor: tint(r.color, 35),
+                      borderColor: r.color,
                     }}
                   />
                 )}
@@ -197,7 +209,7 @@ export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters })
               style={{ backgroundColor: colorOf(r) }}
             />
             <span className="min-w-0 flex-1 truncate text-body">{r.name}</span>
-            <span className="shrink-0 font-display text-body font-semibold">
+            <span className="shrink-0 amount text-body">
               {f.money(r.amount)} · {percentLabel(r.amount, pct[i]!)}
             </span>
           </li>
@@ -254,9 +266,16 @@ export function LeftToSpendBar({
   return (
     <div>
       <p className="flex flex-wrap items-baseline gap-x-2.5">
+        {/* A status, so a status tone: success when there is room, attention (and a glyph)
+            when short. The word beside it says which, so colour is never the only cue. */}
+        {short && (
+          <Icon name="alert" size={20} className="shrink-0 self-center text-tone-attention" />
+        )}
         <span
-          className="type-display text-[2.25rem] leading-tight tabular-nums"
-          style={short ? undefined : { color: SAFE_LINE }}
+          className={cx(
+            'type-display text-[2.25rem] leading-tight tabular-nums',
+            short ? 'text-tone-attention' : 'text-tone-success',
+          )}
         >
           {f.money(Math.abs(safe.total))}
         </span>
@@ -318,13 +337,16 @@ export function LeftToSpendBar({
         {past ? 'what’s left over' : 'safe to spend'}.
       </p>
       {onSeeMath && (
-        <button
-          type="button"
+        <Button
+          variant="text"
+          size="sm"
+          bleed
+          iconEnd="chevron"
           onClick={onSeeMath}
-          className="-mx-2 mt-2 min-h-11 rounded-full px-2 text-sm font-medium text-accent hover:bg-accent-soft/60"
+          className="mt-2"
         >
           See the math
-        </button>
+        </Button>
       )}
     </div>
   )

@@ -6,9 +6,9 @@ import { moneyFor } from '../../domain/today'
 import type { ISODate } from '../../domain/types'
 import { useNow } from '../../lib/useNow'
 import { useToday } from '../../lib/useToday'
-import { buttonClass } from '../../ui/Button'
+import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { Icon } from '../../ui/Icon'
+import { IconButton } from '../../ui/IconButton'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { useFormat } from '../bills/format'
 import { PaydayNote } from '../notes/PaydayNote'
@@ -17,13 +17,6 @@ import { IncomeVsSpending, LeftToSpendBar, SpendingDonut } from '../plan/MoneySh
 import { MathSheet } from '../today/MathSheet'
 import { useTodayModel } from '../today/useTodayModel'
 import { periodNav } from './periodNav'
-
-// aria-disabled, not disabled: an arrow that runs out while focused keeps the focus.
-const navButton =
-  'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-accent hover:bg-accent-soft/60 aria-disabled:cursor-default aria-disabled:text-muted aria-disabled:opacity-40 aria-disabled:hover:bg-transparent'
-
-/** A section title over its card, the same on every Home block. */
-const sectionTitle = 'px-1 type-display text-[1.375rem] leading-tight'
 
 // Home (Full mode): pick any month (or pay period) and see its whole picture as charts.
 // The same engine as Today's hero, so the current period here can never disagree with it.
@@ -87,23 +80,23 @@ export function HomeScreen() {
         </EmptyState>
       ) : (
         <div className="@container space-y-10">
+          {/* Three columns, the outer two equal, so the title sits in the true centre. */}
           <nav
             aria-label={month ? 'Months' : 'Pay periods'}
-            className="card-quiet -mt-2 flex items-center gap-1 p-1.5 @sm:gap-2"
+            className="card-quiet -mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-1 p-1.5"
           >
-            <button
-              type="button"
-              className={navButton}
-              aria-label={month ? 'Previous month' : 'Previous pay period'}
+            {/* aria-disabled, not disabled: an arrow that runs out while focused keeps the focus. */}
+            <IconButton
+              icon="back"
+              label={month ? 'Previous month' : 'Previous pay period'}
               aria-disabled={!nav.prev}
               onClick={() => nav.prev && setAt(nav.prev.start)}
-            >
-              <Icon name="back" size={20} />
-            </button>
+              className="justify-self-start"
+            />
             <p
               ref={labelRef}
               tabIndex={-1}
-              className="min-w-0 flex-1 rounded-full text-center type-display text-heading @xl:text-[1.375rem]"
+              className="min-w-0 rounded-full text-center type-display text-heading @xl:text-[1.375rem]"
               aria-live="polite"
             >
               {dates ? (
@@ -115,32 +108,29 @@ export function HomeScreen() {
                 name
               )}
             </p>
-            <button
-              type="button"
-              className={navButton}
-              aria-label={month ? 'Next month' : 'Next pay period'}
-              aria-disabled={!nav.next}
-              onClick={() => nav.next && setAt(nav.next.start)}
-            >
-              <Icon name="chevron" size={20} />
-            </button>
-            {/* Always there, so nothing shifts when it shows; hidden while on this period. */}
-            <button
-              type="button"
-              onClick={backToNow}
-              disabled={current}
-              aria-hidden={current || undefined}
-              className={cx(
-                'min-h-11 shrink-0 rounded-full px-3 text-sm font-medium whitespace-nowrap text-accent hover:bg-accent-soft/60',
-                current && 'invisible',
-              )}
-            >
-              {month ? 'This month' : 'Now'}
-            </button>
+            <div className="flex items-center justify-end gap-1">
+              {/* Always there, so nothing shifts when it shows; hidden while on this period. */}
+              <Button
+                variant="text"
+                size="sm"
+                onClick={backToNow}
+                disabled={current}
+                aria-hidden={current || undefined}
+                className={cx(current && 'invisible')}
+              >
+                {month ? 'This month' : 'Now'}
+              </Button>
+              <IconButton
+                icon="chevron"
+                label={month ? 'Next month' : 'Next pay period'}
+                aria-disabled={!nav.next}
+                onClick={() => nav.next && setAt(nav.next.start)}
+              />
+            </div>
           </nav>
 
           {!span || !money ? (
-            <p className="px-1 text-body text-muted">
+            <p className="text-body text-muted">
               Nothing to show for these dates. “Now” goes back to this pay period.
             </p>
           ) : (
@@ -213,7 +203,7 @@ export function HomeScreen() {
 function Block({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="space-y-4">
-      <h2 id={id} className={sectionTitle}>
+      <h2 id={id} className="section-title">
         {title}
       </h2>
       {children}

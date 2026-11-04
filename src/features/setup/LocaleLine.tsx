@@ -3,6 +3,7 @@ import { useAppSettings } from '../../app/SettingsProvider'
 import { CURRENCY_CODES, currencyDecimals } from '../../domain/currencies'
 import { currencySymbol, displayNames } from '../../domain/intl'
 import { weekStartForLocale } from '../../domain/locale'
+import { Button } from '../../ui/Button'
 import { Field, inputClass } from '../../ui/Field'
 
 // Formats people pick most; the device's own locale is always added on top.
@@ -35,14 +36,15 @@ export function LocaleLine() {
           {displayName('currency', settings.currency)} ({symbol}) ·{' '}
           {displayName('language', settings.locale)}
         </p>
-        <button
-          type="button"
+        <Button
+          variant="text"
+          size="sm"
+          bleed
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="min-h-11 shrink-0 rounded-full px-2 text-sm font-medium text-accent"
         >
           {open ? 'Done' : 'Change'}
-        </button>
+        </Button>
       </div>
       {open && (
         <div className="pt-1 pb-3">

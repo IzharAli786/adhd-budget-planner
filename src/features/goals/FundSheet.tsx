@@ -152,7 +152,7 @@ function FundForm({
       )}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
         {fund ? (
-          <Button variant="ghost" className="text-muted" onClick={() => void remove()}>
+          <Button variant="quiet" icon="trash" onClick={() => void remove()}>
             Delete fund
           </Button>
         ) : (
@@ -172,7 +172,7 @@ function FundForm({
             <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
               Keep it
             </Button>
-            <Button variant="danger" onClick={() => void remove()}>
+            <Button variant="danger" icon="trash" onClick={() => void remove()}>
               Delete
             </Button>
           </>

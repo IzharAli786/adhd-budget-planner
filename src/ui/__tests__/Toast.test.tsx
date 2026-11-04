@@ -66,3 +66,76 @@ it('the region moves to the top when the focused field would be covered', () => 
   expect(region.className).toMatch(/top-/)
   expect(region.className).not.toMatch(/bottom-/)
 })
+
+function ToneShower({ tone, action }: { tone?: 'neutral' | 'success'; action?: boolean }) {
+  const toast = useToast()
+  return (
+    <button
+      onClick={() =>
+        toast.show({
+          message: 'Marked paid',
+          tone,
+          action: action ? { label: 'Undo', onAction: () => {} } : undefined,
+        })
+      }
+    >
+      Show
+    </button>
+  )
+}
+
+describe('toast look', () => {
+  it('a success toast leads with a check; a neutral one has none', () => {
+    const { unmount } = render(
+      <ToastProvider>
+        <ToneShower tone="success" />
+      </ToastProvider>,
+    )
+    fireEvent.click(screen.getByText('Show'))
+    const toast = screen.getByText('Marked paid').parentElement!
+    expect(toast.classList.contains('toast')).toBe(true)
+    expect(toast.firstElementChild?.tagName.toLowerCase()).toBe('svg')
+    unmount()
+    render(
+      <ToastProvider>
+        <ToneShower />
+      </ToastProvider>,
+    )
+    fireEvent.click(screen.getByText('Show'))
+    expect(screen.getByText('Marked paid').parentElement!.firstElementChild?.tagName).toBe('P')
+  })
+
+  it('without an action it offers a labelled Dismiss that closes it', () => {
+    render(
+      <ToastProvider>
+        <ToneShower />
+      </ToastProvider>,
+    )
+    fireEvent.click(screen.getByText('Show'))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByText('Marked paid')).toBeNull()
+  })
+
+  it('the action is a pill that runs and closes the toast', () => {
+    render(
+      <ToastProvider>
+        <ToneShower action />
+      </ToastProvider>,
+    )
+    fireEvent.click(screen.getByText('Show'))
+    const undo = screen.getByRole('button', { name: 'Undo' })
+    expect(undo.className).toMatch(/rounded-full/)
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull()
+    fireEvent.click(undo)
+    expect(screen.queryByText('Marked paid')).toBeNull()
+  })
+
+  it('from md up it sits at the bottom-right of the content column', () => {
+    render(
+      <ToastProvider>
+        <ToneShower />
+      </ToastProvider>,
+    )
+    expect(screen.getByRole('status').className).toMatch(/md:items-end/)
+  })
+})

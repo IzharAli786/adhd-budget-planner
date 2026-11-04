@@ -196,10 +196,17 @@
 }
 :root[data-theme='midnight'] {
   --muted: #a3acc2;
-  /* Neutral leans to Midnight's blue-grey; the other tones are the shared dark set. */
+  /* Neutral leans to Midnight's blue-grey. The other tones keep the shared dark text
+     colours, but their fills cool toward the navy, so a tinted tile reads as green or
+     brick on Midnight rather than as an olive or brown patch. */
   --tone-neutral-fg: #c5ccdb;
   --tone-neutral-bg: #283149;
   --tone-neutral-border: #3b4766;
+  --tone-progress-bg: #3a3022;
+  --tone-success-bg: #1a3833;
+  --tone-success-border: #2a5148;
+  --tone-attention-bg: #3f2230;
+  --tone-attention-border: #5e3445;
   --control-border: #7c87a0;
 }
 
@@ -453,10 +460,15 @@ select:focus-visible,
 textarea:focus-visible {
   outline-offset: 0;
 }
-/* Box-like inputs (checkbox, radio) keep a gap between the box and the ring. */
+/*
+ * Box-like inputs (checkbox, radio) keep a gap between the box and the ring, and keep
+ * their own box-shadow: their edge and a checked radio's dot are ring utilities, which
+ * the halo above would otherwise replace (a focused, checked radio looked empty).
+ */
 input[type='checkbox']:focus-visible,
 input[type='radio']:focus-visible {
   outline-offset: 2px;
+  box-shadow: revert-layer;
 }
 /* An invalid field says so in its focus ring too, not only in its border. */
 [aria-invalid='true']:focus-visible {
@@ -628,11 +640,24 @@ dialog.sheet[open] {
     --chart-4: #a35a35;
     --chart-5: #7a6524;
     --chart-6: #5b6573;
+    /* The light tone set, whatever mode is on screen: a badge prints dark on light. */
     --tone-neutral-fg: #57524b;
+    --tone-neutral-bg: #f1eee9;
+    --tone-neutral-border: #ddd8d0;
     --tone-progress-fg: #7c4a0b;
+    --tone-progress-bg: #fcefd9;
+    --tone-progress-border: #f0d3a1;
     --tone-success-fg: #2b6a40;
+    --tone-success-bg: #e3f1e6;
+    --tone-success-border: #b8dbc1;
     --tone-attention-fg: #a2372b;
+    --tone-attention-bg: #fde7e2;
+    --tone-attention-border: #f3c1b6;
     --tone-info-fg: #285c88;
+    --tone-info-bg: #e2edf7;
+    --tone-info-border: #b9d3ea;
+    --control-border: #8a857d;
+    --selected-bg: #ffffff;
     --track: #e8e8e8;
     color-scheme: light;
   }

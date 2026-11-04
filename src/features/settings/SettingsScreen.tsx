@@ -29,6 +29,7 @@ import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Field, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
+import { IconTile } from '../../ui/IconTile'
 import { ListGroup, ListRow } from '../../ui/List'
 import { PageHeader } from '../../ui/PageHeader'
 import { Segmented } from '../../ui/Segmented'
@@ -470,7 +471,7 @@ function ThemeSwatch({
             className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full shadow-sm"
             style={{ background: 'var(--l-accent)', color: 'var(--l-surface)' }}
           >
-            <Icon name="check" size={13} strokeWidth={2.75} />
+            <Icon name="check" size={14} weight="bold" />
           </span>
         )}
       </span>
@@ -563,14 +564,7 @@ function StorageCard() {
       <h2 className="px-1 eyebrow text-muted">Storage</h2>
       <div className="card p-5">
         <div className="flex items-start gap-3">
-          <span
-            className={cx(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-              status.persisted ? 'bg-accent text-accent-contrast' : 'bg-accent-soft text-accent',
-            )}
-          >
-            <Icon name={status.persisted ? 'check' : 'shield'} size={19} />
-          </span>
+          <IconTile icon="shield" tone={status.persisted ? 'success' : 'neutral'} />
           <div className="min-w-0 flex-1">
             <p className="font-medium">
               {status.persisted ? 'Protected storage is on' : 'Storage can be cleared'}

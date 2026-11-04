@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { paidShare } from '../../domain/debt'
 import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
+import { DATA_COLOR } from '../../ui/dataColors'
+import { Notice } from '../../ui/Notice'
 import { EmptyState } from '../../ui/PageHeader'
-import { Icon } from '../../ui/Icon'
+import { ProgressBar } from '../../ui/Progress'
+import { StatusBadge, TAG } from '../../ui/status'
 import { useFormat } from '../bills/format'
 import { DebtEditor, type DebtEditorTarget } from './DebtEditor'
 import { PayoffPlan } from './PayoffPlan'
@@ -35,8 +38,7 @@ export function DebtsSection() {
           art="path"
           title="No debts added"
           action={
-            <Button onClick={() => setEditing({})}>
-              <Icon name="plus" size={18} />
+            <Button icon="plus" onClick={() => setEditing({})}>
               Add a debt
             </Button>
           }
@@ -51,16 +53,13 @@ export function DebtsSection() {
               <DebtRow key={d.id} debt={d} onEdit={() => setEditing({ debt: asOwed(d) })} />
             ))}
           </ul>
-          <Button variant="secondary" block onClick={() => setEditing({})}>
-            <Icon name="plus" size={18} />
+          <Button variant="secondary" block icon="plus" onClick={() => setEditing({})}>
             Add a debt
           </Button>
           {owing ? (
             <PayoffPlan debts={debts} today={today} />
           ) : (
-            <p className="rounded-3xl bg-accent-soft/60 px-5 py-4 text-body">
-              Everything here is paid off. Nice work.
-            </p>
+            <Notice tone="success">Everything here is paid off. Nice work.</Notice>
           )}
         </>
       )}
@@ -87,20 +86,20 @@ function DebtRow({ debt, onEdit }: { debt: OwedDebt; onEdit: () => void }) {
           <span className="min-w-0 flex-1 font-medium break-words">{debt.name}</span>
           <span className="ml-auto font-semibold tabular-nums">{f.money(debt.owed)}</span>
         </span>
-        <span className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-sm text-muted">
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <span className="min-w-0 flex-1">
             {f.percent(debt.aprBps / 10_000)} APR · {f.money(debt.minPayment)} on the{' '}
             {f.ordinal(debt.dueDay)}
           </span>
-          <span className="ml-auto tabular-nums">
-            {debt.owed === 0 ? 'Paid off' : `${f.percent(pct / 100)} paid`}
-          </span>
+          {debt.owed === 0 ? (
+            <StatusBadge status={TAG.paidOff} className="ml-auto" />
+          ) : (
+            <span className="ml-auto tabular-nums">{f.percent(pct / 100)} paid</span>
+          )}
         </span>
-        <span aria-hidden="true" className="mt-3 block h-1.5 overflow-hidden rounded-full bg-bg">
-          <span
-            className="block h-full rounded-full bg-accent transition-[width] duration-500"
-            style={{ width: `${pct}%` }}
-          />
+        {/* Decorative: the row already says how much is paid, in words. */}
+        <span aria-hidden="true" className="mt-3 block">
+          <ProgressBar value={pct / 100} label={`${debt.name} paid off`} color={DATA_COLOR.debt} />
         </span>
       </button>
     </li>

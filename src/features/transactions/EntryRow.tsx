@@ -2,8 +2,9 @@ import { useUndoToast } from '../../app/useUndoToast'
 import { deleteTransaction } from '../../db/repos'
 import { txKind } from '../../domain/safeToSpend'
 import type { Transaction } from '../../domain/types'
+import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { Icon } from '../../ui/Icon'
+import { IconButton } from '../../ui/IconButton'
 import { useFormat } from '../bills/format'
 
 const KIND_LABEL = {
@@ -43,29 +44,24 @@ export function EntryRow({
         <span className="block truncate font-medium">{label}</span>
         {sub && <span className="block text-caption text-muted">{sub}</span>}
       </span>
-      <span className={cx('shrink-0 font-semibold tabular-nums', positive && 'text-accent')}>
+      <span className={cx('shrink-0 font-medium tabular-nums', positive && 'text-tone-success')}>
         {positive ? '+' : ''}
         {f.money(Math.abs(tx.amount))}
       </span>
-      <button
-        type="button"
-        onClick={() => onEdit(tx)}
-        aria-label={`Edit ${label}`}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-full px-3 text-sm text-muted hover:bg-accent-soft/60"
-      >
+      <Button variant="quiet" onClick={() => onEdit(tx)} aria-label={`Edit ${label}`}>
         Edit
-      </button>
-      <button
-        type="button"
+      </Button>
+      <IconButton
+        icon="close"
+        tone="danger"
+        size="sm"
+        label={`Delete ${label}`}
         onClick={async () => {
           await deleteTransaction(tx.id)
           undoToast(`Deleted ${label}`)
         }}
-        aria-label={`Delete ${label}`}
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60"
-      >
-        <Icon name="close" size={16} />
-      </button>
+        className="-mr-3"
+      />
     </li>
   )
 }

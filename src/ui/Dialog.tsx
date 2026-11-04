@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { cx } from './cx'
-import { Icon } from './Icon'
+import { IconButton } from './IconButton'
 
 export interface DialogProps {
   open: boolean
@@ -100,14 +100,13 @@ export function Dialog({
               </p>
             )}
           </div>
-          <button
-            type="button"
+          {/* -mr-3: the glyph's right edge lines up with the content edge below. */}
+          <IconButton
+            icon="close"
+            label="Close"
             onClick={() => onCloseRef.current()}
-            className="-mr-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60"
-            aria-label="Close"
-          >
-            <Icon name="close" size={20} />
-          </button>
+            className="-mr-3"
+          />
         </header>
         {children && <div className="overflow-y-auto px-6 pt-4 pb-2">{children}</div>}
         {actions && (

@@ -4,6 +4,9 @@ import type { Runway } from '../../domain/runway'
 import { simpleLines, WALLED_OFF_NOTE, type SafeToSpend } from '../../domain/safeToSpend'
 import type { Cents, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
+import { cx } from '../../ui/cx'
+import { Icon } from '../../ui/Icon'
+import { Notice } from '../../ui/Notice'
 import { Segmented } from '../../ui/Segmented'
 import { Sheet } from '../../ui/Sheet'
 import { useFormat } from '../bills/format'
@@ -51,37 +54,59 @@ export function MathSheet({ open, onClose, safe, runway, past = false, nextPay }
         <Segmented label="Detail" value={view} options={VIEWS} onChange={setView} />
       </div>
       <dl className="divide-y divide-line">
-        {lines.map((line) => (
-          // One <div> per group, no deeper (axe definition-list): items are a second <dd>.
-          <div key={line.id} className="flex flex-wrap justify-between gap-x-4 py-3">
-            <dt className="text-muted">
-              {line.label}
-              {line.date && line.id === 'carried' && (
-                <span className="block text-sm">from {f.day(line.date)}</span>
-              )}
-            </dt>
-            <dd className="font-medium tabular-nums">{f.money(line.amount)}</dd>
-            {view === 'full' && line.items && line.items.length > 0 && (
-              <dd className="w-full">
-                <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 text-sm text-muted">
-                  {line.items.map((item, i) => (
-                    <li key={i} className="flex justify-between gap-4">
-                      <span className="min-w-0 truncate">
-                        {item.done !== undefined && line.id === 'bills' && (
-                          <span className="sr-only">{item.done ? 'Paid: ' : 'Still to pay: '}</span>
-                        )}
-                        {item.label}
-                        {line.id === 'bills' && item.done && <span aria-hidden="true"> ✓</span>}
-                        {item.date && <span> · {f.day(item.date)}</span>}
-                      </span>
-                      <span className="shrink-0 tabular-nums">{f.money(item.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
+        {lines.map((line) => {
+          // Money in reads green here as on Today, Envelopes and Transactions; the labels
+          // stay muted, only the figures carry the direction.
+          const moneyIn = line.id === 'income' && line.amount > 0
+          return (
+            // One <div> per group, no deeper (axe definition-list): items are a second <dd>.
+            <div key={line.id} className="flex flex-wrap justify-between gap-x-4 py-3">
+              <dt className="text-muted">
+                {line.label}
+                {line.date && line.id === 'carried' && (
+                  <span className="block text-sm">from {f.day(line.date)}</span>
+                )}
+              </dt>
+              <dd className={cx('font-medium tabular-nums', moneyIn && 'text-tone-success')}>
+                {f.money(line.amount)}
               </dd>
-            )}
-          </div>
-        ))}
+              {view === 'full' && line.items && line.items.length > 0 && (
+                <dd className="w-full">
+                  <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 text-sm text-muted">
+                    {line.items.map((item, i) => (
+                      <li key={i} className="flex justify-between gap-4">
+                        <span className="min-w-0 truncate">
+                          {item.done !== undefined && line.id === 'bills' && (
+                            <span className="sr-only">
+                              {item.done ? 'Paid: ' : 'Still to pay: '}
+                            </span>
+                          )}
+                          {item.label}
+                          {line.id === 'bills' && item.done && (
+                            <Icon
+                              name="check"
+                              size={14}
+                              className="ml-1 inline-block align-[-0.125em] text-tone-success"
+                            />
+                          )}
+                          {item.date && <span> · {f.day(item.date)}</span>}
+                        </span>
+                        <span
+                          className={cx(
+                            'shrink-0 tabular-nums',
+                            moneyIn && item.amount > 0 && 'text-tone-success',
+                          )}
+                        >
+                          {f.money(item.amount)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              )}
+            </div>
+          )
+        })}
         <div className="flex justify-between gap-4 py-3 text-base">
           <dt className="font-semibold">
             {safe.status === 'short'
@@ -106,7 +131,13 @@ export function MathSheet({ open, onClose, safe, runway, past = false, nextPay }
             <dt className="text-muted">
               ÷ {runway.daysLeft} {runway.daysLeft === 1 ? 'day' : 'days'}, including today
             </dt>
-            <dd className="font-semibold text-accent tabular-nums">
+            {/* Safe to spend a day: the success tone, as on Home's safe figure. */}
+            <dd
+              className={cx(
+                'font-semibold tabular-nums',
+                runway.perDay > 0 && safe.status !== 'short' && 'text-tone-success',
+              )}
+            >
               {f.money(runway.perDay)} a day
             </dd>
           </div>
@@ -119,12 +150,15 @@ export function MathSheet({ open, onClose, safe, runway, past = false, nextPay }
         )}
       </dl>
       {nextPay && (
-        <p className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-sm">
-          <span className="font-medium">
-            Next pay: {f.money(nextPay.amount)} on {f.day(nextPay.date)}.
-          </span>{' '}
-          <span className="text-muted">It counts in the period it lands in.</span>
-        </p>
+        // Payday is the success tone everywhere (Coming up, Calendar, Envelopes).
+        <Notice tone="success" icon="payday" className="mt-3">
+          <p className="text-sm">
+            <span className="font-medium">
+              Next pay: {f.money(nextPay.amount)} on {f.day(nextPay.date)}.
+            </span>{' '}
+            <span className="text-muted">It counts in the period it lands in.</span>
+          </p>
+        </Notice>
       )}
       <p className="mt-3 rounded-2xl bg-bg px-4 py-3 text-sm text-muted">
         {(safe.savingsMoved !== 0 || safe.debtPaid !== 0) && (

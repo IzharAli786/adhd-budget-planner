@@ -7,7 +7,6 @@ import { noSpendCount, noSpendStrip } from '../../domain/noSpend'
 import type { ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { Icon } from '../../ui/Icon'
 import { useFormat } from '../bills/format'
 
 /**
@@ -50,7 +49,7 @@ export function NoSpendCard({ today }: { today: ISODate }) {
   return (
     <section aria-labelledby="nospend-title" className="card space-y-4 p-5">
       <div>
-        <h2 id="nospend-title" className="text-heading">
+        <h2 id="nospend-title" className="card-title">
           No-spend days
         </h2>
         <p className="text-body text-muted">
@@ -62,35 +61,42 @@ export function NoSpendCard({ today }: { today: ISODate }) {
       {/* Seven 44px targets need ~320px: on a phone the row borrows a little of the
           card's padding and the gaps shrink, so each day stays a full tap target. */}
       <ol className="-mx-2 grid grid-cols-7 gap-1 sm:mx-0 sm:gap-1.5" aria-label="The last 7 days">
-        {strip.map((d) => (
-          <li key={d.date}>
-            <button
-              type="button"
-              aria-pressed={d.marked}
-              disabled={!d.marked && spent.has(d.date)}
-              onClick={() => toggle(d.date)}
-              className={cx(
-                'flex min-h-14 w-full min-w-11 flex-col items-center justify-center rounded-2xl text-xs transition-colors disabled:opacity-50',
-                d.marked
-                  ? 'bg-accent text-accent-contrast'
-                  : 'bg-bg text-muted ring-1 ring-line enabled:hover:bg-accent-soft/60',
-                d.date === today && !d.marked && 'ring-accent/50',
-              )}
-            >
-              {/* The name comes from the content, so the visible day number is part of it
+        {strip.map((d) => {
+          // Spending logged: not markable. A dashed outline says so; nothing is faded.
+          const blocked = !d.marked && spent.has(d.date)
+          return (
+            <li key={d.date}>
+              <button
+                type="button"
+                aria-pressed={d.marked}
+                disabled={blocked}
+                onClick={() => toggle(d.date)}
+                className={cx(
+                  'flex min-h-14 w-full min-w-11 flex-col items-center justify-center rounded-2xl text-xs transition-colors',
+                  d.marked
+                    ? 'bg-accent text-accent-contrast'
+                    : blocked
+                      ? 'border border-dashed border-line text-muted'
+                      : 'bg-bg text-muted enabled:hover:bg-accent-soft/60',
+                  !d.marked &&
+                    (d.date === today ? 'ring-2 ring-accent' : !blocked && 'ring-1 ring-line'),
+                )}
+              >
+                {/* The name comes from the content, so the visible day number is part of it
                   (WCAG 2.5.3, label in name). "Sunday 25 October" is split around the 25. */}
-              <span className="sr-only">{longDay(d.date).before}</span>
-              <span aria-hidden="true">{f.weekday(dayOfWeek(d.date), 'narrow')}</span>
-              <span className="mt-0.5 text-sm font-semibold tabular-nums">
-                {parseISODate(d.date).day}
-              </span>
-              <span className="sr-only">
-                {longDay(d.date).after}
-                {d.marked ? ', no-spend day' : spent.has(d.date) ? ', spending logged' : ''}
-              </span>
-            </button>
-          </li>
-        ))}
+                <span className="sr-only">{longDay(d.date).before}</span>
+                <span aria-hidden="true">{f.weekday(dayOfWeek(d.date), 'narrow')}</span>
+                <span className="mt-0.5 text-sm font-semibold tabular-nums">
+                  {parseISODate(d.date).day}
+                </span>
+                <span className="sr-only">
+                  {longDay(d.date).after}
+                  {d.marked ? ', no-spend day' : spent.has(d.date) ? ', spending logged' : ''}
+                </span>
+              </button>
+            </li>
+          )
+        })}
       </ol>
       {spentToday && !markedToday ? (
         <p className="rounded-2xl bg-bg px-4 py-3 text-center text-body text-muted">
@@ -100,17 +106,11 @@ export function NoSpendCard({ today }: { today: ISODate }) {
         <Button
           block
           variant={markedToday ? 'secondary' : 'primary'}
+          icon={markedToday ? 'check' : undefined}
           aria-pressed={markedToday}
           onClick={() => toggle(today)}
         >
-          {markedToday ? (
-            <>
-              <Icon name="check" size={18} />
-              Today is a no-spend day
-            </>
-          ) : (
-            'Mark today as no-spend'
-          )}
+          {markedToday ? 'Today is a no-spend day' : 'Mark today as no-spend'}
         </Button>
       )}
     </section>

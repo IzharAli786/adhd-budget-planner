@@ -7,10 +7,11 @@ import {
   formatCodeBody,
   hasLetterU,
 } from '../../unlock/unlock'
-import { Button } from '../../ui/Button'
+import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { inputClass } from '../../ui/Field'
+import { FieldError, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
+import { Logo } from '../../ui/Logo'
 import { InstallBanner } from '../install/InstallGate'
 
 // In dev the demo runs next to the app (`npm run demo:phone`, port 5174), so the link follows
@@ -83,13 +84,7 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
       <InstallBanner />
       <div className="flex min-h-dvh flex-col px-5 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),1.5rem)]">
         <main className="animate-fade-in mx-auto flex w-full max-w-sm flex-1 flex-col justify-center">
-          <img
-            src="/icon.svg"
-            alt=""
-            width={56}
-            height={56}
-            className="mb-6 rounded-2xl shadow-card"
-          />
+          <Logo size={56} className="mb-6 rounded-[0.8rem] shadow-card" />
           <h1 className="type-display text-[2rem] leading-tight">Welcome to Steady</h1>
           <p className="mt-2 text-base text-muted">
             Enter the code from your PDF to unlock the app. You only need to do this once.
@@ -128,16 +123,15 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
                 )}
               />
             </div>
-            <p
-              id={`${inputId}-msg`}
-              aria-live="polite"
-              className={cx(
-                'mt-2 min-h-5 text-sm',
-                error ? 'font-medium text-accent' : 'text-muted',
+            <div id={`${inputId}-msg`} aria-live="polite" className="mt-2 min-h-5">
+              {error ? (
+                <FieldError>{error}</FieldError>
+              ) : (
+                <p className="text-sm text-muted">
+                  16 letters and numbers. Dashes are added for you.
+                </p>
               )}
-            >
-              {error ?? '16 letters and numbers. Dashes are added for you.'}
-            </p>
+            </div>
             <Button type="submit" size="lg" block className="mt-4" disabled={checking}>
               {checking ? 'Checking…' : 'Unlock'}
             </Button>
@@ -150,14 +144,9 @@ export function UnlockScreen({ onUnlock }: { onUnlock: (hashPrefix: string) => P
         </main>
 
         <footer className="mx-auto mt-8 w-full max-w-sm text-center">
-          <a
-            href={DEMO_URL}
-            target="_blank"
-            rel="noopener"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-body font-medium text-accent hover:bg-accent-soft/60"
-          >
+          <a href={DEMO_URL} target="_blank" rel="noopener" className={buttonClass('text', 'md')}>
             No code? Try the free demo
-            <Icon name="external" size={16} />
+            <Icon name="external" size={16} className="shrink-0" />
           </a>
         </footer>
       </div>

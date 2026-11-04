@@ -67,7 +67,8 @@ export function DisclosureButton({
       aria-controls={controls}
       onClick={onToggle}
       className={cx(
-        'flex min-h-11 w-full items-center gap-2 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        // The focus ring is app.css's global one (it outranks any ring utility here).
+        'flex min-h-11 w-full items-center gap-2 rounded-xl text-left',
         className,
       )}
     >

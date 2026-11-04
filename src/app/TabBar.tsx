@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router'
 import { cx } from '../ui/cx'
 import { Icon } from '../ui/Icon'
+import { Logo } from '../ui/Logo'
 import { useAppSettings } from './SettingsProvider'
 import { visibleTabs } from './tabs'
 
@@ -30,7 +31,7 @@ export function TabBar() {
       )}
     >
       <div className="hidden items-center gap-2.5 px-6 pb-8 md:flex md:justify-center lg:justify-start md:[@media(max-height:30rem)]:hidden">
-        <img src="/icon.svg" alt="" width={32} height={32} className="rounded-[0.6rem]" />
+        <Logo size={32} />
         <span className="hidden text-heading tracking-tight lg:inline">Steady</span>
       </div>
       <div className="md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain md:[scrollbar-width:none]">
@@ -58,7 +59,7 @@ export function TabBar() {
                       isActive && 'bg-accent-soft md:bg-transparent',
                     )}
                   >
-                    <Icon name={tab.icon} size={22} strokeWidth={isActive ? 2.1 : 1.75} />
+                    <Icon name={tab.icon} size={22} weight={isActive ? 'bold' : 'regular'} />
                   </span>
                   <span className="lg:whitespace-nowrap">{tab.label}</span>
                 </Link>

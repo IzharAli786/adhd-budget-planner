@@ -10,6 +10,7 @@ import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
 import { Chip } from '../../ui/Chip'
 import { DateInput } from '../../ui/DateInput'
+import { EnvelopeDot } from '../../ui/EnvelopeDot'
 import { Field, inputClass } from '../../ui/Field'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { Segmented } from '../../ui/Segmented'
@@ -152,6 +153,7 @@ function QuickAddForm({ onDone }: { onDone: () => void }) {
               <Chip
                 key={env.id}
                 selected={chosenEnvelope === env.id}
+                leading={<EnvelopeDot color={env.color} />}
                 onClick={() => setEnvelopeId(env.id)}
               >
                 {env.name}

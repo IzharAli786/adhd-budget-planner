@@ -34,3 +34,29 @@ it('prints only the report: chrome hidden, the report shown, on white', () => {
   expect(print).toMatch(/\.print-report\s*\{\s*display: block !important/)
   expect(print).toMatch(/--bg: #ffffff/)
 })
+
+it('keeps a readable focus ring on the inverted toast and on invalid fields', () => {
+  // The accent ring measured 1.7-3.1:1 on the toast's text-coloured fill.
+  expect(css).toMatch(/\.toast :focus-visible\s*\{\s*outline-color: var\(--bg\)/)
+  expect(css).toMatch(
+    /\[aria-invalid='true'\]:focus-visible\s*\{\s*outline-color: var\(--tone-attention-fg\)/,
+  )
+})
+
+it('lets checkboxes and radios keep their own edge and dot while focused', () => {
+  // The global halo replaces box-shadow; a checked radio's dot is a box-shadow ring.
+  const rule = /input\[type='radio'\]:focus-visible\s*\{([^}]*)\}/.exec(css)?.[1]
+  expect(rule).toMatch(/outline-offset: 2px/)
+  expect(rule).toMatch(/box-shadow: revert-layer/)
+})
+
+it('keeps a focused control clear of the tab bar and the floating + on phones', () => {
+  const phones = /@media \(max-width: 47\.999rem\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1]
+  expect(phones).toMatch(/scroll-padding-bottom: calc\(9\.25rem/)
+  expect(phones).toMatch(/scroll-padding-top: calc\(var\(--demo-banner-h/)
+})
+
+it('defines the shared type utilities', () => {
+  for (const name of ['section-title', 'card-title', 'amount'])
+    expect(css).toMatch(new RegExp(`@utility ${name} \\{[^}]*font-family: var\\(--font-display\\)`))
+})

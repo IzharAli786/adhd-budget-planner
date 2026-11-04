@@ -2,13 +2,15 @@
 // secondary view on the Goals tab. The SVG is decorative for assistive tech; tapping,
 // hovering or focusing a month reads both balances (ChartTips), and the same numbers are
 // always in a table (visually hidden until asked for), per PLAN §8.
-import { useCallback, useId, useState } from 'react'
+import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react'
 import { niceMax } from '../../domain/chartScale'
 import { addMonths } from '../../domain/dates'
 import type { Cents } from '../../domain/money'
 import type { ISODate } from '../../domain/types'
+import { Button } from '../../ui/Button'
 import { ChartTips } from '../../ui/ChartTips'
 import { cx } from '../../ui/cx'
+import { DATA_COLOR } from '../../ui/dataColors'
 import type { Formatters } from '../bills/format'
 
 interface PayoffChartProps {
@@ -18,21 +20,41 @@ interface PayoffChartProps {
   f: Formatters
 }
 
-const W = 320
-const H = 150
-// Room on the left for the light axis labels ("€2.5K").
-const PAD = { top: 10, right: 8, bottom: 22, left: 36 }
-const plotH = H - PAD.top - PAD.bottom
-const xAt = (m: number, months: number) =>
-  PAD.left + (m / Math.max(1, months)) * (W - PAD.left - PAD.right)
-const yAt = (v: Cents, max: number) => PAD.top + (1 - v / Math.max(1, max)) * plotH
+// The SVG is drawn at its real size (1 unit = 1 CSS px), so text and strokes keep their
+// size at any width instead of scaling with the card. Until measured, a phone's width.
+const FALLBACK_W = 320
+// Room on the left for the light axis labels ("€2.5K") and below for the month labels.
+const PAD = { top: 12, right: 10, bottom: 28, left: 46 }
+// Total owed is debt: the debt colour (plum), never the theme accent.
+const AVALANCHE = DATA_COLOR.debt
+const SNOWBALL = 'var(--muted)'
 
-function linePath(series: Cents[], months: number, max: number) {
-  const x = (m: number) => xAt(m, months)
-  const y = (v: Cents) => yAt(v, max)
-  return series
-    .map((v, m) => `${m === 0 ? 'M' : 'L'}${x(m).toFixed(1)},${y(v).toFixed(1)}`)
-    .join('')
+function useWidth() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(FALLBACK_W)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const w = Math.round(el.clientWidth)
+      if (w > 0) setWidth(w)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, width] as const
+}
+
+function scales(W: number, H: number, months: number, max: number) {
+  const plotH = H - PAD.top - PAD.bottom
+  const xAt = (m: number) => PAD.left + (m / Math.max(1, months)) * (W - PAD.left - PAD.right)
+  const yAt = (v: Cents) => PAD.top + (1 - v / Math.max(1, max)) * plotH
+  const linePath = (series: Cents[]) =>
+    series.map((v, m) => `${m === 0 ? 'M' : 'L'}${xAt(m).toFixed(1)},${yAt(v).toFixed(1)}`).join('')
+  return { xAt, yAt, linePath }
 }
 
 /** ~12 rows whatever the length: every month for a short plan, every few for a long one. */
@@ -47,9 +69,13 @@ function sampleMonths(months: number): number[] {
 export default function PayoffChart({ snowball, avalanche, today, f }: PayoffChartProps) {
   const [showTable, setShowTable] = useState(false)
   const tableId = useId()
+  const [boxRef, W] = useWidth()
+  // A little taller on wide screens, so the slope still reads at 700px across.
+  const H = Math.round(Math.min(240, Math.max(160, W * 0.32)))
   const months = Math.max(snowball.length, avalanche.length) - 1
   // A round top so the gridline labels read at a glance.
   const max = niceMax(Math.max(snowball[0] ?? 0, avalanche[0] ?? 0, ...snowball, ...avalanche))
+  const { xAt, yAt, linePath } = scales(W, H, months, max)
   const at = (series: Cents[], m: number) => series[Math.min(m, series.length - 1)] ?? 0
   const monthLabel = (m: number) => f.month(addMonths(today, m))
   const sampled = sampleMonths(months)
@@ -59,32 +85,38 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
   const columns = sampled.map((m) => ({
     key: String(m),
     title: monthLabel(m),
-    at: xAt(m, months) / W,
+    at: xAt(m) / W,
     lines: [
-      { label: 'Avalanche', value: f.money(at(avalanche, m)), color: 'var(--accent)' },
-      { label: 'Snowball', value: f.money(at(snowball, m)), color: 'var(--muted)' },
+      { label: 'Avalanche', value: f.money(at(avalanche, m)), color: AVALANCHE },
+      { label: 'Snowball', value: f.money(at(snowball, m)), color: SNOWBALL },
     ],
   }))
 
   return (
-    <figure className="space-y-3">
+    <figure className="max-w-3xl space-y-3">
       <div className="animate-fade-in rounded-2xl bg-bg px-2 pt-3 pb-1">
-        <div className="relative">
-          <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" aria-hidden="true">
+        <div ref={boxRef} className="relative">
+          <svg
+            width={W}
+            height={H}
+            viewBox={`0 0 ${W} ${H}`}
+            className="block max-w-full"
+            aria-hidden="true"
+          >
             {[0.5, 1].map((t) => (
               <g key={t}>
                 <line
                   x1={PAD.left}
                   x2={W - PAD.right}
-                  y1={yAt(max * t, max)}
-                  y2={yAt(max * t, max)}
+                  y1={yAt(max * t)}
+                  y2={yAt(max * t)}
                   stroke="var(--line)"
                   strokeWidth={1}
                 />
                 <text
-                  x={PAD.left - 5}
-                  y={yAt(max * t, max) + 3}
-                  fontSize={9}
+                  x={PAD.left - 6}
+                  y={yAt(max * t) + 4}
+                  fontSize={12}
                   fill="var(--muted)"
                   textAnchor="end"
                 >
@@ -93,9 +125,9 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
               </g>
             ))}
             <text
-              x={PAD.left - 5}
-              y={H - PAD.bottom + 3}
-              fontSize={9}
+              x={PAD.left - 6}
+              y={H - PAD.bottom + 4}
+              fontSize={12}
               fill="var(--muted)"
               textAnchor="end"
             >
@@ -111,52 +143,52 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
             />
             {/* Dashed vs solid, not only colour, tells the two lines apart. */}
             <path
-              d={linePath(snowball, months, max)}
+              d={linePath(snowball)}
               fill="none"
-              stroke="var(--muted)"
+              stroke={SNOWBALL}
               strokeWidth={2}
               strokeDasharray="5 4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
-              d={linePath(avalanche, months, max)}
+              d={linePath(avalanche)}
               fill="none"
-              stroke="var(--accent)"
-              strokeWidth={2.5}
+              stroke={AVALANCHE}
+              strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             {activeMonth !== null && (
               <g>
                 <line
-                  x1={xAt(activeMonth, months)}
-                  x2={xAt(activeMonth, months)}
+                  x1={xAt(activeMonth)}
+                  x2={xAt(activeMonth)}
                   y1={PAD.top}
                   y2={H - PAD.bottom}
                   stroke="var(--muted)"
                   strokeOpacity={0.5}
                 />
                 <circle
-                  cx={xAt(activeMonth, months)}
-                  cy={yAt(at(snowball, activeMonth), max)}
-                  r={3.5}
+                  cx={xAt(activeMonth)}
+                  cy={yAt(at(snowball, activeMonth))}
+                  r={4}
                   fill="var(--surface)"
-                  stroke="var(--muted)"
+                  stroke={SNOWBALL}
                   strokeWidth={2}
                 />
                 <circle
-                  cx={xAt(activeMonth, months)}
-                  cy={yAt(at(avalanche, activeMonth), max)}
-                  r={3.5}
-                  fill="var(--accent)"
+                  cx={xAt(activeMonth)}
+                  cy={yAt(at(avalanche, activeMonth))}
+                  r={4}
+                  fill={AVALANCHE}
                 />
               </g>
             )}
-            <text x={PAD.left} y={H - 6} fontSize={10} fill="var(--muted)">
+            <text x={PAD.left} y={H - 8} fontSize={12} fill="var(--muted)">
               {f.month(today)}
             </text>
-            <text x={W - PAD.right} y={H - 6} fontSize={10} fill="var(--muted)" textAnchor="end">
+            <text x={W - PAD.right} y={H - 8} fontSize={12} fill="var(--muted)" textAnchor="end">
               {monthLabel(months)}
             </text>
           </svg>
@@ -172,8 +204,8 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
               x2="21"
               y1="3"
               y2="3"
-              stroke="var(--accent)"
-              strokeWidth="2.5"
+              stroke={AVALANCHE}
+              strokeWidth="2"
               strokeLinecap="round"
             />
           </svg>
@@ -186,7 +218,7 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
               x2="21"
               y1="3"
               y2="3"
-              stroke="var(--muted)"
+              stroke={SNOWBALL}
               strokeWidth="2"
               strokeDasharray="5 4"
             />
@@ -195,15 +227,17 @@ export default function PayoffChart({ snowball, avalanche, today, f }: PayoffCha
         </span>
         {/* The start, not the peak: with interest outrunning a minimum, the peak comes later. */}
         <span>Total owed, starting at {f.money(snowball[0] ?? 0)}</span>
-        <button
-          type="button"
+        <Button
+          variant="text"
+          size="sm"
+          bleed
           aria-expanded={showTable}
           aria-controls={tableId}
           onClick={() => setShowTable((s) => !s)}
-          className="-mx-2 ml-auto min-h-11 rounded-full px-2 font-medium text-accent"
+          className="ml-auto"
         >
           {showTable ? 'Hide table' : 'Show as a table'}
-        </button>
+        </Button>
       </figcaption>
 
       <div id={tableId} className={cx(!showTable && 'sr-only')}>

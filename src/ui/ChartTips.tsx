@@ -141,8 +141,8 @@ export function ChartTips({ columns, label, onActive, className }: Props) {
           }}
           onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
-            'absolute inset-y-0 rounded-lg outline-none',
-            'focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset',
+            // Focus: app.css's global ring (it outranks ring utilities, so none here).
+            'absolute inset-y-0 rounded-lg',
             shown === i && 'bg-text/5',
           )}
           style={{

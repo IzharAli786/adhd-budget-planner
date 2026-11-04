@@ -97,10 +97,13 @@ describe('Yearly review', () => {
     expect(
       await screen.findByRole('img', { name: /Money in and out per month, 2026/ }),
     ).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Previous year' }).hasAttribute('disabled')).toBe(
-      true,
+    // aria-disabled, not disabled, so focus stays on an arrow that runs out.
+    expect(
+      screen.getByRole('button', { name: 'Previous year' }).getAttribute('aria-disabled'),
+    ).toBe('true')
+    expect(screen.getByRole('button', { name: 'Next year' }).getAttribute('aria-disabled')).toBe(
+      'true',
     )
-    expect(screen.getByRole('button', { name: 'Next year' }).hasAttribute('disabled')).toBe(true)
   })
 
   it('says "so far" when a year still under way is behind on paper', async () => {

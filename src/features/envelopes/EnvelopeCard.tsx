@@ -6,9 +6,16 @@ import { budgetFor } from '../../domain/categories'
 import { parseAmount, type Cents } from '../../domain/money'
 import type { EnvelopeUsage } from '../../domain/safeToSpend'
 import type { Envelope, ISODate, Transaction } from '../../domain/types'
+import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
+import { tint } from '../../ui/dataColors'
+import { EnvelopeDot, envelopeColor } from '../../ui/EnvelopeDot'
+import { FieldError, inputClass } from '../../ui/Field'
+import { Icon } from '../../ui/Icon'
+import { ProgressBar } from '../../ui/Progress'
+import { BILL_STATUS, TAG } from '../../ui/status'
 import { useFormat } from '../bills/format'
-import { CalendarLink, EntryActions, EntryLine, textButton } from './EntryLine'
+import { CalendarLink, EntryActions, EntryLine } from './EntryLine'
 
 interface Props {
   env: Envelope
@@ -58,40 +65,33 @@ export function EnvelopeCard({
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 
   return (
-    <section aria-labelledby={titleId} className="card p-5 sm:px-6 sm:pt-6 sm:pb-5">
+    <section aria-labelledby={titleId} className="card p-5 sm:p-6">
       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2 id={titleId} className="min-w-0 type-display text-[1.375rem] leading-tight break-words">
-          {env.name}
+        <h2 id={titleId} className="flex min-w-0 items-center gap-2.5 section-title">
+          <EnvelopeDot color={env.color} className="size-3" />
+          <span className="min-w-0 break-words">{env.name}</span>
         </h2>
-        <div className="-mx-2.5 flex shrink-0 flex-wrap items-center sm:gap-1">
-          <button
-            type="button"
+        <div className="-mx-3 flex shrink-0 flex-wrap items-center sm:gap-1">
+          <Button
+            variant="text"
+            icon="plus"
             onClick={onAddSpend}
             aria-label={`Add spend to ${env.name}`}
-            className={textButton}
           >
-            <span aria-hidden="true" className="mr-1">
-              +
-            </span>
             Add spend
-          </button>
-          <button
-            type="button"
-            onClick={onRename}
-            aria-label={`Rename ${env.name}`}
-            className={textButton}
-          >
+          </Button>
+          <Button variant="quiet" onClick={onRename} aria-label={`Rename ${env.name}`}>
             Rename
-          </button>
+          </Button>
           {!env.isDefault && (
-            <button
-              type="button"
+            <Button
+              variant="quiet"
+              icon="trash"
               onClick={onDelete}
               aria-label={`Delete ${env.name}`}
-              className={textButton}
             >
               Delete
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -107,12 +107,9 @@ export function EnvelopeCard({
               <EntryLine
                 key={`${row.bill.billId}|${row.bill.originalDate}`}
                 name={row.bill.name}
-                tag="Bill"
-                sub={
-                  row.bill.status === 'paid'
-                    ? `${rowDay(row.bill.date)} · paid`
-                    : rowDay(row.bill.date)
-                }
+                tag={TAG.bill}
+                status={row.bill.status === 'paid' ? BILL_STATUS.paid : undefined}
+                sub={rowDay(row.bill.date)}
                 amount={f.money(row.bill.amount)}
                 actions={<CalendarLink label={row.bill.name} />}
               />
@@ -147,6 +144,7 @@ function TxLine({
       name={label}
       sub={refund ? `${rowDay(tx.date)} · refund` : rowDay(tx.date)}
       amount={refund ? `+${f.money(tx.amount)}` : f.money(-tx.amount)}
+      incoming={refund}
       actions={<EntryActions tx={tx} label={label} onEdit={onEdit} />}
     />
   )
@@ -220,7 +218,7 @@ function BudgetRow({
           value={text}
           placeholder="0"
           aria-invalid={invalid || undefined}
-          aria-describedby={`${inputId}-used`}
+          aria-describedby={invalid ? `${inputId}-used ${inputId}-error` : `${inputId}-used`}
           onFocus={() => setDraft(text)}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => void commit()}
@@ -234,44 +232,42 @@ function BudgetRow({
               setDraft(budget > 0 ? toText(budget, f.decimals) : '')
             }
           }}
-          className={cx(
-            'min-h-12 w-full min-w-0 rounded-xl border border-line bg-surface px-4 text-body font-medium text-text tabular-nums outline-none transition-colors',
-            'placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 aria-invalid:border-accent',
-          )}
+          className={cx(inputClass, 'min-w-0 font-medium tabular-nums')}
         />
         <div className="min-w-0">
-          <div
-            role="progressbar"
-            aria-label={`${env.name} used`}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(share * 100)}
-            className="h-3.5 overflow-hidden rounded-full bg-accent-soft"
-          >
-            <div
-              className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
-              style={{ width: `${share * 100}%` }}
-            />
-          </div>
+          {/* The envelope's own colour, also when over: going over is said in words. */}
+          <ProgressBar
+            size="md"
+            value={share}
+            label={`${env.name} used`}
+            color={envelopeColor(env.color)}
+            trackColor={tint(envelopeColor(env.color))}
+          />
           <p
             id={`${inputId}-used`}
-            className="mt-2 flex flex-wrap justify-between gap-x-3 text-sm font-semibold text-muted tabular-nums"
+            className="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-sm font-semibold text-muted tabular-nums"
           >
             <span>{f.money(used)} spent</span>
-            <span>
-              {budget === 0
-                ? 'No budget yet'
-                : over > 0
-                  ? `${f.money(over)} over`
-                  : `${f.money(left)} left`}
-            </span>
+            {/* ml-auto: when it wraps, the status figure stays on the right edge. */}
+            {over > 0 ? (
+              <span className="ml-auto inline-flex items-center gap-1 text-tone-attention">
+                <Icon name="alert" size={14} className="shrink-0" />
+                {f.money(over)} over
+              </span>
+            ) : (
+              <span className="ml-auto">
+                {budget === 0 ? 'No budget yet' : `${f.money(left)} left`}
+              </span>
+            )}
           </p>
         </div>
       </div>
       {invalid && (
-        <p className="mt-1.5 text-sm font-medium text-accent">
-          Enter an amount like 180{f.decimals ? '.50' : ''}
-        </p>
+        <div className="mt-1.5">
+          <FieldError id={`${inputId}-error`}>
+            Enter an amount like 180{f.decimals ? '.50' : ''}
+          </FieldError>
+        </div>
       )}
     </div>
   )

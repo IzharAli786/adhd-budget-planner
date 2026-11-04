@@ -12,7 +12,8 @@ import {
 } from '../../db/repos'
 import { Button, buttonClass } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
-import { Icon, type IconName } from '../../ui/Icon'
+import type { IconName } from '../../ui/Icon'
+import { IconTile } from '../../ui/IconTile'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { useToast } from '../../ui/Toast'
 
@@ -80,9 +81,7 @@ export function RecentlyDeletedScreen() {
                   key={`${item.table}:${item.id}`}
                   className="flex items-center gap-3.5 px-4 py-2.5"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-                    <Icon name={kind.icon} size={19} />
-                  </span>
+                  <IconTile icon={kind.icon} tone="neutral" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{item.name || kind.noun}</span>
                     <span className="block text-sm text-muted">
@@ -101,7 +100,7 @@ export function RecentlyDeletedScreen() {
             })}
           </ul>
           <div className="text-center">
-            <Button variant="ghost" className="text-muted" onClick={() => setConfirmEmpty(true)}>
+            <Button variant="quiet" icon="trash" onClick={() => setConfirmEmpty(true)}>
               Delete all for good
             </Button>
           </div>
@@ -118,7 +117,7 @@ export function RecentlyDeletedScreen() {
             <Button variant="ghost" onClick={() => setConfirmEmpty(false)}>
               Keep them
             </Button>
-            <Button variant="danger" onClick={() => void empty()}>
+            <Button variant="danger" icon="trash" onClick={() => void empty()}>
               Delete for good
             </Button>
           </>

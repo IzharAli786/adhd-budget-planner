@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { buttonClass } from './Button'
 import { cx } from './cx'
 import { Icon } from './Icon'
 import { Illustration, type IllustrationName } from './Illustration'
@@ -17,11 +18,9 @@ export function PageHeader({
   return (
     <header className="mb-7">
       {back && (
-        <Link
-          to={back.to}
-          className="-ml-3 mb-1 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-1.5 text-body font-medium text-accent hover:bg-accent-soft/60"
-        >
-          <Icon name="back" size={20} />
+        // A text button bled to the edge: the chevron lines up with the title below.
+        <Link to={back.to} className={cx(buttonClass('text', 'md', false, true), 'mb-1')}>
+          <Icon name="back" size={18} className="shrink-0" />
           {back.label}
         </Link>
       )}

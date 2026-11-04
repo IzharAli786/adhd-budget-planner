@@ -20,7 +20,7 @@ export function EnvelopeDot({ color, className }: { color?: string; className?: 
   )
 }
 
-/** "● Groceries": a quiet label for a row, not a button. */
+/** "● Groceries": a quiet label for a row, not a button. The same geometry as a Badge. */
 export function EnvelopeLabel({
   name,
   color,
@@ -33,11 +33,11 @@ export function EnvelopeLabel({
   return (
     <span
       className={cx(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full bg-bg px-2 py-0.5 text-caption text-text ring-1 ring-line',
+        'inline-flex h-6 max-w-full items-center gap-1.5 rounded-full bg-tone-neutral-bg px-2.5 text-xs font-medium text-text ring-1 ring-tone-neutral-line ring-inset',
         className,
       )}
     >
-      <EnvelopeDot color={color} className="h-2 w-2" />
+      <EnvelopeDot color={color} className="size-2" />
       <span className="truncate">{name}</span>
     </span>
   )

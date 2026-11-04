@@ -3,6 +3,7 @@ import { promptInstall, type InstallContext } from '../../lib/install'
 import { copyText } from '../../lib/share'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
+import { Logo } from '../../ui/Logo'
 import { PageHeader } from '../../ui/PageHeader'
 import { useInstallContext } from './useInstall'
 
@@ -36,7 +37,7 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
     return (
       <>
         <PageHeader title="Install Steady" back={{ to: '/more', label: 'More' }} />
-        <div className="card p-6">{body}</div>
+        <div className="card p-5 sm:p-6">{body}</div>
       </>
     )
   }
@@ -44,13 +45,7 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col px-6 pt-[max(env(safe-area-inset-top),2.5rem)] pb-[max(env(safe-area-inset-bottom),1.5rem)]">
       <div className="animate-fade-in flex-1">
-        <img
-          src="/icon.svg"
-          alt=""
-          width={64}
-          height={64}
-          className="rounded-[1.1rem] shadow-card"
-        />
+        <Logo size={64} className="rounded-[0.9rem] shadow-card" />
         <h1 className="mt-6 type-display text-[2rem] leading-tight">
           {ctx === 'in-app'
             ? 'Open Steady in your browser'
@@ -64,13 +59,9 @@ export function InstallScreen({ embedded = false, onContinue, context }: Install
         <div className="mt-8">{body}</div>
       </div>
       {onContinue && (
-        <button
-          type="button"
-          onClick={onContinue}
-          className="mx-auto mt-8 min-h-11 rounded-full px-4 text-body font-medium text-muted underline underline-offset-4 hover:text-text"
-        >
+        <Button variant="quiet" onClick={onContinue} className="mx-auto mt-8">
           Continue in browser
-        </button>
+        </Button>
       )}
     </div>
   )
@@ -133,9 +124,9 @@ function InAppGuide() {
         </span>
         <Button
           variant={copied ? 'secondary' : 'primary'}
+          icon={copied ? 'check' : 'copy'}
           onClick={async () => setCopied(await copyText(url))}
         >
-          <Icon name={copied ? 'check' : 'copy'} size={18} />
           {copied ? 'Copied' : 'Copy link'}
         </Button>
       </div>
@@ -153,10 +144,10 @@ function PromptInstall() {
       <Button
         size="lg"
         block
+        icon="download"
         onClick={async () => setOutcome(await promptInstall())}
         disabled={outcome === 'accepted'}
       >
-        <Icon name="download" size={20} />
         {outcome === 'accepted' ? 'Installing…' : 'Install app'}
       </Button>
       {outcome === 'accepted' && (

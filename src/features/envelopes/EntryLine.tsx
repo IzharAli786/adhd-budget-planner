@@ -3,49 +3,60 @@ import { Link } from 'react-router'
 import { useUndoToast } from '../../app/useUndoToast'
 import { deleteTransaction } from '../../db/repos'
 import type { Transaction } from '../../domain/types'
+import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
-
-/** Quiet text button: "+ Add spend", "Rename", "Delete", "Edit". 44px tall for thumbs. */
-export const textButton =
-  'inline-flex min-h-11 items-center justify-center rounded-full px-2.5 text-body text-muted transition-colors hover:bg-accent-soft/60 hover:text-text'
+import { IconButton } from '../../ui/IconButton'
+import { StatusBadge, type StatusSpec } from '../../ui/status'
 
 /**
- * One row on an Envelopes card: name over its date on the left, the amount in the display
- * face, then the row's actions in a fixed-width slot so every amount lines up. The amount
- * and actions sit on the name's line; the date has the line below to itself.
+ * One row on an Envelopes card: the name, the amount in the display face, then the row's
+ * actions in a fixed-width slot so every amount lines up. The line below holds the badges
+ * (where the row comes from, its state) and the date, and runs under the amount too, so a
+ * narrow phone keeps every row to two lines instead of stacking badges under a short name.
  */
 export function EntryLine({
   name,
   sub,
   tag,
+  status,
   amount,
+  incoming = false,
   actions,
 }: {
   name: string
   sub: ReactNode
-  /** A word that says where the row comes from ("Bill", "Payday"), never colour alone. */
-  tag?: string
+  /** Where the row comes from (TAG.bill, TAG.payday): a word and a glyph, never colour alone. */
+  tag?: StatusSpec
+  /** Its state, when it has one worth saying (BILL_STATUS.paid). */
+  status?: StatusSpec
   amount: string
+  /** Money in (income, a refund): the amount is in the success tone. */
+  incoming?: boolean
   actions: ReactNode
 }) {
   return (
-    <li className="flex min-h-16 items-start gap-2 border-t border-line py-3 first:border-t-0 sm:gap-3">
-      <div className="min-w-0 flex-1">
-        <p className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-semibold">{name}</span>
-          {tag && (
-            <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
-              {tag}
-            </span>
-          )}
-        </p>
-        <p className="mt-0.5 text-sm text-muted">{sub}</p>
-      </div>
-      <span className="shrink-0 font-display text-lg leading-6 font-bold tabular-nums sm:text-[1.1875rem]">
+    // DOM order is name, details, amount, actions (what a screen reader reads, and what the
+    // row's text was before); the grid puts the amount and actions up on the name's line.
+    <li className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto_6.375rem] items-start gap-x-2 border-t border-line py-3 first:border-t-0 sm:gap-x-3">
+      <p className="col-start-1 row-start-1 leading-6 font-semibold break-words">{name}</p>
+      <p className="col-span-2 col-start-1 row-start-2 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+        {tag && <StatusBadge status={tag} />}
+        {status && <StatusBadge status={status} />}
+        <span>{sub}</span>
+      </p>
+      <span
+        className={cx(
+          'col-start-2 row-start-1 amount text-lg leading-6 whitespace-nowrap sm:text-[1.1875rem]',
+          incoming && 'text-tone-success',
+        )}
+      >
         {amount}
       </span>
-      <div className="-my-2.5 -mr-2.5 flex w-[5.75rem] shrink-0 items-center justify-end">
+      {/* 7.125rem in all, wide enough for "Calendar" with its glyph, or Edit and ×: the
+          column is 6.375rem and -mr-3 runs the slot into the card's padding, so the last
+          label or glyph lines up with the card's text edge. */}
+      <div className="col-start-3 row-start-1 -my-2.5 -mr-3 flex items-center justify-end">
         {actions}
       </div>
     </li>
@@ -65,25 +76,19 @@ export function EntryActions({
   const undoToast = useUndoToast()
   return (
     <>
-      <button
-        type="button"
-        onClick={() => onEdit(tx)}
-        aria-label={`Edit ${label}`}
-        className={textButton}
-      >
+      <Button variant="quiet" onClick={() => onEdit(tx)} aria-label={`Edit ${label}`}>
         Edit
-      </button>
-      <button
-        type="button"
+      </Button>
+      <IconButton
+        icon="close"
+        tone="danger"
+        size="sm"
+        label={`Delete ${label}`}
         onClick={async () => {
           await deleteTransaction(tx.id)
           undoToast(`Deleted ${label}`)
         }}
-        aria-label={`Delete ${label}`}
-        className={cx(textButton, 'min-w-11 px-0')}
-      >
-        <Icon name="close" size={15} />
-      </button>
+      />
     </>
   )
 }
@@ -91,7 +96,8 @@ export function EntryActions({
 /** For rows that live on the calendar (bills, paydays): changed there, not here. */
 export function CalendarLink({ label, to = '/bills' }: { label: string; to?: string }) {
   return (
-    <Link to={to} aria-label={`Open ${label} in Calendar`} className={textButton}>
+    <Link to={to} aria-label={`Open ${label} in Calendar`} className={buttonClass('quiet', 'md')}>
+      <Icon name="calendar" size={18} className="shrink-0" />
       Calendar
     </Link>
   )

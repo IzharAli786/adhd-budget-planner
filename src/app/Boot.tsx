@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { db } from '../db/schema'
 import { openDatabase } from '../db/snapshot'
+import { Button } from '../ui/Button'
+import { Logo } from '../ui/Logo'
 
 type State = { status: 'opening' } | { status: 'ready' } | { status: 'failed'; error: Error }
 
@@ -33,13 +35,10 @@ export function Boot({ children }: { children: ReactNode }) {
     // Usually a few ms; render the brand quietly instead of a spinner flash.
     return (
       <div className="flex min-h-dvh items-center justify-center" aria-busy="true">
-        <img
-          src="/icon.svg"
-          alt="Steady is starting"
-          width={56}
-          height={56}
-          className="animate-fade-in rounded-2xl"
-        />
+        {/* The mark is decorative on its own; this wrapper carries what it means here. */}
+        <span role="img" aria-label="Steady is starting" className="animate-fade-in">
+          <Logo size={56} />
+        </span>
       </div>
     )
   }
@@ -54,13 +53,9 @@ export function Boot({ children }: { children: ReactNode }) {
           ? 'Another tab may be running an older version. Close other Steady tabs and try again.'
           : 'Your browser blocked storage. Private browsing can do this. Your data has not been touched.'}
       </p>
-      <button
-        type="button"
-        onClick={() => location.reload()}
-        className="mx-auto mt-6 min-h-11 rounded-full bg-accent px-6 font-medium text-accent-contrast"
-      >
+      <Button size="lg" onClick={() => location.reload()} className="mx-auto mt-6">
         Try again
-      </button>
+      </Button>
     </div>
   )
 }

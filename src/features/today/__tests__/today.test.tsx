@@ -254,8 +254,11 @@ describe('Today', () => {
     const list = within(await screen.findByRole('region', { name: 'Coming up' }))
     const row = within(list.getAllByRole('listitem')[0]!)
     expect(row.getByText('Rent')).toBeTruthy()
-    // Overdue says so in words, next to the date, not by weight alone.
-    expect(row.getByText('Overdue')).toBeTruthy()
+    // Overdue says so in words (a badge after the name), not by colour or weight alone.
+    const badge = row.getByText('Overdue')
+    expect(
+      row.getByText('Rent').compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(row.getByRole('checkbox', { name: 'Rent, 1 Nov' })).toBeTruthy()
     expect(screen.queryByText('Did Rent go out?')).toBeNull()
   })

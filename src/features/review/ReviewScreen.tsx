@@ -22,6 +22,7 @@ import { Link } from 'react-router'
 import { Button, buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
+import { IconButton } from '../../ui/IconButton'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { Segmented } from '../../ui/Segmented'
 import { Stat } from '../../ui/Stat'
@@ -287,6 +288,7 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
               {latest && (
                 <Button
                   variant="secondary"
+                  icon="print"
                   onClick={() =>
                     setPrinting({
                       kind: 'period',
@@ -296,12 +298,12 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                     })
                   }
                 >
-                  <Icon name="print" size={18} />
                   Print this period
                 </Button>
               )}
               <Button
                 variant="secondary"
+                icon="print"
                 onClick={() =>
                   setPrinting({
                     kind: 'year',
@@ -316,11 +318,10 @@ function Review({ data, today }: { data: ReviewData; today: ISODate }) {
                   })
                 }
               >
-                <Icon name="print" size={18} />
                 Print this year
               </Button>
               <Link to="/more/reports" className={buttonClass('secondary')}>
-                <Icon name="report" size={18} />
+                <Icon name="report" size={18} className="shrink-0" />
                 Make a PDF report
               </Link>
             </div>
@@ -343,31 +344,26 @@ function YearSwitcher({
 }) {
   const first = years[0] ?? year
   const last = years.at(-1) ?? year
-  const step =
-    'inline-flex size-11 items-center justify-center rounded-full text-accent hover:bg-accent-soft/60 disabled:text-muted disabled:opacity-40 disabled:hover:bg-transparent'
+  const canPrev = year > first
+  const canNext = year < last
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        aria-label="Previous year"
-        disabled={year <= first}
-        onClick={() => onChange(year - 1)}
-        className={step}
-      >
-        <Icon name="back" size={20} />
-      </button>
+      {/* aria-disabled, not disabled: an arrow that runs out while focused keeps the focus. */}
+      <IconButton
+        icon="back"
+        label="Previous year"
+        aria-disabled={!canPrev}
+        onClick={() => canPrev && onChange(year - 1)}
+      />
       <h2 aria-live="polite" className="min-w-16 text-center text-heading tabular-nums">
         {year}
       </h2>
-      <button
-        type="button"
-        aria-label="Next year"
-        disabled={year >= last}
-        onClick={() => onChange(year + 1)}
-        className={step}
-      >
-        <Icon name="chevron" size={20} />
-      </button>
+      <IconButton
+        icon="chevron"
+        label="Next year"
+        aria-disabled={!canNext}
+        onClick={() => canNext && onChange(year + 1)}
+      />
     </div>
   )
 }

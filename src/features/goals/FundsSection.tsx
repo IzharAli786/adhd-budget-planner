@@ -14,7 +14,9 @@ import {
 } from '../../domain/savings'
 import type { Cents, ISODate, SavingsFund, Transaction } from '../../domain/types'
 import { Button } from '../../ui/Button'
+import { DATA_COLOR } from '../../ui/dataColors'
 import { Icon } from '../../ui/Icon'
+import { IconButton } from '../../ui/IconButton'
 import { EmptyState } from '../../ui/PageHeader'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { ProgressRing } from '../../ui/Progress'
@@ -37,13 +39,12 @@ export function FundsSection({ today }: { today: ISODate }) {
 
   return (
     <section aria-labelledby="funds-title" className="space-y-3">
-      <div className="flex items-end justify-between gap-3 px-1">
-        <h2 id="funds-title" className="text-heading">
+      <div className="flex items-end justify-between gap-3">
+        <h2 id="funds-title" className="section-title">
           Savings
         </h2>
         {funds.length > 0 && (
-          <Button variant="ghost" onClick={() => setEditing('new')}>
-            <Icon name="plus" size={18} />
+          <Button variant="ghost" icon="plus" onClick={() => setEditing('new')}>
             New fund
           </Button>
         )}
@@ -53,8 +54,7 @@ export function FundsSection({ today }: { today: ISODate }) {
           art="sprout"
           title="Start one small fund"
           action={
-            <Button onClick={() => setEditing('new')}>
-              <Icon name="plus" size={18} />
+            <Button icon="plus" onClick={() => setEditing('new')}>
               New savings fund
             </Button>
           }
@@ -134,7 +134,7 @@ function FundCard({
   return (
     <li className="card p-5">
       <div className="flex items-center gap-4">
-        <ProgressRing value={progress} label={`${fund.name} progress`}>
+        <ProgressRing value={progress} label={`${fund.name} progress`} color={DATA_COLOR.savings}>
           {fund.target ? (
             f.percent(Math.floor(progress * 100) / 100)
           ) : (
@@ -143,21 +143,20 @@ function FundCard({
         </ProgressRing>
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold break-words">{fund.name}</h3>
-          <p className="text-body tabular-nums">
+          <p className="text-body font-medium tabular-nums">
             {f.money(saved)}
             {fund.target !== undefined && (
               <span className="text-muted"> of {f.money(fund.target)}</span>
             )}
           </p>
         </div>
-        <button
-          type="button"
+        <IconButton
+          icon="edit"
+          size="sm"
+          label={`Edit ${fund.name}`}
           onClick={onEdit}
-          aria-label={`Edit ${fund.name}`}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60"
-        >
-          <Icon name="edit" size={18} />
-        </button>
+          className="-mr-3"
+        />
       </div>
       {(pace || challenge || fund.challenge?.kind === 'fixed') && (
         <p className="mt-3 text-sm text-muted">
@@ -171,8 +170,7 @@ function FundCard({
           {pace}
         </p>
       )}
-      <Button variant="secondary" block className="mt-4" onClick={onAdd}>
-        <Icon name="plus" size={18} />
+      <Button variant="secondary" block icon="plus" className="mt-4" onClick={onAdd}>
         Add money
       </Button>
     </li>

@@ -6,8 +6,9 @@ import { useDebts, useEnvelopes, useFunds } from '../../db/hooks'
 import { addBill, addIncome, addToFund, addTransaction } from '../../db/repos'
 import { dayOfMonthOf } from './entryKinds'
 import type { Cents, Id, ISODate } from '../../domain/types'
-import { Button } from '../../ui/Button'
+import { Button, textLinkClass } from '../../ui/Button'
 import { Chip } from '../../ui/Chip'
+import { EnvelopeDot } from '../../ui/EnvelopeDot'
 import { Field, inputClass } from '../../ui/Field'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { Sheet } from '../../ui/Sheet'
@@ -160,10 +161,7 @@ function AddEntryForm({
       {missing ? (
         <p className="card-quiet p-4 text-body">
           {missing === 'fund' ? 'No savings funds yet. ' : 'No debts listed yet. '}
-          <Link
-            to={missing === 'fund' ? '/goals' : '/more/debts'}
-            className="font-medium text-accent"
-          >
+          <Link to={missing === 'fund' ? '/goals' : '/more/debts'} className={textLinkClass}>
             {missing === 'fund' ? 'Start a fund in Goals' : 'Add a debt'}
           </Link>
         </p>
@@ -206,6 +204,7 @@ function AddEntryForm({
                   <Chip
                     key={env.id}
                     selected={envelopeId === env.id}
+                    leading={<EnvelopeDot color={env.color} />}
                     onClick={() => setEnvelopeId(envelopeId === env.id ? undefined : env.id)}
                   >
                     {env.name}

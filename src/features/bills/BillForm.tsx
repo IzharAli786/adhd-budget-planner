@@ -3,8 +3,10 @@ import { defaultBillEnvelope } from '../../domain/categories'
 import { choiceFromRule, ruleFromChoice, type Repeat, type RepeatChoice } from '../../domain/bills'
 import { isValidISODate } from '../../domain/dates'
 import type { Bill, Envelope, Id, ISODate } from '../../domain/types'
+import { Checkbox } from '../../ui/Checkbox'
 import { Chip } from '../../ui/Chip'
 import { DateInput } from '../../ui/DateInput'
+import { EnvelopeDot } from '../../ui/EnvelopeDot'
 import { Field, inputClass } from '../../ui/Field'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { Segmented } from '../../ui/Segmented'
@@ -171,15 +173,14 @@ export function BillForm({
       />
 
       {choice.repeat === 'monthly' && day >= 28 && (
-        <label className="flex min-h-11 items-center gap-3 text-body">
-          <input
-            type="checkbox"
-            checked={choice.lastDay}
-            onChange={(e) => change({ lastDay: e.target.checked })}
-            className="h-5 w-5 accent-[var(--accent)]"
-          />
+        // -ml-3: the 44px target's 20px box lines up with the fields' left edge.
+        <Checkbox
+          checked={choice.lastDay}
+          onCheckedChange={(lastDay) => change({ lastDay })}
+          className="-ml-3"
+        >
           Always on the last day of the month
-        </label>
+        </Checkbox>
       )}
 
       {summaryRule && (
@@ -199,7 +200,12 @@ export function BillForm({
               No
             </Chip>
             {envelopes.map((e) => (
-              <Chip key={e.id} selected={envelopeId === e.id} onClick={() => setEnvelopeId(e.id)}>
+              <Chip
+                key={e.id}
+                selected={envelopeId === e.id}
+                leading={<EnvelopeDot color={e.color} />}
+                onClick={() => setEnvelopeId(e.id)}
+              >
                 {e.name}
               </Chip>
             ))}

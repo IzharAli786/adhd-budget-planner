@@ -3,7 +3,9 @@
 // printed year report uses. Calm words only: debt still owed is a fact, not a warning.
 import { useId, useState, type ReactNode } from 'react'
 import type { DebtsYear, FundYear } from '../../domain/yearSummary'
+import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
+import { DATA_COLOR } from '../../ui/dataColors'
 import { ProgressBar } from '../../ui/Progress'
 import type { Formatters } from '../bills/format'
 
@@ -43,12 +45,15 @@ export function SavingsYearCard({
           <li key={r.id}>
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate text-body font-medium">{r.name}</span>
-              <span className="shrink-0 text-body tabular-nums">{fundMove(f, r.savedInRange)}</span>
+              <span className="shrink-0 text-body font-medium tabular-nums">
+                {fundMove(f, r.savedInRange)}
+              </span>
             </div>
             {r.ofTarget !== null && (
               <ProgressBar
                 value={r.ofTarget}
                 label={`${r.name}, share of target`}
+                color={DATA_COLOR.savings}
                 className="mt-2"
               />
             )}
@@ -107,7 +112,9 @@ export function DebtYearCard({
                 {f.money(r.owed)} left · {apr(f, r.aprBps)} APR
               </span>
             </span>
-            <span className="shrink-0 text-body tabular-nums">{f.money(r.paidInRange)} paid</span>
+            <span className="shrink-0 text-body font-medium tabular-nums">
+              {f.money(r.paidInRange)} paid
+            </span>
           </li>
         ))}
       </ul>
@@ -146,15 +153,16 @@ function YearCard({
         {table}
       </div>
       <div className="mt-2 flex justify-end">
-        <button
-          type="button"
+        <Button
+          variant="text"
+          size="sm"
+          bleed
           aria-expanded={showTable}
           aria-controls={tableId}
           onClick={() => setShowTable((s) => !s)}
-          className="-mx-2 min-h-11 rounded-full px-2 text-sm font-medium text-accent"
         >
           {showTable ? 'Show as a list' : 'Show as a table'}
-        </button>
+        </Button>
       </div>
     </section>
   )

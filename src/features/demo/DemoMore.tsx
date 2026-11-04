@@ -43,11 +43,12 @@ export function DemoMoreGroup() {
         description="Everything in this demo is cleared, and you can pick sample data or your own numbers again."
         actions={
           <>
-            <Button variant="secondary" onClick={() => setConfirm(false)}>
+            <Button variant="ghost" onClick={() => setConfirm(false)}>
               Keep it
             </Button>
             <Button
               variant="danger"
+              icon="trash"
               onClick={async () => {
                 await resetDemo()
                 setConfirm(false)

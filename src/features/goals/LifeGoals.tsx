@@ -23,42 +23,29 @@ import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { DateInput } from '../../ui/DateInput'
 import { Field, inputClass } from '../../ui/Field'
-import { Icon } from '../../ui/Icon'
+import { DATA_COLOR } from '../../ui/dataColors'
+import { IconButton } from '../../ui/IconButton'
+import { IconTile } from '../../ui/IconTile'
 import { ProgressBar } from '../../ui/Progress'
 import { Segmented } from '../../ui/Segmented'
 import { Sheet } from '../../ui/Sheet'
+import { GOAL_STATUS, StatusBadge, TAG } from '../../ui/status'
 import { useFormat, type Formatters } from '../bills/format'
 import { useDebtsOwed, type OwedDebt } from '../debts/useDebtsOwed'
 
-export const STATUS_LABEL: Record<LifeGoalStatus, string> = {
-  todo: 'Not started',
-  doing: 'In progress',
-  done: 'Done',
-}
 const STATUS_OPTIONS = (['todo', 'doing', 'done'] as const).map((value) => ({
   value,
-  label: STATUS_LABEL[value],
+  label: GOAL_STATUS[value].label,
 }))
 // In progress first: what you're working on now, then what's next, then what's done.
 const ORDER: Record<LifeGoalStatus, number> = { doing: 0, todo: 1, done: 2 }
 
-// Each status reads differently at a glance, never by colour alone (the label is always
-// there): a dashed "slot" waiting, the accent while it's moving, a calm green when done.
-// --env-sage is the contrast-tested envelope green, with its own dark-mode value.
+// Each status reads differently at a glance, never by colour alone (the word and glyph are
+// always there): a dashed "slot" waiting, a full card while it's moving, quiet when done.
 const STATUS_CARD: Record<LifeGoalStatus, string> = {
   todo: 'card-quiet border border-dashed border-line',
-  doing: 'ring-2 ring-accent/40',
+  doing: 'card',
   done: 'card-quiet',
-}
-const STATUS_ICON: Record<LifeGoalStatus, string> = {
-  todo: 'border border-dashed border-muted/60 text-muted',
-  doing: 'bg-accent-soft text-accent',
-  done: 'bg-(--env-sage) text-surface',
-}
-const STATUS_PILL: Record<LifeGoalStatus, string> = {
-  todo: 'bg-bg text-muted ring-1 ring-line',
-  doing: 'bg-accent-soft text-accent',
-  done: 'bg-(--env-sage) text-surface',
 }
 
 /**
@@ -82,9 +69,9 @@ export function LifeGoalsCard({ today }: { today: ISODate }) {
 
   return (
     <section aria-labelledby="life-goals-title" className="space-y-3">
-      <div className="flex items-end justify-between gap-3 px-1">
+      <div className="flex items-end justify-between gap-3">
         <div>
-          <h2 id="life-goals-title" className="text-heading">
+          <h2 id="life-goals-title" className="section-title">
             Life goals
           </h2>
           {goals.length > 0 && (
@@ -98,10 +85,10 @@ export function LifeGoalsCard({ today }: { today: ISODate }) {
         {goals.length > 0 && (
           <Button
             variant="ghost"
+            icon="plus"
             className="shrink-0 whitespace-nowrap"
             onClick={() => setEditing('new')}
           >
-            <Icon name="plus" size={18} />
             New goal
           </Button>
         )}
@@ -112,8 +99,12 @@ export function LifeGoalsCard({ today }: { today: ISODate }) {
             What is the money for? A move, a course, a calmer year. Write it down, link it to a fund
             or a debt if you like, and watch it get closer.
           </p>
-          <Button variant="secondary" className="mt-4" onClick={() => setEditing('new')}>
-            <Icon name="plus" size={18} />
+          <Button
+            variant="secondary"
+            icon="plus"
+            className="mt-4"
+            onClick={() => setEditing('new')}
+          >
             Add a life goal
           </Button>
         </div>
@@ -172,34 +163,18 @@ function GoalRow({
   const f = useFormat()
   const undoToast = useUndoToast()
   const isDone = goal.status === 'done'
+  const status = GOAL_STATUS[goal.status]
   const next: LifeGoalStatus = goal.status === 'todo' ? 'doing' : 'done'
 
   return (
-    <li className={cx('card p-4', STATUS_CARD[goal.status])}>
+    <li className={cx('p-5', STATUS_CARD[goal.status])}>
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden="true"
-          className={cx(
-            'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full',
-            STATUS_ICON[goal.status],
-          )}
-        >
-          <Icon
-            name={isDone ? 'check' : goal.status === 'doing' ? 'sprout' : 'sparkle'}
-            size={16}
-          />
-        </span>
+        <IconTile icon={status.icon ?? 'check'} tone={status.tone} round />
         <div className="min-w-0 flex-1">
           <h3 className={cx('font-semibold break-words', isDone && 'text-muted')}>{goal.title}</h3>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-            <span
-              className={cx(
-                'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                STATUS_PILL[goal.status],
-              )}
-            >
-              {STATUS_LABEL[goal.status]}
-            </span>
+            {/* No glyph in the badge: the disc beside the title already shows it. */}
+            <StatusBadge status={status} icon={false} />
             {isDone && goal.doneAt
               ? f.month(goal.doneAt.slice(0, 10))
               : goal.targetDate
@@ -212,14 +187,13 @@ function GoalRow({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          aria-label={`Edit ${goal.title}`}
+        <IconButton
+          icon="edit"
+          size="sm"
+          label={`Edit ${goal.title}`}
           onClick={onEdit}
-          className="-m-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60"
-        >
-          <Icon name="edit" size={18} />
-        </button>
+          className="-my-1 -mr-3"
+        />
       </div>
       {!isDone && (fund || debt) && (
         <GoalLink fund={fund} debt={debt} transactions={transactions} f={f} />
@@ -228,22 +202,17 @@ function GoalRow({
         <div className="mt-3 flex justify-end">
           <Button
             variant="ghost"
+            icon={next === 'done' ? 'check' : 'circleHalf'}
             onClick={() =>
               void setLifeGoalStatus(goal.id, next).then(() =>
                 undoToast(
                   next === 'done' ? `${goal.title}: done. Well done.` : 'Marked in progress',
+                  next === 'done' ? { tone: 'success' } : undefined,
                 ),
               )
             }
           >
-            {next === 'done' ? (
-              <>
-                <Icon name="check" size={18} />
-                Mark done
-              </>
-            ) : (
-              'Start it'
-            )}
+            {next === 'done' ? 'Mark done' : 'Start it'}
           </Button>
         </div>
       )}
@@ -280,6 +249,7 @@ function GoalLink({
           <ProgressBar
             value={fundProgress(saved, fund.target)}
             label={`${fund.name} progress`}
+            color={DATA_COLOR.savings}
             className="mt-2"
           />
         )}
@@ -290,16 +260,19 @@ function GoalLink({
   const paid = Math.max(0, debt.originalBalance - debt.owed)
   return (
     <div className="mt-3 rounded-2xl bg-bg px-3.5 py-2.5 text-sm">
-      <div className="flex justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <span className="truncate text-muted">Debt · {debt.name}</span>
-        <span className="shrink-0 tabular-nums">
-          {debt.owed <= 0 ? 'Paid off' : `${f.money(debt.owed)} left`}
-        </span>
+        {debt.owed <= 0 ? (
+          <StatusBadge status={TAG.paidOff} />
+        ) : (
+          <span className="shrink-0 tabular-nums">{f.money(debt.owed)} left</span>
+        )}
       </div>
       {debt.originalBalance > 0 && (
         <ProgressBar
           value={Math.min(1, paid / debt.originalBalance)}
           label={`${debt.name} paid off`}
+          color={DATA_COLOR.debt}
           className="mt-2"
         />
       )}
@@ -440,7 +413,7 @@ function GoalForm({
       )}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
         {goal ? (
-          <Button variant="ghost" className="text-muted" onClick={() => void remove()}>
+          <Button variant="quiet" icon="trash" onClick={() => void remove()}>
             Delete goal
           </Button>
         ) : (

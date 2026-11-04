@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { SaveBackupButton, useBackupFile } from '../features/backup/SaveBackup'
 import { Button } from '../ui/Button'
-import { Icon } from '../ui/Icon'
+import { IconTile } from '../ui/IconTile'
 
 const HOUR = 60 * 60 * 1000
 // A download link starts reading its blob a moment after the tap; reloading at once would
@@ -69,11 +69,9 @@ export function UpdateReady({
       className="print-hide animate-toast-in fixed inset-x-4 top-[max(env(safe-area-inset-top),0.75rem)] z-50 mx-auto max-w-md rounded-3xl bg-surface p-3 pl-4 shadow-card ring-1 ring-line md:top-6"
     >
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
-          <Icon name="sparkle" size={18} />
-        </span>
+        <IconTile icon="sparkle" round />
         <p className="min-w-0 flex-1 text-body font-medium">An update is ready</p>
-        <Button variant="ghost" onClick={onLater} className="px-3">
+        <Button variant="quiet" onClick={onLater}>
           Later
         </Button>
       </div>
@@ -83,13 +81,12 @@ export function UpdateReady({
           label="Back up first"
           variant="secondary"
           size="md"
-          className="px-3"
           onSaved={(result) => {
             if (result === 'downloaded') setTimeout(onRefresh, AFTER_DOWNLOAD_MS)
             else onRefresh()
           }}
         />
-        <Button block onClick={onRefresh} className="px-3">
+        <Button block onClick={onRefresh}>
           Refresh now
         </Button>
       </div>

@@ -99,7 +99,7 @@ function InlineNote({ target, title, hint, labelledBy, className }: Props) {
       />
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <p className="text-caption text-muted">Saves by itself when you leave the box.</p>
-        <Button type="submit" variant="secondary" className="ml-auto px-4">
+        <Button type="submit" variant="secondary" className="ml-auto">
           Save
         </Button>
       </div>
@@ -161,7 +161,12 @@ function NoteCard({ target, title, hint, variant = 'card', foldId, className }: 
           )}
         </Heading>
         {open && note && draft === null && (
-          <Button variant="ghost" onClick={() => setDraft(note.text)} aria-label={`Edit ${title}`}>
+          <Button
+            variant="quiet"
+            className="-mr-3"
+            onClick={() => setDraft(note.text)}
+            aria-label={`Edit ${title}`}
+          >
             Edit
           </Button>
         )}
@@ -197,8 +202,9 @@ function NoteCard({ target, title, hint, variant = 'card', foldId, className }: 
               </Button>
               {note && (
                 <Button
-                  variant="ghost"
-                  className="ml-auto text-muted"
+                  variant="quiet"
+                  icon="trash"
+                  className="ml-auto"
                   disabled={saving}
                   onClick={() => void save(undefined, '')}
                 >
@@ -212,8 +218,7 @@ function NoteCard({ target, title, hint, variant = 'card', foldId, className }: 
         ) : (
           <div className="mt-1 space-y-3">
             <p className="text-body text-muted">{hint}</p>
-            <Button variant="secondary" onClick={() => setDraft('')}>
-              <Icon name="plus" size={18} />
+            <Button variant="secondary" icon="plus" onClick={() => setDraft('')}>
               Add a note
             </Button>
           </div>

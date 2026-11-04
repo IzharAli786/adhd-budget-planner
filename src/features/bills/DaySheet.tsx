@@ -3,7 +3,7 @@ import type { PaydaySaving } from '../../domain/savings'
 import type { ISODate, Transaction } from '../../domain/types'
 import { EntryRow } from '../transactions/EntryRow'
 import { Button } from '../../ui/Button'
-import { Icon } from '../../ui/Icon'
+import { IconTile } from '../../ui/IconTile'
 import { Sheet } from '../../ui/Sheet'
 import { NoteEditor } from '../notes/NoteEditor'
 import { BillRow } from './BillRow'
@@ -49,8 +49,12 @@ export function DaySheet({
       description={date ? (date === today ? 'Today' : capitalize(f.relative(date, today))) : ''}
       actions={
         date && (
-          <Button variant={empty ? 'primary' : 'secondary'} block onClick={() => onAdd(date)}>
-            <Icon name="plus" size={18} />
+          <Button
+            variant={empty ? 'primary' : 'secondary'}
+            block
+            icon="plus"
+            onClick={() => onAdd(date)}
+          >
             Add to this day
           </Button>
         )
@@ -64,16 +68,18 @@ export function DaySheet({
               {paydays.map((p) => (
                 <li
                   key={`${p.incomeId}|${p.nominal}`}
-                  className="flex min-h-14 items-center gap-3 rounded-2xl bg-accent-soft px-4"
+                  className="flex min-h-14 items-center gap-3 rounded-2xl py-2 pr-4 pl-2.5 ring-1 ring-line"
                 >
-                  <Icon name="payday" size={20} className="text-accent" />
+                  <IconTile icon="payday" tone="success" />
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium">{p.name}</span>
                     <span className="block text-sm text-muted">
                       Payday{p.overridden ? ` · moved from ${f.day(p.nominal)}` : ''}
                     </span>
                   </span>
-                  <span className="font-medium tabular-nums">+{f.money(p.amount)}</span>
+                  <span className="font-medium text-tone-success tabular-nums">
+                    +{f.money(p.amount)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -83,9 +89,9 @@ export function DaySheet({
               {savings.map((s) => (
                 <li
                   key={s.fundId}
-                  className="flex min-h-12 items-center gap-3 rounded-2xl px-4 ring-1 ring-line"
+                  className="flex min-h-12 items-center gap-3 rounded-2xl py-1.5 pr-4 pl-2.5 ring-1 ring-line"
                 >
-                  <Icon name="sprout" size={20} className="text-accent" />
+                  <IconTile icon="sprout" tone="info" />
                   <span className="min-w-0 flex-1 text-body">
                     Set aside {f.money(s.amount)} for {s.name}
                   </span>

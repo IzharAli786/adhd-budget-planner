@@ -7,7 +7,7 @@ import { parseAmount, type Cents } from '../../domain/money'
 import { monthSpan } from '../../domain/safeToSpend'
 import { useToday } from '../../lib/useToday'
 import { cx } from '../../ui/cx'
-import { inputClass } from '../../ui/Field'
+import { FieldError, inputClass } from '../../ui/Field'
 import { Icon } from '../../ui/Icon'
 import { PageHeader } from '../../ui/PageHeader'
 import { Switch } from '../../ui/Switch'
@@ -16,7 +16,7 @@ import { displayName } from '../setup/LocaleLine'
 import { SECTION_GUIDE } from './sections'
 
 /** A card's own title: the display face, one step above body text. */
-const cardTitle = 'type-display text-heading'
+const cardTitle = 'card-title'
 
 /**
  * Getting started: the few numbers everything is built on (currency, starting balance,
@@ -47,10 +47,10 @@ export function GettingStartedScreen() {
       )}
 
       <section aria-labelledby="section-guide-title" className="mt-10 space-y-3">
-        <h2 id="section-guide-title" className="type-display text-[1.375rem] leading-tight">
+        <h2 id="section-guide-title" className="section-title">
           How each section works
         </h2>
-        <ul className="card divide-y divide-line px-6 py-5">
+        <ul className="card divide-y divide-line px-5 py-4 sm:px-6 sm:py-5">
           {sections.map((s) => (
             <li key={s.to} className="py-3.5">
               <h3 className={cardTitle}>{s.label}</h3>
@@ -78,7 +78,7 @@ function SettingCard({
   const id = useId()
   const ids = { title: `${id}-title`, body: `${id}-body` }
   return (
-    <section aria-labelledby={ids.title} className="card p-6">
+    <section aria-labelledby={ids.title} className="card p-5 sm:p-6">
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <h2 id={ids.title} className={cardTitle}>
@@ -268,9 +268,11 @@ function StartingBalanceCard() {
             className={cx(inputClass, 'tabular-nums sm:w-1/4 sm:min-w-48')}
           />
           {invalid && (
-            <p id={`${ids.title}-error`} className="mt-1.5 text-sm font-medium text-accent">
-              Enter an amount like {decimals ? `250.${'0'.repeat(decimals)}` : '250'}
-            </p>
+            <div className="mt-1.5">
+              <FieldError id={`${ids.title}-error`}>
+                Enter an amount like {decimals ? `250.${'0'.repeat(decimals)}` : '250'}
+              </FieldError>
+            </div>
           )}
         </div>
       )}

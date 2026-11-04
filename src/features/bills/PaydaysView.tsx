@@ -13,10 +13,10 @@ import { primaryIncome } from '../../domain/paySchedule'
 import type { IncomeSource, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { DateInput } from '../../ui/DateInput'
-import { Icon } from '../../ui/Icon'
 import { EmptyState } from '../../ui/PageHeader'
 import { ListGroup, ListRow } from '../../ui/List'
 import { Sheet } from '../../ui/Sheet'
+import { StatusBadge, TAG } from '../../ui/status'
 import { describeSchedule } from './describe'
 import { useFormat } from './format'
 import { IncomeForm, type IncomeInput } from './IncomeForm'
@@ -51,8 +51,7 @@ export function PaydaysView({ data, today }: { data: BillsData; today: ISODate }
           art="sunrise"
           title="When do you get paid?"
           action={
-            <Button onClick={() => setPanel({ kind: 'income' })}>
-              <Icon name="plus" size={18} />
+            <Button icon="plus" onClick={() => setPanel({ kind: 'income' })}>
               Add your pay
             </Button>
           }
@@ -62,11 +61,11 @@ export function PaydaysView({ data, today }: { data: BillsData; today: ISODate }
         </EmptyState>
       ) : (
         <>
-          <section className="card p-6">
+          <section className="card p-5 sm:p-6">
             <p className="text-sm text-muted">Next payday</p>
             {next ? (
               <>
-                <p className="mt-1 text-[2rem] leading-tight font-semibold tracking-tight">
+                <p className="mt-1 type-display text-[2rem] leading-tight">
                   {f.dayLong(next.date)}
                 </p>
                 <p className="mt-2 text-body text-muted">
@@ -80,8 +79,7 @@ export function PaydaysView({ data, today }: { data: BillsData; today: ISODate }
                 No date yet. Add your next expected payday.
               </p>
             )}
-            <Button className="mt-4" onClick={() => setPanel({ kind: 'income' })}>
-              <Icon name="plus" size={18} />
+            <Button icon="plus" className="mt-4" onClick={() => setPanel({ kind: 'income' })}>
               Add income
             </Button>
           </section>
@@ -91,13 +89,12 @@ export function PaydaysView({ data, today }: { data: BillsData; today: ISODate }
               <ListRow
                 key={i.id}
                 icon="payday"
+                iconTone="success"
                 label={
                   <>
                     {i.name}
                     {i.id === primary?.id && incomes.length > 1 && (
-                      <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 align-middle text-xs font-medium text-accent">
-                        Main
-                      </span>
+                      <StatusBadge status={TAG.main} className="ml-2 align-middle" />
                     )}
                   </>
                 }
@@ -214,11 +211,11 @@ function IncomeEditor({
           <div className="sticky -bottom-2 -mx-6 mt-2 flex flex-col-reverse gap-2 border-t border-line bg-surface px-6 pt-3 pb-6 sm:flex-row sm:items-center">
             {income && (
               <Button
-                variant="ghost"
-                className="text-muted sm:mr-auto"
+                variant="quiet"
+                icon="trash"
+                className="sm:mr-auto"
                 onClick={() => void remove()}
               >
-                <Icon name="trash" size={18} />
                 Delete
               </Button>
             )}

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { Icon, type IconName } from '../../ui/Icon'
+import { IconTile } from '../../ui/IconTile'
+import { StatusBadge, TAG } from '../../ui/status'
 import { PageHeader } from '../../ui/PageHeader'
 import { SectionHeader } from '../../ui/Section'
 import { SECTION_GUIDE } from '../start/sections'
@@ -64,15 +66,9 @@ export function HelpScreen() {
           {PARTS.map((part) => (
             <li key={part.name} className="card p-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-                  <Icon name={part.icon} size={20} />
-                </span>
+                <IconTile icon={part.icon} />
                 <h2 className="text-heading">{part.name}</h2>
-                {part.full && (
-                  <span className="ml-auto rounded-full bg-bg px-2.5 py-1 text-caption text-muted">
-                    More tools
-                  </span>
-                )}
+                {part.full && <StatusBadge status={TAG.moreTools} className="ml-auto" />}
               </div>
               <p className="mt-3 text-body text-muted">{part.body}</p>
             </li>

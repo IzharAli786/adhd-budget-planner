@@ -3,7 +3,7 @@ import { useUndoToast } from '../../app/useUndoToast'
 import { addStarterEnvelopes } from '../../db/repos'
 import { STARTER_CATEGORIES } from '../../domain/categories'
 import { Button } from '../../ui/Button'
-import { EnvelopeDot } from '../../ui/EnvelopeDot'
+import { EnvelopeLabel } from '../../ui/EnvelopeDot'
 
 const SKIP_KEY = 'steady:starter-categories'
 // Per device on purpose: it only hides an offer, and storage can be unavailable (private
@@ -40,8 +40,8 @@ export function StarterOffer({ onSkip }: { onSkip: () => void }) {
   }
 
   return (
-    <section aria-labelledby="starter-title" className="card p-5 sm:px-8 sm:py-7">
-      <h2 id="starter-title" className="type-display text-[1.375rem] leading-tight">
+    <section aria-labelledby="starter-title" className="card p-5 sm:p-6">
+      <h2 id="starter-title" className="section-title">
         Start with common categories?
       </h2>
       <p className="mt-1.5 text-body text-muted">
@@ -50,12 +50,8 @@ export function StarterOffer({ onSkip }: { onSkip: () => void }) {
       </p>
       <ul aria-label="Categories it adds" className="mt-4 flex flex-wrap gap-1.5">
         {STARTER_CATEGORIES.map((c) => (
-          <li
-            key={c.name}
-            className="inline-flex items-center gap-1.5 rounded-full bg-bg px-2.5 py-1 text-caption ring-1 ring-line"
-          >
-            <EnvelopeDot color={c.color} className="h-2 w-2" />
-            {c.name}
+          <li key={c.name} className="inline-flex">
+            <EnvelopeLabel name={c.name} color={c.color} />
           </li>
         ))}
       </ul>
@@ -64,7 +60,7 @@ export function StarterOffer({ onSkip }: { onSkip: () => void }) {
           Start with common categories
         </Button>
         <Button
-          variant="ghost"
+          variant="quiet"
           onClick={() => {
             writeSkipped()
             onSkip()

@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { Link } from 'react-router'
+import { buttonClass } from '../../ui/Button'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
+import { segmentItemClass } from '../../ui/Segmented'
 
 export interface MonthTab {
   /** 'YYYY-MM' */
@@ -82,10 +84,8 @@ export function MonthTabs({
               aria-current={m.key === current ? 'date' : undefined}
               onClick={() => onChange(m.key)}
               className={cx(
-                'relative inline-flex min-h-11 min-w-13 flex-1 shrink-0 items-center justify-center rounded-full px-3 text-sm font-medium whitespace-nowrap transition-colors',
-                selected
-                  ? 'bg-surface font-semibold text-text shadow-card ring-1 ring-line'
-                  : 'text-muted hover:text-text',
+                segmentItemClass(selected),
+                'relative inline-flex min-w-13 shrink-0 items-center justify-center',
               )}
             >
               <span aria-hidden="true">{m.short}</span>
@@ -101,11 +101,8 @@ export function MonthTabs({
         })}
       </div>
       <span aria-hidden="true" className="mx-1 my-2.5 w-px shrink-0 bg-line" />
-      <Link
-        to="/review"
-        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap text-accent hover:bg-accent-soft/60"
-      >
-        <Icon name="history" size={16} />
+      <Link to="/review" className={cx(buttonClass('text', 'sm'), 'mr-0.5 self-center')}>
+        <Icon name="history" size={16} className="shrink-0" />
         Year
       </Link>
     </div>

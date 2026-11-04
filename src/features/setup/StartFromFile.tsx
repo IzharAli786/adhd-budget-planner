@@ -3,7 +3,6 @@ import { importBackup, readBackupFile, type RestoreError, type ValidBackup } fro
 import { saveSetupProgress } from '../../db/repos'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
-import { Icon } from '../../ui/Icon'
 import { BackupPreview } from '../backup/BackupScreen'
 
 /**
@@ -57,14 +56,9 @@ export function StartFromFile({ ackAt }: { ackAt: string | undefined }) {
         aria-label="Backup or demo file"
         onChange={(e) => void onPick(e.target.files?.[0])}
       />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-body font-medium text-accent hover:bg-accent-soft/60"
-      >
-        <Icon name="upload" size={18} />
+      <Button variant="text" icon="upload" onClick={() => inputRef.current?.click()}>
         Start from a backup or demo file
-      </button>
+      </Button>
 
       <Dialog
         open={pending !== null}

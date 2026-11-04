@@ -31,10 +31,12 @@ import type { Cents, DayOfMonth } from '../../domain/types'
 import { detectLocaleDefaults } from '../../lib/locale'
 import { useToday } from '../../lib/useToday'
 import { Button } from '../../ui/Button'
+import { radioClass } from '../../ui/Checkbox'
 import { Chip } from '../../ui/Chip'
 import { cx } from '../../ui/cx'
 import { DateInput } from '../../ui/DateInput'
-import { Icon } from '../../ui/Icon'
+import { FieldError } from '../../ui/Field'
+import { IconTile } from '../../ui/IconTile'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { Switch } from '../../ui/Switch'
 import { DaySelect, KINDS } from '../bills/IncomeForm'
@@ -116,14 +118,9 @@ function StepFrame({
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="flex min-h-14 items-center justify-between">
           {onBack ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="-ml-3 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-1.5 text-body font-medium text-accent hover:bg-accent-soft/60"
-            >
-              <Icon name="back" size={20} />
+            <Button variant="text" bleed icon="back" onClick={onBack}>
               Back
-            </button>
+            </Button>
           ) : (
             <span />
           )}
@@ -198,18 +195,16 @@ function AckStep() {
           enter. It’s not financial advice.
         </Point>
         <Point icon="shield">It can’t see your bank. Everything stays on this device.</Point>
-        <Point icon="refresh">You can change any answer later.</Point>
+        <Point icon="edit">You can change any answer later.</Point>
       </ul>
     </StepFrame>
   )
 }
 
-function Point({ icon, children }: { icon: 'info' | 'shield' | 'refresh'; children: ReactNode }) {
+function Point({ icon, children }: { icon: 'info' | 'shield' | 'edit'; children: ReactNode }) {
   return (
     <li className="flex gap-3 text-body">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-        <Icon name={icon} size={18} />
-      </span>
+      <IconTile icon={icon} />
       <span className="pt-1.5">{children}</span>
     </li>
   )
@@ -356,16 +351,16 @@ function PayStep({
                   setKind(k.value)
                   setKindError(null)
                 }}
-                className="h-5 w-5 accent-accent"
+                className={radioClass}
               />
               <span className="text-body font-medium">{k.label}</span>
             </label>
           ))}
         </div>
         {kindError && kind !== 'semimonthly' && (
-          <p role="alert" className="mt-2 text-sm font-medium text-accent">
-            {kindError}
-          </p>
+          <div role="alert" className="mt-2">
+            <FieldError>{kindError}</FieldError>
+          </div>
         )}
       </fieldset>
 

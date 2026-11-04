@@ -4,7 +4,6 @@ import { addDebt, deleteDebt, updateDebt } from '../../db/repos'
 import type { Debt, ISODate } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
-import { Icon } from '../../ui/Icon'
 import { Sheet } from '../../ui/Sheet'
 import { DebtForm, type DebtValues } from './DebtForm'
 
@@ -80,11 +79,11 @@ function EditorBody({
       <div className="sticky -bottom-2 -mx-6 mt-2 flex flex-col-reverse gap-2 border-t border-line bg-surface px-6 pt-3 pb-6 sm:flex-row sm:items-center">
         {debt && (
           <Button
-            variant="ghost"
-            className="text-muted sm:mr-auto"
+            variant="quiet"
+            icon="trash"
+            className="sm:mr-auto"
             onClick={() => setConfirmDelete(true)}
           >
-            <Icon name="trash" size={18} />
             Delete
           </Button>
         )}
@@ -104,7 +103,7 @@ function EditorBody({
               <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
                 Keep it
               </Button>
-              <Button variant="danger" onClick={() => void remove()}>
+              <Button variant="danger" icon="trash" onClick={() => void remove()}>
                 Delete {debt.name}
               </Button>
             </>

@@ -35,9 +35,8 @@ export function StatStrip({
             className="flex flex-wrap items-baseline justify-between gap-x-4 px-5 py-3.5 sm:block sm:py-4"
           >
             <dt className="text-sm text-muted">{item.label}</dt>
-            <dd className="text-xl font-semibold tracking-tight tabular-nums sm:mt-1">
-              {item.value}
-            </dd>
+            {/* Today's serif: a strip's figures read as figures, not as list text. */}
+            <dd className="type-display text-[1.375rem] leading-tight sm:mt-1">{item.value}</dd>
             {item.hint && <dd className="w-full text-caption text-muted sm:mt-0.5">{item.hint}</dd>}
           </div>
         ))}

@@ -7,7 +7,8 @@ import { purgeDeleted } from '../db/repos'
 import { requestPersist } from '../lib/storage'
 import { AppBadge } from './AppBadge'
 import { cx } from '../ui/cx'
-import { Icon } from '../ui/Icon'
+import { IconButton } from '../ui/IconButton'
+import { Notice } from '../ui/Notice'
 import { TabBar } from './TabBar'
 import { UpdateToast } from './UpdateToast'
 
@@ -87,17 +88,12 @@ export function AppShell() {
 function OfflineNote({ onDismiss }: { onDismiss: () => void }) {
   return (
     // No live region: it isn't news about anything the person did, just a quiet fact.
-    <div className="print-hide mb-4 flex items-center gap-2 rounded-2xl bg-accent-soft py-1 pr-1 pl-3 text-sm">
-      <Icon name="check" size={16} className="shrink-0 text-accent" />
-      <p className="min-w-0 flex-1">Steady now works offline, even with no connection.</p>
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label="Dismiss"
-        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-muted hover:text-text"
-      >
-        <Icon name="close" size={16} />
-      </button>
-    </div>
+    <Notice
+      tone="success"
+      className="print-hide mb-4"
+      action={<IconButton icon="close" label="Dismiss" size="sm" onClick={onDismiss} />}
+    >
+      <p>Steady now works offline, even with no connection.</p>
+    </Notice>
   )
 }

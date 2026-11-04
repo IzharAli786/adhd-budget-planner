@@ -331,7 +331,9 @@ function TransactionRow({
             </span>
           )}
         </span>
-        <span className="shrink-0 font-medium tabular-nums">
+        <span
+          className={cx('shrink-0 font-medium tabular-nums', t.amount > 0 && 'text-tone-success')}
+        >
           {t.amount > 0 ? '+' : ''}
           {f.money(t.amount)}
         </span>
@@ -455,8 +457,12 @@ function EnvelopeFilter({
   return (
     <div role="group" aria-label="Envelope" className="flex flex-wrap gap-2">
       {envelopes.map((e) => (
-        <Chip key={e.id} selected={value === e.id} onClick={() => toggle(e.id)}>
-          <EnvelopeDot color={e.color} className="h-2 w-2" />
+        <Chip
+          key={e.id}
+          selected={value === e.id}
+          leading={<EnvelopeDot color={e.color} />}
+          onClick={() => toggle(e.id)}
+        >
           {e.name}
         </Chip>
       ))}
@@ -609,6 +615,7 @@ function TransactionForm({ tx, onClose }: { tx: Transaction; onClose: () => void
               <Chip
                 key={env.id}
                 selected={envelopeId === env.id}
+                leading={<EnvelopeDot color={env.color} />}
                 onClick={() => setEnvelopeId(envelopeId === env.id ? undefined : env.id)}
               >
                 {env.name}
@@ -618,15 +625,16 @@ function TransactionForm({ tx, onClose }: { tx: Transaction; onClose: () => void
         </fieldset>
       )}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+        {/* One step with Undo, so quiet: danger is kept for confirming what can't be undone. */}
         <Button
-          variant="danger"
+          variant="quiet"
+          icon="trash"
           onClick={async () => {
             await deleteTransaction(tx.id)
             undoToast(`Deleted ${label}`)
             onClose()
           }}
         >
-          <Icon name="trash" size={18} />
           Delete
         </Button>
         <Button type="submit">Save</Button>

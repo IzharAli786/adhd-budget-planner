@@ -8,8 +8,10 @@ import {
   promptInstall,
   setContinuedInBrowser,
 } from '../../lib/install'
-import { Button } from '../../ui/Button'
+import { Button, buttonClass } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
+import { cx } from '../../ui/cx'
+import { IconButton } from '../../ui/IconButton'
 import { InstallScreen } from './InstallScreen'
 import { useInstallContext } from './useInstall'
 
@@ -45,38 +47,34 @@ export function InstallBanner() {
   if ((ctx === 'ios' || ctx === 'in-app') && !continuedInBrowser()) return null
 
   return (
-    <div className="print-hide border-b border-line bg-accent-soft pt-[env(safe-area-inset-top)]">
+    // A full-width strip in the info tone (the same recipe as Notice): a status, not an
+    // accent action, so the Install button is the one accent thing in it.
+    <div className="print-hide border-b border-tone-info-line bg-tone-info-bg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex max-w-2xl items-center gap-3 px-5 py-2 md:px-10">
-        <Icon name="phone" size={18} className="shrink-0 text-accent" />
-        <p className="min-w-0 flex-1 text-sm">
+        <Icon name="phone" size={20} className="shrink-0 text-tone-info" />
+        <p className="min-w-0 flex-1 text-sm text-text">
           {ctx === 'prompt'
             ? 'Install Steady to use it offline, like an app.'
             : 'You’re in the browser. Data here is separate from the installed app.'}
         </p>
         {ctx === 'prompt' ? (
-          <Button className="shrink-0 px-4" onClick={() => void promptInstall()}>
-            Install
-          </Button>
+          <Button onClick={() => void promptInstall()}>Install</Button>
         ) : (
-          <Link
-            to="/more/install"
-            className="min-h-11 shrink-0 content-center px-2 text-sm font-semibold text-accent"
-          >
+          <Link to="/more/install" className={cx(buttonClass('text', 'sm'), '-mr-2.5')}>
             How to install
           </Link>
         )}
         {ctx === 'prompt' && (
-          <button
-            type="button"
-            aria-label="Not now"
+          <IconButton
+            icon="close"
+            label="Not now"
+            size="sm"
             onClick={() => {
               dismissInstallBanner()
               setHidden(true)
             }}
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-muted"
-          >
-            <Icon name="close" size={18} />
-          </button>
+            className="-mr-3"
+          />
         )}
       </div>
     </div>

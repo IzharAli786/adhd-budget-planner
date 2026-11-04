@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router'
 import { setMeta } from '../../db/repos'
 import { addSnooze, type NextAction, type Snoozes } from '../../domain/nextAction'
 import { Button } from '../../ui/Button'
-import { Icon } from '../../ui/Icon'
+import { IconTile } from '../../ui/IconTile'
 
 interface Props {
   /** The data-safety nudge ('backup'): the one action card Today still carries. */
@@ -21,11 +21,9 @@ export function ActionCard({ action, snoozes }: Props) {
       aria-labelledby="next-action"
       className="card-quiet animate-fade-in flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center"
     >
-      <span
-        aria-hidden="true"
-        className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent sm:inline-flex"
-      >
-        <Icon name="shield" size={20} />
+      {/* The tile's own display wins over `hidden`, so a wrapper hides it on phones. */}
+      <span className="hidden shrink-0 sm:inline-flex">
+        <IconTile icon="shield" size="md" round />
       </span>
       <div className="min-w-0 flex-1">
         <p className="eyebrow text-accent">Keep your data safe</p>
@@ -39,8 +37,7 @@ export function ActionCard({ action, snoozes }: Props) {
           <Button onClick={() => navigate('/more/backup')}>{action.cta}</Button>
           {action.snoozable && (
             <Button
-              variant="ghost"
-              className="text-muted"
+              variant="quiet"
               onClick={() =>
                 void setMeta('snoozes', addSnooze(snoozes, action.id, new Date().toISOString()))
               }

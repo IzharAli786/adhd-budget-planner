@@ -5,8 +5,11 @@ import { markDue, markPaid, setNoteDone } from '../../db/repos'
 import { billEntriesBetween, paydayEntriesBetween } from '../../domain/bills'
 import { addDays } from '../../domain/dates'
 import type { ISODate } from '../../domain/types'
+import { Checkbox } from '../../ui/Checkbox'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
+import { Marker, type MarkerKind } from '../../ui/Marker'
+import { BILL_STATUS, StatusBadge } from '../../ui/status'
 import { useFormat } from '../bills/format'
 import { useBillsData } from '../bills/useBillsData'
 import { Header, useShortDay } from './Dashboard'
@@ -33,23 +36,18 @@ type Item =
   | { key: string; kind: 'payday'; date: ISODate; name: string; amount: number }
   | { key: string; kind: 'note'; date: ISODate; name: string; id: string; done: boolean }
 
-// The dot says what a row is at a glance; the same words are there for screen readers,
-// and paydays also carry their own icon and a "+", so colour is never the only cue.
-const DOT = {
-  bill: 'bg-accent',
-  debt: 'bg-(--env-ocean)',
-  payday: 'bg-(--env-sage)',
-  note: 'bg-muted',
-} as const
-
-function kindOf(item: Item): keyof typeof DOT {
+// The marker's shape says what a row is at a glance (dot bill, diamond debt, ring payday,
+// dash note); the same words are there in text, and paydays also carry their own icon and
+// a "+", so colour is never the only cue.
+function markerOf(item: Item): MarkerKind {
   return item.kind === 'bill' ? (item.debt ? 'debt' : 'bill') : item.kind
 }
 
-function kindWords(item: Item): string {
+/** The kind of row for screen readers, where no badge says it already. */
+function kindWord(item: Item): string | null {
   if (item.kind === 'payday') return 'Payday'
   if (item.kind === 'note') return 'Note'
-  return [item.debt ? 'Debt minimum' : 'Bill', item.autopay && 'Autopay'].filter(Boolean).join(', ')
+  return item.debt ? null : 'Bill'
 }
 
 /**
@@ -117,10 +115,12 @@ export function ComingUp({ today }: { today: ISODate }) {
     if (item.kind === 'bill') {
       if (item.paid) await markDue(item.billId, item.originalDate)
       else await markPaid(item.billId, item.originalDate, item.amount)
-      undoToast(item.paid ? `${item.name} back to due` : `${item.name} paid`)
+      if (item.paid) undoToast(`${item.name} back to due`)
+      else undoToast(`${item.name} paid`, { tone: 'success' })
     } else if (item.kind === 'note') {
       await setNoteDone(item.id, !item.done)
-      undoToast(item.done ? 'Unticked' : 'Ticked off')
+      if (item.done) undoToast('Unticked')
+      else undoToast('Ticked off', { tone: 'success' })
     }
   }
 
@@ -139,63 +139,75 @@ export function ComingUp({ today }: { today: ISODate }) {
             const done = item.kind === 'bill' ? item.paid : item.kind === 'note' && item.done
             const overdue = item.kind === 'bill' && !item.paid && item.date < today
             const when = item.date === today ? 'Today' : shortDay(item.date)
+            const word = kindWord(item)
             return (
               <li key={item.key} className="flex min-h-11 items-center">
-                {/* Overdue says so in words under the date, not by weight alone. */}
                 <span
                   className={cx(
                     'w-16 shrink-0 text-caption leading-tight tabular-nums',
-                    overdue ? 'font-semibold text-text' : 'font-medium text-muted',
+                    overdue ? 'font-semibold text-tone-attention' : 'font-medium text-muted',
                   )}
                 >
                   {when}
-                  {overdue && <span className="block text-xs font-semibold">Overdue</span>}
                 </span>
                 {pay ? (
                   <span
                     aria-hidden="true"
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-accent"
+                    className="inline-flex size-11 shrink-0 items-center justify-center text-tone-success"
                   >
                     <Icon name="payday" size={20} />
                   </span>
                 ) : (
-                  // The box is 18px to look at; the label around it is the 44px target. Its
+                  // The box is 20px to look at; the label around it is the 44px target. Its
                   // name stays the same ticked or not: the checked state speaks for itself.
-                  <label className="relative inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={done}
-                      onChange={() => void toggle(item)}
-                      aria-label={`${item.name}, ${when}`}
-                      className="peer h-[1.125rem] w-[1.125rem] cursor-pointer appearance-none rounded-[0.3125rem] border-[1.5px] border-[color-mix(in_oklab,var(--muted)_70%,var(--surface))] bg-surface transition-colors checked:border-accent checked:bg-accent"
-                    />
-                    <Icon
-                      name="check"
-                      size={13}
-                      strokeWidth={2.8}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute hidden text-accent-contrast peer-checked:block"
-                    />
-                  </label>
+                  <Checkbox
+                    tone="success"
+                    checked={done}
+                    onCheckedChange={() => void toggle(item)}
+                    aria-label={`${item.name}, ${when}`}
+                  />
                 )}
-                <span
-                  aria-hidden="true"
-                  className={cx('mr-3 ml-1 h-2 w-2 shrink-0 rounded-full', DOT[kindOf(item)])}
-                />
-                <span
-                  className={cx(
-                    'relative min-w-0 flex-1 truncate text-body',
-                    done && 'text-muted line-through',
+                {/* A fixed slot, so names line up whatever the marker's shape. */}
+                <span className="mr-3 ml-1 flex w-2.5 shrink-0 justify-center">
+                  <Marker
+                    size="md"
+                    kind={markerOf(item)}
+                    paid={item.kind === 'bill' && item.paid}
+                  />
+                </span>
+                {/* The name gives way first; badges stay whole and drop under it if need be. */}
+                <span className="relative flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 py-1.5">
+                  <span className={cx('relative min-w-0 truncate text-body', done && 'text-muted')}>
+                    {item.name}
+                    {word && <span className="sr-only">, {word}</span>}
+                  </span>
+                  {overdue && <StatusBadge status={BILL_STATUS.overdue} />}
+                  {item.kind === 'bill' && item.debt && (
+                    <>
+                      {/* Wide: the badge. Narrow: the diamond marker, and the word for readers. */}
+                      <span className="hidden @xl/today:inline-flex">
+                        <StatusBadge status={BILL_STATUS.debtMinimum} />
+                      </span>
+                      <span className="sr-only @xl/today:hidden">, Debt minimum</span>
+                    </>
                   )}
-                >
-                  {item.name}
-                  <span className="sr-only">, {kindWords(item)}</span>
+                  {item.kind === 'bill' && item.autopay && (
+                    <>
+                      <span className="hidden @xl/today:inline-flex">
+                        <StatusBadge status={BILL_STATUS.autopay} />
+                      </span>
+                      <span className="relative inline-flex shrink-0 text-muted @xl/today:hidden">
+                        <Icon name="repeat" size={14} />
+                        <span className="sr-only">, Autopay</span>
+                      </span>
+                    </>
+                  )}
                 </span>
                 {item.kind !== 'note' && (
                   <span
                     className={cx(
-                      'ml-3 shrink-0 font-display text-base font-semibold whitespace-nowrap',
-                      pay && 'text-accent',
+                      'ml-3 shrink-0 amount text-base whitespace-nowrap',
+                      pay && 'text-tone-success',
                       done && 'text-muted',
                     )}
                   >

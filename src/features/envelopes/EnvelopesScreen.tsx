@@ -127,8 +127,13 @@ export function EnvelopesScreen() {
                     />
                   ))}
                   {offerStarters && <StarterOffer onSkip={() => setSkipped(true)} />}
-                  <Button variant="secondary" block size="lg" onClick={() => setCreating(true)}>
-                    <span aria-hidden="true">+</span>
+                  <Button
+                    variant="secondary"
+                    block
+                    size="lg"
+                    icon="plus"
+                    onClick={() => setCreating(true)}
+                  >
                     Add envelope
                   </Button>
                   <div className="card-quiet flex items-center justify-between gap-4 px-5 py-3">
@@ -178,10 +183,10 @@ export function EnvelopesScreen() {
 function OffCard({ onTurnOn }: { onTurnOn: () => void }) {
   const f = useFormat()
   return (
-    <section aria-labelledby="envelopes-off-title" className="card p-5 sm:px-8 sm:py-7">
+    <section aria-labelledby="envelopes-off-title" className="card p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id="envelopes-off-title" className="type-display text-[1.375rem] leading-tight">
+          <h2 id="envelopes-off-title" className="section-title">
             Envelopes are off
           </h2>
           <p className="mt-1.5 text-body text-muted">

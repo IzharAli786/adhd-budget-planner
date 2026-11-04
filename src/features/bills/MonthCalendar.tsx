@@ -4,8 +4,10 @@ import type { BillEntry, PaydayEntry } from '../../domain/bills'
 import type { PaydaySaving } from '../../domain/savings'
 import { addDays, addMonths, dayOfWeek, mod } from '../../domain/dates'
 import type { ISODate } from '../../domain/types'
+import { Button } from '../../ui/Button'
 import { cx } from '../../ui/cx'
-import { Icon } from '../../ui/Icon'
+import { IconButton } from '../../ui/IconButton'
+import { Marker } from '../../ui/Marker'
 import { calendarDayLabel } from './describe'
 import { useFormat } from './format'
 
@@ -90,6 +92,17 @@ export function MonthCalendar({
     setFocusDate(target)
   }
 
+  // "Paid" joins the key when some day on the grid shows the grey (all-paid) mark.
+  const anyPaid = dates.some((d) => {
+    const live = (bills.get(d) ?? []).filter((b) => b.status !== 'skipped')
+    const fullyPaid = (list: BillEntry[]) =>
+      list.length > 0 && list.every((b) => b.status === 'paid')
+    return (
+      fullyPaid(live.filter((b) => b.debtId === undefined)) ||
+      fullyPaid(live.filter((b) => b.debtId !== undefined))
+    )
+  })
+
   return (
     <section aria-label="Calendar" className="card p-4 sm:p-5">
       <div className="mb-2 flex items-center gap-1">
@@ -97,30 +110,12 @@ export function MonthCalendar({
           {f.month(first)}
         </h2>
         {!showingToday && (
-          <button
-            type="button"
-            onClick={() => onMonthChange(0)}
-            className="min-h-11 rounded-full px-3 text-sm font-medium text-accent hover:bg-accent-soft/60"
-          >
+          <Button variant="text" size="sm" onClick={() => onMonthChange(0)}>
             Today
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          onClick={() => onMonthChange(-1)}
-          aria-label="Previous month"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60 hover:text-text"
-        >
-          <Icon name="back" size={20} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onMonthChange(1)}
-          aria-label="Next month"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted hover:bg-accent-soft/60 hover:text-text"
-        >
-          <Icon name="chevron" size={20} />
-        </button>
+        <IconButton icon="back" label="Previous month" onClick={() => onMonthChange(-1)} />
+        <IconButton icon="chevron" label="Next month" onClick={() => onMonthChange(1)} />
       </div>
 
       <div aria-hidden="true" className="grid grid-cols-7 pb-1 text-center text-xs text-muted">
@@ -147,8 +142,6 @@ export function MonthCalendar({
           const isToday = date === today
           const allPaid = (list: BillEntry[]) =>
             list.length > 0 && list.every((b) => b.status === 'paid')
-          const mark = (paid: boolean) =>
-            isToday ? 'bg-accent-contrast' : paid ? 'bg-muted/50' : 'bg-accent'
           return (
             <button
               key={date}
@@ -179,35 +172,14 @@ export function MonthCalendar({
               <span>{Number(date.slice(8))}</span>
               <span aria-hidden="true" className="flex h-1.5 items-center gap-[3px]">
                 {dayBills.length > 0 && (
-                  <span className={cx('h-1.5 w-1.5 rounded-full', mark(allPaid(dayBills)))} />
+                  <Marker kind="bill" paid={allPaid(dayBills)} inverse={isToday} />
                 )}
                 {dayDebts.length > 0 && (
-                  <span className={cx('h-[5px] w-[5px] rotate-45', mark(allPaid(dayDebts)))} />
+                  <Marker kind="debt" paid={allPaid(dayDebts)} inverse={isToday} />
                 )}
-                {dayPaydays.length > 0 && (
-                  <span
-                    className={cx(
-                      'h-1.5 w-1.5 rounded-full border-[1.5px]',
-                      isToday ? 'border-accent-contrast' : 'border-text',
-                    )}
-                  />
-                )}
-                {loggedCount > 0 && (
-                  <span
-                    className={cx(
-                      'h-[5px] w-[5px] rounded-[1px]',
-                      isToday ? 'bg-accent-contrast' : 'bg-muted',
-                    )}
-                  />
-                )}
-                {hasNote && (
-                  <span
-                    className={cx(
-                      'h-[1.5px] w-2 rounded-full',
-                      isToday ? 'bg-accent-contrast' : 'bg-muted',
-                    )}
-                  />
-                )}
+                {dayPaydays.length > 0 && <Marker kind="payday" inverse={isToday} />}
+                {loggedCount > 0 && <Marker kind="logged" inverse={isToday} />}
+                {hasNote && <Marker kind="note" inverse={isToday} />}
               </span>
             </button>
           )
@@ -220,24 +192,29 @@ export function MonthCalendar({
         className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted"
       >
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Bill
+          <Marker kind="bill" size="md" /> Bill
         </span>
+        {anyPaid && (
+          <span className="inline-flex items-center gap-1.5">
+            <Marker kind="bill" size="md" paid /> Paid
+          </span>
+        )}
         {dates.some((d) => bills.get(d)?.some((b) => b.debtId !== undefined)) && (
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-[5px] w-[5px] rotate-45 bg-accent" /> Debt minimum
+            <Marker kind="debt" size="md" /> Debt minimum
           </span>
         )}
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full border-[1.5px] border-text" /> Payday
+          <Marker kind="payday" size="md" /> Payday
         </span>
         {dates.some((d) => (logged.get(d)?.length ?? 0) > 0) && (
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-[5px] w-[5px] rounded-[1px] bg-muted" /> Logged
+            <Marker kind="logged" size="md" /> Logged
           </span>
         )}
         {dates.some((d) => notes.has(d)) && (
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-[1.5px] w-2 rounded-full bg-muted" /> Note
+            <Marker kind="note" size="md" /> Note
           </span>
         )}
       </div>

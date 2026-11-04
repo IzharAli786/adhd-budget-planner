@@ -23,7 +23,6 @@ import { todayISO } from '../../lib/clock'
 import { useToday } from '../../lib/useToday'
 import { BigNumber } from '../../ui/BigNumber'
 import { Button } from '../../ui/Button'
-import { Icon } from '../../ui/Icon'
 import { ListGroup, ListRow } from '../../ui/List'
 import { EmptyState, PageHeader } from '../../ui/PageHeader'
 import { SectionHeader } from '../../ui/Section'
@@ -196,8 +195,7 @@ function BillsView({
             art="calendar"
             title="No bills yet"
             action={
-              <Button onClick={() => addBill()}>
-                <Icon name="plus" size={18} />
+              <Button icon="plus" onClick={() => addBill()}>
                 Add your first bill
               </Button>
             }
@@ -206,7 +204,7 @@ function BillsView({
             until it’s paid.
           </EmptyState>
         ) : (
-          <section className="card @container p-6">
+          <section className="card @container p-5 sm:p-6">
             <p className="text-sm text-muted">
               {period.fromPayday ? 'Left to pay before payday' : 'Left to pay this month'}
             </p>
@@ -215,18 +213,13 @@ function BillsView({
               {summaryLine(dueSoon.dueCount, dueSoon.paidCount, period, f)}
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <Button onClick={() => addBill()}>
-                <Icon name="plus" size={18} />
+              <Button icon="plus" onClick={() => addBill()}>
                 Add bill
               </Button>
               {!period.fromPayday && incomes.length === 0 && (
-                <button
-                  type="button"
-                  onClick={onShowPaydays}
-                  className="min-h-11 rounded-full px-1 text-sm font-medium text-accent"
-                >
+                <Button variant="text" size="sm" onClick={onShowPaydays}>
                   Add your payday to plan by pay period
-                </button>
+                </Button>
               )}
             </div>
           </section>

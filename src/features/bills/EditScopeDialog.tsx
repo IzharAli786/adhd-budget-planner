@@ -62,8 +62,11 @@ export function EditScopeDialog({
             disabled={o.disabled}
             onClick={() => onChoose(o.scope)}
             className={cx(
-              'block min-h-14 w-full rounded-2xl px-4 py-3 text-left ring-1 ring-line transition-colors',
-              'hover:bg-accent-soft/50 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent',
+              'block min-h-14 w-full rounded-2xl px-4 py-3 text-left ring-1 ring-line transition-[background-color,box-shadow]',
+              // The option under the pointer or finger reads as chosen: accent wash + edge.
+              'hover:bg-accent-soft/50 hover:ring-[1.5px] hover:ring-accent active:bg-accent-soft/50 active:ring-[1.5px] active:ring-accent',
+              // Unavailable, but still readable: a neutral slab with muted words (no fading).
+              'disabled:cursor-not-allowed disabled:bg-tone-neutral-bg disabled:text-muted disabled:ring-0',
             )}
           >
             <span className="block font-medium">{o.title}</span>

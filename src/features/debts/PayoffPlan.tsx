@@ -15,7 +15,9 @@ import type { Debt, ISODate } from '../../domain/types'
 import { cx } from '../../ui/cx'
 import { Icon } from '../../ui/Icon'
 import { MoneyInput } from '../../ui/MoneyInput'
+import { Notice } from '../../ui/Notice'
 import { Segmented } from '../../ui/Segmented'
+import { StatusBadge, TAG } from '../../ui/status'
 import { useFormat, type Formatters } from '../bills/format'
 import type { OwedDebt } from './useDebtsOwed'
 
@@ -60,7 +62,7 @@ export function PayoffPlan({ debts: owedDebts, today }: { debts: OwedDebt[]; tod
   return (
     <section aria-labelledby={`${sliderId}-title`} className="card space-y-6 p-5 sm:p-6">
       <header>
-        <h3 id={`${sliderId}-title`} className="text-heading">
+        <h3 id={`${sliderId}-title`} className="section-title">
           Your payoff plan
         </h3>
         <p className="mt-0.5 text-body text-muted">
@@ -96,10 +98,10 @@ export function PayoffPlan({ debts: owedDebts, today }: { debts: OwedDebt[]; tod
       </div>
 
       {'error' in result ? (
-        <p role="status" className="rounded-2xl bg-danger-soft px-4 py-3 text-body">
+        <Notice tone="attention" role="status">
           To cover every minimum this needs at least{' '}
           <span className="font-semibold tabular-nums">{f.money(result.minimums)}</span> a month.
-        </p>
+        </Notice>
       ) : (
         <Comparison
           snowball={result.snowball}
@@ -115,8 +117,7 @@ export function PayoffPlan({ debts: owedDebts, today }: { debts: OwedDebt[]; tod
       )}
 
       {stuck.length > 0 && (
-        <div className="flex gap-3 rounded-2xl bg-accent-soft/70 px-4 py-3 text-body">
-          <Icon name="info" size={20} className="mt-0.5 shrink-0 text-accent" />
+        <Notice tone="info">
           <div className="space-y-1">
             {stuck.map((d) => (
               <p key={d.id}>
@@ -129,7 +130,7 @@ export function PayoffPlan({ debts: owedDebts, today }: { debts: OwedDebt[]; tod
               </p>
             ))}
           </div>
-        </div>
+        </Notice>
       )}
 
       <div className="space-y-1 text-sm text-muted">
@@ -197,30 +198,18 @@ function Comparison(p: ComparisonProps) {
         <ol aria-labelledby={orderId} className="divide-y divide-line">
           {picked.payoffOrder.map((o, i) => (
             <li key={o.id} className="flex min-h-12 items-center gap-3 py-2">
-              <span
-                aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-bg text-sm font-medium text-muted tabular-nums"
-              >
-                {i + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-medium">{names.get(o.id)}</span>
-              {o.id === picked.focus && <FocusChip />}
-              <span className="text-sm text-muted tabular-nums">
+              <OrderNumber n={i + 1} />
+              <OrderName name={names.get(o.id)} focus={o.id === picked.focus} />
+              <span className="shrink-0 text-sm text-muted tabular-nums">
                 {f.month(addMonths(today, o.month))}
               </span>
             </li>
           ))}
           {unfinished.map((d, i) => (
             <li key={d.id} className="flex min-h-12 items-center gap-3 py-2">
-              <span
-                aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-bg text-sm font-medium text-muted tabular-nums"
-              >
-                {picked.payoffOrder.length + i + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-medium">{d.name}</span>
-              {d.id === picked.focus && <FocusChip />}
-              <span className="text-sm text-muted">Over 50 years</span>
+              <OrderNumber n={picked.payoffOrder.length + i + 1} />
+              <OrderName name={d.name} focus={d.id === picked.focus} />
+              <span className="shrink-0 text-sm text-muted">Over 50 years</span>
             </li>
           ))}
         </ol>
@@ -240,12 +229,25 @@ function Comparison(p: ComparisonProps) {
   )
 }
 
-// Marks where the money above the minimums goes now (sim.focus), which is not always the
-// debt that finishes first.
-function FocusChip() {
+function OrderNumber({ n }: { n: number }) {
   return (
-    <span className="shrink-0 rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-contrast">
-      Focus first
+    <span
+      aria-hidden="true"
+      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-bg text-sm font-medium text-muted tabular-nums"
+    >
+      {n}
+    </span>
+  )
+}
+
+// "Focus first" marks where the money above the minimums goes now (sim.focus), which is
+// not always the debt that finishes first. On a narrow row the badge drops under the
+// name, so the name is never cut short ("Credit c…").
+function OrderName({ name, focus }: { name: string | undefined; focus: boolean }) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="min-w-0 font-medium break-words">{name}</span>
+      {focus && <StatusBadge status={TAG.focusFirst} />}
     </span>
   )
 }
@@ -268,11 +270,14 @@ function StrategyCard({
   return (
     <div
       className={cx(
-        'rounded-3xl bg-bg p-4 ring-1 transition-shadow',
-        selected ? 'ring-accent/40' : 'ring-transparent',
+        'relative rounded-3xl bg-bg p-4 transition-shadow',
+        selected ? 'ring-2 ring-accent' : 'ring-1 ring-line',
       )}
     >
-      <h4 className="font-semibold">{info.title}</h4>
+      {selected && (
+        <Icon name="check" size={16} weight="bold" className="absolute top-4 right-4 text-accent" />
+      )}
+      <h4 className="pr-6 font-semibold">{info.title}</h4>
       <p className="text-sm text-muted">{info.blurb}</p>
       <dl className="mt-3 space-y-2">
         <div>

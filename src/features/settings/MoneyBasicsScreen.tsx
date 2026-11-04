@@ -178,7 +178,7 @@ function Card({
   children?: React.ReactNode
 }) {
   return (
-    <section className="card space-y-4 p-5">
+    <section className="card space-y-4 p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-heading">{title}</h2>
