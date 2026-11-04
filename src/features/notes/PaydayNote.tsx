@@ -2,13 +2,28 @@ import { useAppSettings } from '../../app/SettingsProvider'
 import type { ISODate } from '../../domain/types'
 import { NoteEditor } from './NoteEditor'
 
-/** The same note on Plan and Today: one per period (month or pay period), keyed by its first day. */
-export function PaydayNote({ periodStart, foldId }: { periodStart: ISODate; foldId?: string }) {
+/**
+ * The note for one period (month or pay period), keyed by its first day. Home shows it as
+ * an always-open box under its own section heading ('inline', named by `labelledBy`).
+ */
+export function PaydayNote({
+  periodStart,
+  foldId,
+  variant,
+  labelledBy,
+}: {
+  periodStart: ISODate
+  foldId?: string
+  variant?: 'card' | 'inline'
+  labelledBy?: string
+}) {
   const month = useAppSettings().settings.planBy === 'month'
   return (
     <NoteEditor
       target={{ periodStart }}
       foldId={foldId}
+      variant={variant}
+      labelledBy={labelledBy}
       title={month ? 'Note for this month' : 'Note for this payday'}
       hint={
         month

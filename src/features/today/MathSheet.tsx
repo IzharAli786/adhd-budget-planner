@@ -19,7 +19,8 @@ interface Props {
   safe: SafeToSpend
   /** Today's per-day split. Left out on Home, which looks at a whole period, not a day. */
   runway?: Runway
-  today: ISODate
+  /** A period that has ended (Home looking back): "left over", not "safe to spend". */
+  past?: boolean
   /** Shown, never summed: pay that hasn't landed isn't money you can spend yet. */
   nextPay?: { date: ISODate; amount: Cents }
 }
@@ -28,7 +29,7 @@ interface Props {
  * "See the math": renders the very lines safeToSpend() summed, so the breakdown can't
  * disagree with the hero. Simple mode shows 4 lines, Full every line with its items.
  */
-export function MathSheet({ open, onClose, safe, runway, nextPay }: Props) {
+export function MathSheet({ open, onClose, safe, runway, past = false, nextPay }: Props) {
   const f = useFormat()
   const { settings } = useAppSettings()
   const [view, setView] = useState<'simple' | 'full'>(settings.simpleMode ? 'simple' : 'full')
@@ -83,9 +84,16 @@ export function MathSheet({ open, onClose, safe, runway, nextPay }: Props) {
         ))}
         <div className="flex justify-between gap-4 py-3 text-base">
           <dt className="font-semibold">
-            {safe.status === 'short' ? 'Short this period' : 'Safe to spend this period'}
+            {safe.status === 'short'
+              ? past
+                ? 'Ran short this period'
+                : 'Short this period'
+              : past
+                ? 'Left over this period'
+                : 'Safe to spend this period'}
           </dt>
-          <dd className="font-semibold tabular-nums">{f.money(safe.total)}</dd>
+          {/* The label already says "short", so no minus sign as well. */}
+          <dd className="font-semibold tabular-nums">{f.money(Math.abs(safe.total))}</dd>
         </div>
         {runway && runway.startOfDaySafe !== safe.total && (
           <div className="flex justify-between gap-4 py-3">

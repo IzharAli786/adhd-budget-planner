@@ -100,7 +100,7 @@ describe('Common categories', () => {
     goto('/envelopes')
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: 'Track spending' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
     await userEvent.type(
       within(sheet).getByRole('textbox', { name: 'What for (optional)' }),
@@ -125,58 +125,81 @@ describe('Common categories', () => {
   })
 })
 
-describe('Note for this month', () => {
-  it('is written on Home and is still there next time', async () => {
+describe('Notes for this month', () => {
+  const notes = () => screen.findByRole('region', { name: 'Notes for this month' })
+  const box = async () =>
+    within(await notes()).findByRole('textbox', { name: 'Notes for this month' })
+
+  it('is written on Home, saved with Save, and is still there next time', async () => {
     goto('/home')
     const { unmount } = render(<App />)
-    const card = await screen.findByRole('region', { name: 'Note for this month' })
-    await userEvent.click(await within(card).findByRole('button', { name: 'Add a note' }))
-    await userEvent.type(within(card).getByRole('textbox'), '  Birthday month, go easy  ')
-    await userEvent.click(within(card).getByRole('button', { name: 'Save note' }))
+    const field = await box()
+    await userEvent.type(field, '  Birthday month, go easy  ')
+    await userEvent.click(within(await notes()).getByRole('button', { name: 'Save' }))
     await waitFor(async () =>
       expect(await r.getNote({ periodStart: '2026-11-01' })).toMatchObject({
         id: 'period|2026-11-01',
         text: 'Birthday month, go easy',
       }),
     )
-    expect(await within(card).findByText('Birthday month, go easy')).toBeTruthy()
+    expect(await screen.findByText('Note saved')).toBeTruthy()
+    await waitFor(() =>
+      expect((field as HTMLTextAreaElement).value).toBe('Birthday month, go easy'),
+    )
     unmount()
 
     goto('/home')
     render(<App />)
-    const again = await screen.findByRole('region', { name: 'Note for this month' })
-    expect(await within(again).findByText('Birthday month, go easy')).toBeTruthy()
+    const again = await box()
+    await waitFor(() =>
+      expect((again as HTMLTextAreaElement).value).toBe('Birthday month, go easy'),
+    )
+  })
+
+  it('saves by itself when you leave the box', async () => {
+    goto('/home')
+    render(<App />)
+    await userEvent.type(await box(), 'Trip on the 20th')
+    await userEvent.click(screen.getByRole('heading', { level: 1, name: 'Home' }))
+    await waitFor(async () =>
+      expect((await r.getNote({ periodStart: '2026-11-01' }))?.text).toBe('Trip on the 20th'),
+    )
+    // Once: leaving the box again with nothing changed saves nothing more.
+    expect(screen.getAllByText('Note saved')).toHaveLength(1)
   })
 
   it('belongs to its own month: October’s is separate', async () => {
     await r.saveNote({ periodStart: '2026-11-01' }, 'November only')
+    // Something tracked in October, so Home can step back to it.
+    await r.addTransaction({ date: '2026-10-20', amount: -1500, note: 'lunch' })
     goto('/home')
     render(<App />)
-    const card = await screen.findByRole('region', { name: 'Note for this month' })
-    expect(await within(card).findByText('November only')).toBeTruthy()
+    const field = await box()
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe('November only'))
     const nav = screen.getByRole('navigation', { name: 'Months' })
     await userEvent.click(within(nav).getByRole('button', { name: 'Previous month' }))
     expect(await within(nav).findByText('October 2026')).toBeTruthy()
-    const october = await screen.findByRole('region', { name: 'Note for this month' })
-    expect(await within(october).findByRole('button', { name: 'Add a note' })).toBeTruthy()
-    expect(screen.queryByText('November only')).toBeNull()
+    const october = (await box()) as HTMLTextAreaElement
+    await waitFor(() => expect(october.value).toBe(''))
+    expect(screen.queryByDisplayValue('November only')).toBeNull()
   })
 
-  it('editing to blank removes it, with undo', async () => {
+  it('emptying the box removes it, with undo', async () => {
     await r.saveNote({ periodStart: '2026-11-01' }, 'old note')
     goto('/home')
     render(<App />)
-    const card = await screen.findByRole('region', { name: 'Note for this month' })
-    await userEvent.click(
-      await within(card).findByRole('button', { name: 'Edit Note for this month' }),
-    )
-    await userEvent.click(within(card).getByRole('button', { name: 'Remove' }))
+    const field = await box()
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe('old note'))
+    await userEvent.clear(field)
+    await userEvent.click(within(await notes()).getByRole('button', { name: 'Save' }))
     await waitFor(async () =>
       expect(await r.getNote({ periodStart: '2026-11-01' })).toBeUndefined(),
     )
+    expect(await screen.findByText('Note removed')).toBeTruthy()
     await userEvent.click(await screen.findByRole('button', { name: 'Undo' }))
     await waitFor(async () =>
       expect((await r.getNote({ periodStart: '2026-11-01' }))?.text).toBe('old note'),
     )
+    await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe('old note'))
   })
 })

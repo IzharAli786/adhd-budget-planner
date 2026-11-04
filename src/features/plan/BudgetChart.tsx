@@ -2,55 +2,64 @@ import type { EnvelopeUsage } from '../../domain/safeToSpend'
 import { envelopeColor } from '../../ui/EnvelopeDot'
 import type { Formatters } from '../bills/format'
 
+/** What a column's two numbers leave out: still coming, and how far past plan it goes. */
+function extras(r: EnvelopeUsage, f: Formatters): string[] {
+  return [
+    r.linkedDue > 0 ? `${f.money(r.linkedDue)} still coming` : '',
+    r.over > 0 ? `${f.money(r.over)} over plan` : '',
+  ].filter(Boolean)
+}
+
 /**
- * Budget vs actuals (planned vs spent), one pair of bars per envelope, on one shared
- * scale. The planned bar is a light outline, the actual bar is filled in the envelope's
- * colour; columns wrap to new rows and centre. Over budget is said in words, never in red.
+ * Budget vs actuals on Home: a pair of bars per envelope (planned as a light outline,
+ * actual filled in the envelope's colour) on one shared scale. Under each pair, only its
+ * name and "planned / actual"; what is still coming and how far past plan it goes are in
+ * the tooltip and the screen-reader sentence. Over budget is said in words, never in red.
  *
- * The bars are decorative: every number is also written under them, and each column has a
- * full sentence for screen readers.
+ * Inside an `@container` (Home): three columns to a row on a phone, fixed-width columns
+ * that wrap and centre once there is room. Every column's label area is the same height,
+ * so the bars in a row stand on one baseline.
  */
 export function BudgetChart({
   rows,
   f,
-  compact = false,
-  label,
+  labelledBy,
 }: {
   rows: readonly EnvelopeUsage[]
   f: Formatters
-  /** One row per envelope instead of columns, for Today. */
-  compact?: boolean
-  label: string
+  /** The id of the section heading that names the list. */
+  labelledBy: string
 }) {
   const shown = rows.filter((r) => r.budget > 0 || r.spent + r.linkedDue > 0)
   if (shown.length === 0) return null
-  if (compact) return <BudgetBars rows={shown} f={f} label={label} />
   const max = Math.max(1, ...shown.map((r) => Math.max(r.budget, r.spent)))
   // A share of the plot's height, so the plot can be shorter on a phone. Zero still shows
-  // a small stub, so a column never looks like it is missing a bar.
+  // a small stub (min-h), so a column never looks like it is missing a bar.
   const pct = (c: number) => `${Math.max(0, (c / max) * 100)}%`
 
   return (
-    <figure className="m-0">
+    <div>
       <ul
-        aria-label={label}
-        className="flex flex-wrap items-end justify-center gap-x-1 gap-y-10 sm:gap-x-2"
+        aria-labelledby={labelledBy}
+        className="flex flex-wrap items-start justify-center gap-x-1 gap-y-6 @xl:gap-x-2 @xl:gap-y-8"
       >
         {shown.map((r) => {
           const color = envelopeColor(r.color)
+          const more = extras(r, f)
           return (
             <li
               key={r.id}
-              className="flex w-[6.25rem] min-w-0 flex-col items-center text-center sm:w-[8.5rem]"
+              title={more.length > 0 ? `${r.name}: ${more.join(', ')}` : undefined}
+              className="flex w-[calc((100%-0.5rem)/3)] min-w-0 flex-col items-center text-center @xl:w-[7.5rem]"
             >
               <span className="sr-only">
                 {r.name}: planned {f.money(r.budget)}, actual {f.money(r.spent)}
                 {r.linkedDue > 0 ? `, ${f.money(r.linkedDue)} still coming` : ''}
                 {r.over > 0 ? `, over by ${f.money(r.over)}` : ''}.
               </span>
-              <div aria-hidden="true" className="flex h-36 items-end gap-1.5 sm:h-52">
+              <div aria-hidden="true" className="flex h-36 items-end gap-1.5 @xl:h-52">
                 <div
-                  className="min-h-1.5 w-5 rounded-t-lg border-[1.5px] border-b-0 sm:w-6"
+                  className="min-h-1.5 w-5 rounded-t-lg border-[1.5px] border-b-0 @xl:w-6"
                   style={{
                     height: pct(r.budget),
                     borderColor: color,
@@ -58,105 +67,40 @@ export function BudgetChart({
                   }}
                 />
                 <div
-                  className="min-h-1.5 w-5 rounded-t-lg sm:w-6"
+                  className="min-h-1.5 w-5 rounded-t-lg @xl:w-6"
                   style={{ height: pct(r.spent), backgroundColor: color }}
                 />
               </div>
-              <span
+              {/* Room for the longest label (two lines of name, two of numbers on a phone), so
+                  every column's bars stand on the same line whatever its own label needs. */}
+              <div
                 aria-hidden="true"
-                className="mt-2.5 line-clamp-2 text-body leading-tight font-semibold"
+                className="mt-2.5 flex min-h-[4.875rem] w-full flex-col @xl:min-h-[3.75rem]"
               >
-                {r.name}
-              </span>
-              <span aria-hidden="true" className="mt-1 text-caption text-muted tabular-nums">
-                {f.money(r.budget)} / {f.money(r.spent)}
-              </span>
-              {r.linkedDue > 0 && (
-                <span aria-hidden="true" className="text-caption text-muted tabular-nums">
-                  +{f.money(r.linkedDue)} coming
+                <span className="line-clamp-2 text-body leading-tight font-semibold [overflow-wrap:anywhere] hyphens-auto">
+                  {r.name}
                 </span>
-              )}
-              {r.over > 0 && (
-                <span aria-hidden="true" className="text-caption text-muted tabular-nums">
-                  {f.money(r.over)} over plan
+                <span className="mt-1 text-caption text-muted tabular-nums">
+                  {f.money(r.budget)} / {f.money(r.spent)}
                 </span>
-              )}
+              </div>
             </li>
           )
         })}
       </ul>
-      <figcaption className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-1 text-body text-muted">
+      <div
+        aria-hidden="true"
+        className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-1 text-body text-muted"
+      >
         <span className="inline-flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="h-3.5 w-3.5 rounded-[3px] border-[1.5px] border-muted"
-          />
+          <span className="h-3.5 w-3.5 rounded-[3px] border-[1.5px] border-muted" />
           Planned
         </span>
         <span className="inline-flex items-center gap-2">
-          <span aria-hidden="true" className="h-3.5 w-3.5 rounded-[3px] bg-muted" />
+          <span className="h-3.5 w-3.5 rounded-[3px] bg-muted" />
           Actual
         </span>
-      </figcaption>
-    </figure>
-  )
-}
-
-/**
- * Today's version: one row per envelope, each bar scaled to its own budget, so a small
- * Coffee envelope reads as clearly as Rent. Planned is the track, actual the fill.
- */
-function BudgetBars({
-  rows,
-  f,
-  label,
-}: {
-  rows: readonly EnvelopeUsage[]
-  f: Formatters
-  label: string
-}) {
-  return (
-    <ul aria-label={label} className="space-y-3.5">
-      {rows.map((r) => {
-        const color = envelopeColor(r.color)
-        const used = r.spent + r.linkedDue
-        const scale = Math.max(r.budget, used, 1)
-        return (
-          <li key={r.id}>
-            <div className="flex items-baseline justify-between gap-3 text-body">
-              <span className="min-w-0 truncate font-medium">{r.name}</span>
-              <span className="shrink-0 text-sm text-muted tabular-nums">
-                <span className="font-semibold text-text">{f.money(r.spent)}</span>
-                {r.budget > 0 ? ` of ${f.money(r.budget)}` : ' · no budget'}
-              </span>
-            </div>
-            <div
-              aria-hidden="true"
-              className="mt-1.5 flex h-2.5 overflow-hidden rounded-full"
-              style={{ backgroundColor: `color-mix(in oklab, ${color} 16%, var(--surface))` }}
-            >
-              <div style={{ width: `${(r.spent / scale) * 100}%`, backgroundColor: color }} />
-              <div
-                style={{
-                  width: `${(r.linkedDue / scale) * 100}%`,
-                  backgroundColor: `color-mix(in oklab, ${color} 45%, var(--surface))`,
-                }}
-              />
-            </div>
-            <p className="sr-only">
-              {r.name}: planned {f.money(r.budget)}, actual {f.money(r.spent)}
-              {r.linkedDue > 0 ? `, ${f.money(r.linkedDue)} still coming` : ''}.
-            </p>
-            {(r.linkedDue > 0 || r.over > 0) && (
-              <p className="mt-1 text-caption text-muted tabular-nums">
-                {r.linkedDue > 0 && `${f.money(r.linkedDue)} still coming`}
-                {r.linkedDue > 0 && r.over > 0 && ' · '}
-                {r.over > 0 && `${f.money(r.over)} over plan`}
-              </p>
-            )}
-          </li>
-        )
-      })}
-    </ul>
+      </div>
+    </div>
   )
 }

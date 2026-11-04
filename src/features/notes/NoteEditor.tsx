@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import { useUndoToast } from '../../app/useUndoToast'
 import { getNote, saveNote } from '../../db/repos'
 import { NOTE_MAX_LENGTH, noteId, type NoteTarget } from '../../domain/types'
@@ -12,24 +12,107 @@ import { Icon } from '../../ui/Icon'
 interface Props {
   target: NoteTarget
   title: string
-  /** Shown when there is no note yet: what a note here is good for. */
+  /** What a note here is good for: shown when there is none, or as the box's placeholder. */
   hint: string
-  /** 'card' on a screen, 'plain' inside a sheet that is already a card. */
-  variant?: 'card' | 'plain'
+  /**
+   * 'card' on a screen, 'plain' inside a sheet that is already a card, 'inline' under a
+   * section heading the screen draws itself (Home): just the text box, always open.
+   */
+  variant?: 'card' | 'plain' | 'inline'
+  /** 'inline' only: the id of the heading that names the box. */
+  labelledBy?: string
   /** Makes the card foldable, remembered under this id (Plan on a phone). */
   foldId?: string
   className?: string
+}
+
+export function NoteEditor(props: Props) {
+  return props.variant === 'inline' ? <InlineNote {...props} /> : <NoteCard {...props} />
+}
+
+/** The note for a target, and a save that undoes in one tap. Unchanged text writes nothing. */
+function useNote(target: NoteTarget) {
+  const id = noteId(target)
+  // null = no note; undefined = still loading (useLiveQuery's own "not yet").
+  const note = useLiveQuery(async () => (await getNote(target)) ?? null, [id])
+  const undoToast = useUndoToast()
+  async function write(text: string) {
+    // Unchanged: nothing to do. A toast here would offer to undo some earlier action.
+    if (text.trim() === (note?.text ?? '')) return
+    await saveNote(target, text)
+    undoToast(text.trim() ? 'Note saved' : 'Note removed')
+  }
+  return { note, write }
+}
+
+/**
+ * Always open, like a page in a notebook: the box shows the note, typing changes it, and
+ * leaving the box (or Save) keeps it. Emptying the box removes the note.
+ */
+function InlineNote({ target, title, hint, labelledBy, className }: Props) {
+  const { note, write } = useNote(target)
+  const fieldId = useId()
+  const [draft, setDraft] = useState<string | null>(null)
+  // One save at a time: a click on Save also blurs the box, and both ask to save.
+  const busy = useRef(false)
+
+  async function save() {
+    if (draft === null || busy.current) return
+    const text = draft
+    busy.current = true
+    try {
+      await write(text)
+      // Anything typed while it saved stays as the new draft.
+      setDraft((d) => (d === text ? null : d))
+    } finally {
+      busy.current = false
+    }
+  }
+
+  return (
+    <form
+      className={cx('space-y-3', className)}
+      onSubmit={(e) => {
+        e.preventDefault()
+        void save()
+      }}
+      onBlur={(e) => {
+        // Moving from the box to its own Save button is not leaving the note.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) void save()
+      }}
+    >
+      {!labelledBy && (
+        <label htmlFor={fieldId} className="sr-only">
+          {title}
+        </label>
+      )}
+      <textarea
+        id={fieldId}
+        aria-labelledby={labelledBy}
+        value={draft ?? note?.text ?? ''}
+        onChange={(e) => setDraft(e.target.value)}
+        readOnly={note === undefined}
+        maxLength={NOTE_MAX_LENGTH}
+        rows={4}
+        placeholder={hint}
+        className={cx(inputClass, 'block resize-y py-3 leading-relaxed')}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <p className="text-caption text-muted">Saves by itself when you leave the box.</p>
+        <Button type="submit" variant="secondary" className="ml-auto px-4">
+          Save
+        </Button>
+      </div>
+    </form>
+  )
 }
 
 /**
  * A few words for a day or a pay period. Read first, edit on tap: a note is something you
  * glance at far more often than you write, so it is not an always-open text box.
  */
-export function NoteEditor({ target, title, hint, variant = 'card', foldId, className }: Props) {
-  const id = noteId(target)
-  // null = no note; undefined = still loading (useLiveQuery's own "not yet").
-  const note = useLiveQuery(async () => (await getNote(target)) ?? null, [id])
-  const undoToast = useUndoToast()
+function NoteCard({ target, title, hint, variant = 'card', foldId, className }: Props) {
+  const { note, write } = useNote(target)
   const headingId = useId()
   const fieldId = useId()
   const panelId = useId()
@@ -40,12 +123,9 @@ export function NoteEditor({ target, title, hint, variant = 'card', foldId, clas
 
   async function save(e?: FormEvent, text = draft ?? '') {
     e?.preventDefault()
-    // Unchanged: just close. A toast here would offer to undo some earlier action.
-    if (text.trim() === (note?.text ?? '')) return setDraft(null)
     setSaving(true)
     try {
-      await saveNote(target, text)
-      undoToast(text.trim() ? 'Note saved' : 'Note removed')
+      await write(text)
       setDraft(null)
     } finally {
       setSaving(false)

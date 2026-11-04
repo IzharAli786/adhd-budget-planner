@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { useAppSettings } from '../../app/SettingsProvider'
-import { catchUp, type CatchUp } from '../../domain/catchUp'
+import { useLifeGoals } from '../../db/hooks'
 import { greeting } from '../../domain/greeting'
 import { candidates, isSnoozed } from '../../domain/nextAction'
 import type { Instant, ISODate } from '../../domain/types'
@@ -11,10 +11,9 @@ import { buttonClass } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { EmptyState } from '../../ui/PageHeader'
 import { useCatchUpSession } from '../catchup/CatchUpProvider'
-import { FreshStart } from '../catchup/FreshStart'
 import { ActionCard } from './ActionCard'
 import { ComingUp } from './ComingUp'
-import { GlanceTiles, GoalsInMotion, MoneyOverview } from './Dashboard'
+import { GlanceTiles, GoalsInMotion, MoneyOverview, useTotals } from './Dashboard'
 import { useTodayModel, type TodayModel } from './useTodayModel'
 
 /**
@@ -31,7 +30,9 @@ export function TodayScreen() {
   const { ready } = useCatchUpSession()
 
   return (
-    <div>
+    // A size container: the hero and tiles switch layout on this column's width, which on
+    // a tablet is still phone-narrow while the viewport is wide (see Dashboard.tsx).
+    <div className="@container/today">
       <TodayHeader now={now} />
       {!model.loaded || !model.plan || !ready ? (
         <div aria-hidden="true" className="card-hero h-48 animate-pulse" />
@@ -46,19 +47,21 @@ export function TodayScreen() {
 function TodayHeader({ now }: { now: Instant }) {
   const { displayName } = useAppSettings().settings
   return (
-    <header className="mb-7 sm:mb-8">
-      <h1 className="type-display text-[2rem] leading-[1.1] sm:text-[2.5rem]">
+    <header className="mb-6 @xl/today:mb-7">
+      <h1 className="type-display text-[1.75rem] leading-[1.1] @xl/today:text-[1.875rem]">
         {greeting(new Date(now).getHours(), displayName)}
       </h1>
-      <p className="mt-2 text-body text-muted sm:text-base">Your money at a glance.</p>
+      <p className="mt-1.5 text-body text-muted">Your money at a glance.</p>
     </header>
   )
 }
 
 function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; now: Instant }) {
   const { settings } = useAppSettings()
-  const session = useCatchUpSession()
   const { plan, actionState, snoozes } = model
+  // Worked out once here and handed to the hero, the tiles and the goals list.
+  const totals = useTotals(model)
+  const goals = useLifeGoals()
 
   // Only the data-safety nudge is left on Today; it waits below the lists.
   const backup = useMemo(
@@ -69,21 +72,6 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
           )
         : undefined,
     [actionState, snoozes, today, now],
-  )
-
-  const gap = useMemo<CatchUp>(
-    () =>
-      plan?.kind === 'ready' && session.since !== null
-        ? catchUp({
-            lastOpened: session.since,
-            today,
-            due: plan.safe.dueEntries,
-            periodStart: plan.period.start,
-            impulse: model.impulse,
-            now,
-          })
-        : { mode: 'none' },
-    [plan, session.since, today, model.impulse, now],
   )
 
   if (!plan) return null
@@ -109,20 +97,15 @@ function TodayBody({ model, today, now }: { model: TodayModel; today: ISODate; n
     )
   }
 
-  // After a long time away, one calm welcome takes the whole screen first.
-  if (gap.mode === 'fresh') {
-    return <FreshStart gap={gap} today={today} onDone={session.dismiss} />
-  }
-
   return (
-    <div className="space-y-10">
-      <div className="space-y-5 sm:space-y-6">
-        <MoneyOverview model={model} />
-        <GlanceTiles model={model} />
+    <div className="space-y-8">
+      <div className="space-y-5">
+        <MoneyOverview totals={totals} />
+        <GlanceTiles plan={plan} totals={totals} goals={goals} />
       </div>
       <ComingUp today={today} />
       {/* Goals is a Full-mode section; Simple keeps Today to money and dates. */}
-      {!settings.simpleMode && <GoalsInMotion />}
+      {!settings.simpleMode && <GoalsInMotion goals={goals} />}
       {backup && <ActionCard action={backup} snoozes={snoozes} />}
     </div>
   )

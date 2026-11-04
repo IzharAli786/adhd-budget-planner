@@ -53,6 +53,18 @@ const start = (balance: number, date = '2026-11-04') =>
 
 const overview = async () => within(await screen.findByRole('region', { name: 'Savings and debt' }))
 
+/** A hero amount, found by the label above it ("Saved across every fund", "Still owed"). */
+async function heroAmount(label: string) {
+  const card = await overview()
+  return card.getByText(label).nextElementSibling!.textContent
+}
+
+/** The undo toast with this message, and its Undo button. */
+async function undoToast(message: string | RegExp) {
+  const toast = (await screen.findByText(message)).closest('[role="status"]') as HTMLElement
+  return within(toast).getByRole('button', { name: 'Undo' })
+}
+
 /** A glance tile's big number, found by its label. */
 async function tile(label: string | RegExp) {
   const tiles = within(await screen.findByRole('list', { name: 'At a glance' }))
@@ -73,16 +85,34 @@ describe('Today', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   })
 
-  it('is a dashboard now: no per-day hero, quick-add field or extra buttons', async () => {
+  it('reads top down: saved and owed, the three tiles, Coming up, then Goals in motion', async () => {
     await start(84250)
     render(<App />)
-    await screen.findByRole('region', { name: 'Savings and debt' })
-    expect(screen.queryByText('You can spend today')).toBeNull()
-    expect(screen.queryByRole('textbox', { name: /Quick add/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Can this fit?' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'See the math' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Just today' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'All entries' })).toBeNull()
+    const hero = await screen.findByRole('region', { name: 'Savings and debt' })
+    const tiles = await screen.findByRole('list', { name: 'At a glance' })
+    const coming = await screen.findByRole('region', { name: 'Coming up' })
+    const goals = await screen.findByRole('region', { name: 'Goals in motion' })
+    const order = [hero, tiles, coming, goals]
+    for (let i = 1; i < order.length; i++)
+      expect(
+        order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+
+    // The hero: saved on the left, still owed on the right, each with its line under it.
+    const card = within(hero)
+    expect(card.getByText('Saved across every fund')).toBeTruthy()
+    expect(card.getByText('Still owed')).toBeTruthy()
+    // Three tiles, in this order.
+    expect(
+      within(tiles)
+        .getAllByRole('listitem')
+        .map((li) => li.querySelector('p')!.textContent),
+    ).toEqual(['November safe to spend', 'Debt minimums due monthly', 'Goals in progress'])
+    // Each list section: an h2 and one link out.
+    expect(within(coming).getByRole('heading', { level: 2, name: 'Coming up' })).toBeTruthy()
+    expect(within(coming).getByRole('link', { name: 'Open calendar' })).toBeTruthy()
+    expect(within(goals).getByRole('heading', { level: 2, name: 'Goals in motion' })).toBeTruthy()
+    expect(within(goals).getByRole('link', { name: 'Open goals' })).toBeTruthy()
     // Logging lives on the floating button, the same as every other screen.
     expect(screen.getByRole('button', { name: 'Track spending' })).toBeTruthy()
   })
@@ -128,9 +158,9 @@ describe('Today', () => {
     })
     render(<App />)
     const card = await overview()
-    await waitFor(() => {
-      expect(card.getByText('€100.00')).toBeTruthy()
-      expect(card.getByText('€500.00')).toBeTruthy()
+    await waitFor(async () => {
+      expect(await heroAmount('Saved across every fund')).toBe('€100.00')
+      expect(await heroAmount('Still owed')).toBe('€500.00')
     })
     expect(card.getByText('across 1 fund, toward €1,000.00')).toBeTruthy()
     expect(card.getByText('across 1 debt')).toBeTruthy()
@@ -139,25 +169,26 @@ describe('Today', () => {
     await r.addToFund(fund, 20000, '2026-11-04')
     await r.addTransaction({ date: '2026-11-04', amount: -15000, note: '', debtId: debt.debt.id })
     // Two separate writes: wait for both totals, not just the first.
-    await waitFor(() => {
-      expect(card.getByText('€300.00')).toBeTruthy()
-      expect(card.getByText('€350.00')).toBeTruthy()
+    await waitFor(async () => {
+      expect(await heroAmount('Saved across every fund')).toBe('€300.00')
+      expect(await heroAmount('Still owed')).toBe('€350.00')
     })
     expect(await safeTile()).toBe('€842.50')
     expect(await tile('Debt minimums due monthly')).toBe('€25.00')
   })
 
-  it('shows the cents smaller, but reads the amount whole', async () => {
+  it('shows the cents smaller, with the amount written once', async () => {
     await start(84250)
     await r.addFund({ name: 'Trip', perPeriod: 0, openingSaved: 900000 })
     render(<App />)
     const card = await overview()
-    const whole = await card.findByText('€9,000.00')
-    // The visible copy is split, so the cents can be set small; it's hidden from readers.
-    const visible = whole.previousElementSibling!
-    expect(visible.getAttribute('aria-hidden')).toBe('true')
-    expect(visible.textContent).toBe('€9,000.00')
-    expect(visible.querySelector('span')!.textContent).toBe('.00')
+    await waitFor(async () => expect(await heroAmount('Saved across every fund')).toBe('€9,000.00'))
+    const amount = card.getByText('Saved across every fund').nextElementSibling!
+    // One copy of the text (nothing hidden, nothing doubled), with the cents in a span.
+    expect(amount.querySelector('[aria-hidden]')).toBeNull()
+    expect(amount.querySelector('span')!.textContent).toBe('.00')
+    const hero = screen.getByRole('region', { name: 'Savings and debt' })
+    expect(hero.textContent!.split('9,000')).toHaveLength(2)
     expect(card.getByText('Nothing owed right now.')).toBeTruthy()
   })
 
@@ -167,7 +198,7 @@ describe('Today', () => {
     await waitFor(async () => expect(await safeTile()).toBe('€842.50'))
 
     await userEvent.click(screen.getByRole('button', { name: 'Track spending' }))
-    const sheet = await screen.findByRole('dialog', { name: 'Quick add' })
+    const sheet = await screen.findByRole('dialog', { name: 'Track spending' })
     await userEvent.type(within(sheet).getByRole('textbox', { name: 'Amount' }), '12')
     await userEvent.type(within(sheet).getByRole('textbox', { name: /What for/ }), 'coffee')
     await userEvent.click(within(sheet).getByRole('button', { name: 'Log it' }))
@@ -190,11 +221,14 @@ describe('Today', () => {
     expect(screen.queryByRole('region', { name: 'Savings and debt' })).toBeNull()
   })
 
-  it('by payday, the first tile names the pay period', async () => {
-    await r.updateSettings({ planBy: 'payday' })
+  it('by payday, the first tile names the pay period and shows its amount', async () => {
+    await r.updateSettings({ planBy: 'payday', startDate: '2026-10-01', startingBalance: 0 })
     await salary()
+    await r.addBill({ name: 'Gym', amount: 3000, rule: monthly(12), autopay: false })
     render(<App />)
-    expect(await tile('This pay period safe to spend')).toMatch(/^€/)
+    // This period runs from October's pay (Fri 30 Oct, the 31st being a Saturday) to the
+    // next one: that pay, less the Gym bill on 12 Nov.
+    await waitFor(async () => expect(await tile('This pay period safe to spend')).toBe('€2,070.00'))
   })
 
   it('asks for a backup below the goals once two weeks pass without one', async () => {
@@ -218,8 +252,38 @@ describe('Today', () => {
     await oldBill('Rent', 95000, 1, false)
     render(<App />)
     const list = within(await screen.findByRole('region', { name: 'Coming up' }))
-    expect(list.getAllByRole('listitem')[0]!.textContent).toContain('Rent')
+    const row = within(list.getAllByRole('listitem')[0]!)
+    expect(row.getByText('Rent')).toBeTruthy()
+    // Overdue says so in words, next to the date, not by weight alone.
+    expect(row.getByText('Overdue')).toBeTruthy()
+    expect(row.getByRole('checkbox', { name: 'Rent, 1 Nov' })).toBeTruthy()
     expect(screen.queryByText('Did Rent go out?')).toBeNull()
+  })
+
+  it('a debt minimum ticked paid lowers "Still owed", and Debt shows the same amount', async () => {
+    await start(200000)
+    await r.addDebt({
+      name: 'Card',
+      balance: 50000,
+      balanceAsOf: '2026-11-01',
+      aprBps: 1999,
+      minPayment: 2500,
+      dueDay: 20,
+    })
+    render(<App />)
+    await waitFor(async () => expect(await heroAmount('Still owed')).toBe('€500.00'))
+    const list = within(await screen.findByRole('region', { name: 'Coming up' }))
+    await userEvent.click(list.getByRole('checkbox', { name: 'Card, 20 Nov' }))
+    await waitFor(async () => expect(await heroAmount('Still owed')).toBe('€475.00'))
+    expect(await tile('Debt minimums due monthly')).toBe('€25.00')
+
+    // The Debt screen reads the same owed amount, not the balance entered on 1 Nov.
+    cleanup()
+    window.history.replaceState(null, '', '/debt')
+    render(<App />)
+    const row = await screen.findByRole('button', { name: /^Card/ })
+    await waitFor(() => expect(row.textContent).toContain('€475.00'))
+    expect(row.textContent).not.toContain('€500.00')
   })
 })
 
@@ -265,12 +329,24 @@ describe('Coming up', () => {
     )
     await waitFor(() => expect((box as HTMLInputElement).checked).toBe(true))
     expect(await safeTile()).toBe('€1,970.00')
+    // Its name stays put ticked or not; the checked state says the rest.
+    expect(box.getAttribute('aria-label')).toBe('Gym, 12 Nov')
 
-    // And back again.
+    // One tap on Undo in the toast puts it back.
+    await userEvent.click(await undoToast('Gym paid'))
+    await waitFor(async () =>
+      expect((await r.listOccurrences()).find((o) => o.billId === gym.id)?.status).not.toBe('paid'),
+    )
+    await waitFor(() => expect((box as HTMLInputElement).checked).toBe(false))
+
+    // And ticking it off again, then back by hand.
+    await userEvent.click(box)
+    await waitFor(() => expect((box as HTMLInputElement).checked).toBe(true))
     await userEvent.click(box)
     await waitFor(async () =>
       expect((await r.listOccurrences()).find((o) => o.billId === gym.id)?.status).not.toBe('paid'),
     )
+    expect(await undoToast('Gym back to due')).toBeTruthy()
     expect(await safeTile()).toBe('€1,970.00')
   })
 
@@ -316,6 +392,40 @@ describe('Goals in motion', () => {
     ).toBeTruthy()
     expect((await r.listLifeGoals())[0]?.status).toBe('doing')
     await waitFor(async () => expect(await tile('Goals in progress')).toBe('1'))
+    expect(await undoToast('Learn to swim: in progress')).toBeTruthy()
+  })
+
+  it('a goal marked done leaves the list, and focus moves to the next pill', async () => {
+    await start(84250)
+    await r.addLifeGoal({ title: 'Swim', status: 'doing', targetDate: '2026-12-01' })
+    await r.addLifeGoal({ title: 'Paint', status: 'doing', targetDate: '2026-12-02' })
+    await r.addLifeGoal({ title: 'Sing', status: 'todo' })
+    render(<App />)
+    const section = within(await screen.findByRole('region', { name: 'Goals in motion' }))
+    const pill = (name: string) => section.findByRole('button', { name: new RegExp(`^${name}:`) })
+
+    // Keyboard: In progress -> Done. The row goes; the next goal's pill takes focus.
+    ;(await pill('Swim')).focus()
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(section.queryByText('Swim')).toBeNull())
+    expect(document.activeElement).toBe(await pill('Paint'))
+    expect(await undoToast('Swim: done')).toBeTruthy()
+
+    // The last row done: focus goes back to the one before it.
+    ;(await pill('Sing')).focus()
+    await userEvent.keyboard('{Enter}') // Not started -> In progress: stays focused
+    await section.findByRole('button', { name: 'Sing: In progress. Change status' })
+    expect(document.activeElement).toBe(await pill('Sing'))
+    // Sorted by date, Sing (none) is after Paint, so it's still last.
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(section.queryByText('Sing')).toBeNull())
+    expect(document.activeElement).toBe(await pill('Paint'))
+
+    // The only one left: focus lands on the section heading.
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(section.queryByText('Paint')).toBeNull())
+    expect(document.activeElement).toBe(section.getByRole('heading', { name: 'Goals in motion' }))
+    expect(section.getByRole('link', { name: 'Add a goal' })).toBeTruthy()
   })
 
   it('stays off Today in Simple mode, where Goals is hidden', async () => {

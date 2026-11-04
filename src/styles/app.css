@@ -139,7 +139,9 @@
 /*
  * Envelope colours (domain/categories.ts keys). Dots and bars, never text, so the bar is
  * 3:1 against every theme's surface and background (WCAG 1.4.11); contrast.test.ts checks
- * each pair. Muted, mid-tone hues: tellable apart, none of them alarm red.
+ * each pair. Muted, mid-tone hues: tellable apart, none of them alarm red. Everyday (the
+ * default envelope, stored as 'accent') has its own indigo, away from every palette hue,
+ * so it never looks like the envelope that happens to share the theme's accent.
  */
 :root {
   --env-clay: #b25a35;
@@ -152,6 +154,7 @@
   --env-slate: #5a6678;
   --env-olive: #6c7531;
   --env-amber: #a8611a;
+  --env-everyday: #5249b4;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-mode='light']) {
@@ -165,6 +168,7 @@
     --env-slate: #a9b5c7;
     --env-olive: #bcc47a;
     --env-amber: #eeaa63;
+    --env-everyday: #9893fa;
   }
 }
 :root[data-mode='dark'],
@@ -179,6 +183,7 @@
   --env-slate: #a9b5c7;
   --env-olive: #bcc47a;
   --env-amber: #eeaa63;
+  --env-everyday: #9893fa;
 }
 
 @theme inline {

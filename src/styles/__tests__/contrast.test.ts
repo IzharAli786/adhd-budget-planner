@@ -100,21 +100,50 @@ it.each([
   expect(ratio(a, b)).toBeCloseTo(expected, 1)
 })
 
+// OKLab distance: how far apart two colours look (0 = the same; the palette's own closest
+// pair, clay and amber, is about 0.04).
+function oklab(hex: string): [number, number, number] {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }) as [number, number, number]
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ]
+}
+const apart = (a: string, b: string) => {
+  const [x, y] = [oklab(a), oklab(b)]
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+}
+
 describe('envelope colours', () => {
+  // The palette keys, plus Everyday's own colour (the default envelope, stored as 'accent').
+  const KEYS = [...ENVELOPE_COLORS, 'everyday']
   // Every declaration in order: the light block, then the two dark blocks.
   const decls = [...css.matchAll(/--env-([\w]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1]!, m[2]!])
-  const light = Object.fromEntries(decls.slice(0, ENVELOPE_COLORS.length))
-  const darkMedia = Object.fromEntries(
-    decls.slice(ENVELOPE_COLORS.length, 2 * ENVELOPE_COLORS.length),
-  )
-  const darkForced = Object.fromEntries(decls.slice(2 * ENVELOPE_COLORS.length))
+  const light = Object.fromEntries(decls.slice(0, KEYS.length))
+  const darkMedia = Object.fromEntries(decls.slice(KEYS.length, 2 * KEYS.length))
+  const darkForced = Object.fromEntries(decls.slice(2 * KEYS.length))
 
-  it('defines every palette key once per mode, the same dark value in both dark blocks', () => {
-    expect(decls).toHaveLength(3 * ENVELOPE_COLORS.length)
+  it('defines every palette key and Everyday once per mode, the same dark value in both dark blocks', () => {
+    expect(decls).toHaveLength(3 * KEYS.length)
     for (const block of [light, darkMedia, darkForced])
-      expect(Object.keys(block).sort()).toEqual([...ENVELOPE_COLORS].sort())
+      expect(Object.keys(block).sort()).toEqual([...KEYS].sort())
     expect(darkForced).toEqual(darkMedia)
-    expect(new Set(Object.values(light)).size).toBe(ENVELOPE_COLORS.length)
+    expect(new Set(Object.values(light)).size).toBe(KEYS.length)
+    expect(new Set(Object.values(darkMedia)).size).toBe(KEYS.length)
+  })
+
+  // Everyday sits next to every other envelope in the charts, so it must not pass for one
+  // of them: at least twice as far from each as the palette's own closest pair.
+  it.each(ENVELOPE_COLORS)('Everyday is easy to tell from %s in light and dark', (key) => {
+    expect(apart(light.everyday!, light[key]!)).toBeGreaterThanOrEqual(0.08)
+    expect(apart(darkMedia.everyday!, darkMedia[key]!)).toBeGreaterThanOrEqual(0.08)
   })
 
   // Non-text marks (dots, bars): WCAG 1.4.11 asks 3:1 against what they sit on.
@@ -123,7 +152,7 @@ describe('envelope colours', () => {
       const tk = tokens(t)
       return [tk[`${prefix}-bg`]!, tk[`${prefix}-surface`]!].map((bg) => [t, bg] as const)
     })
-  it.each(ENVELOPE_COLORS)('%s is 3:1 on every light and dark surface', (key) => {
+  it.each(KEYS)('%s is 3:1 on every light and dark surface', (key) => {
     for (const [, bg] of surfaces('l')) expect(ratio(light[key]!, bg)).toBeGreaterThanOrEqual(3)
     for (const [, bg] of surfaces('d')) expect(ratio(darkMedia[key]!, bg)).toBeGreaterThanOrEqual(3)
   })

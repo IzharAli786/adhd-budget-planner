@@ -1,9 +1,13 @@
 import { isPaletteColor } from '../domain/categories'
 import { cx } from './cx'
 
-/** The CSS colour for an envelope's stored palette key; Everyday follows the theme accent. */
+/**
+ * The CSS colour for an envelope's stored palette key. Everyday (stored as 'accent') and
+ * rows from before colours existed get --env-everyday: its own hue, not the theme accent,
+ * which sits right next to one of the palette colours in every theme.
+ */
 export const envelopeColor = (color: string | undefined) =>
-  color && isPaletteColor(color) ? `var(--env-${color})` : 'var(--accent)'
+  color && isPaletteColor(color) ? `var(--env-${color})` : 'var(--env-everyday)'
 
 /** A small colour dot. Decorative: the envelope's name is always written next to it. */
 export function EnvelopeDot({ color, className }: { color?: string; className?: string }) {

@@ -1,6 +1,9 @@
 import type { SafeToSpend } from '../../domain/safeToSpend'
+import type { ISODate } from '../../domain/types'
 import { envelopeColor } from '../../ui/EnvelopeDot'
+import { cx } from '../../ui/cx'
 import type { Formatters } from '../bills/format'
+import { percentLabel, percents } from '../home/percents'
 
 const BILLS = 'var(--env-rose)'
 const SPENT = 'var(--env-amber)'
@@ -9,36 +12,51 @@ const ENVELOPES = 'var(--env-amber)'
 const DEBT = 'var(--env-rose)'
 const SAVINGS = 'var(--env-ocean)'
 const SAFE_LINE = 'var(--env-sage)'
-const SAFE_FILL = 'color-mix(in oklab, var(--env-sage) 16%, var(--surface))'
 const tint = (color: string, pct = 16) => `color-mix(in oklab, ${color} ${pct}%, var(--surface))`
+const SAFE_FILL = tint(SAFE_LINE)
+/** The empty part of a track: neutral, so it never reads as one of the coloured parts. */
+const TRACK = 'color-mix(in oklab, var(--text) 7%, var(--surface))'
 
 const colorOf = (d: { id: string; color?: string }) =>
   d.id === 'bills' ? BILLS : d.id === 'spending' ? SPENT : envelopeColor(d.color)
 
-/** Whole-number percentages that add up to exactly 100 (largest remainder). */
-function percents(values: readonly number[]): number[] {
-  const total = values.reduce((a, b) => a + b, 0)
-  if (total <= 0) return values.map(() => 0)
-  const raw = values.map((v) => (v / total) * 100)
-  const out = raw.map(Math.floor)
-  let left = 100 - out.reduce((a, b) => a + b, 0)
-  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0])
-  for (const [, i] of order) {
-    if (left <= 0) break
-    out[i]! += 1
-    left -= 1
-  }
-  return out
-}
+const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0)
 
 /**
- * "Income vs spending": what came in this period against what went out (bills plus
- * spending), as two bars on the same scale. Savings and debt payments are neither.
+ * "Income vs spending": money in this period against money out (bills plus spending), as
+ * two bars on one scale. Savings and debt payments are neither.
+ *
+ * Until a period is over, part of it has not happened yet: pay that hasn't landed, bills
+ * not yet due. That part is the lighter end of each bar, its amount is written under it,
+ * and the sentence says "coming in" rather than "came in".
  */
-export function IncomeVsSpending({ safe, f }: { safe: SafeToSpend; f: Formatters }) {
+export function IncomeVsSpending({
+  safe,
+  f,
+  today,
+  past = false,
+  unit = 'month',
+}: {
+  safe: SafeToSpend
+  f: Formatters
+  today: ISODate
+  /** The period has ended: everything in it has happened. */
+  past?: boolean
+  unit?: 'month' | 'pay period'
+}) {
+  const { flows } = safe
   const moneyIn = Math.max(0, safe.income)
   const spent = Math.max(0, safe.expenses)
   const moneyOut = safe.bills + spent
+  // What has already happened, by date (a bill ticked paid early counts as gone out).
+  const inSoFar =
+    sum(flows.paydays.filter((p) => p.date <= today).map((p) => p.amount)) +
+    sum(flows.loggedIncome.filter((t) => t.date <= today).map((t) => t.amount))
+  const outSoFar =
+    sum(
+      flows.billEntries.filter((e) => e.status === 'paid' || e.date <= today).map((e) => e.amount),
+    ) - sum(flows.spending.filter((t) => t.date <= today).map((t) => t.amount))
+  const clamp = (soFar: number, whole: number) => Math.min(whole, Math.max(0, soFar))
   const scale = Math.max(1, moneyIn, moneyOut)
   const diff = moneyIn - moneyOut
   const rows = [
@@ -46,6 +64,7 @@ export function IncomeVsSpending({ safe, f }: { safe: SafeToSpend; f: Formatters
       key: 'in',
       label: 'Money in',
       amount: moneyIn,
+      done: past ? moneyIn : clamp(inSoFar, moneyIn),
       color: IN,
       hint: 'Paydays and other income',
     },
@@ -53,6 +72,7 @@ export function IncomeVsSpending({ safe, f }: { safe: SafeToSpend; f: Formatters
       key: 'out',
       label: 'Money out',
       amount: moneyOut,
+      done: past ? moneyOut : clamp(outSoFar, moneyOut),
       color: SPENT,
       hint: `Bills ${f.money(safe.bills)} · spending ${f.money(spent)}`,
     },
@@ -60,42 +80,60 @@ export function IncomeVsSpending({ safe, f }: { safe: SafeToSpend; f: Formatters
   return (
     <div>
       <ul className="space-y-5">
-        {rows.map((r) => (
-          <li key={r.key}>
-            <p className="flex flex-wrap items-baseline justify-between gap-x-4">
-              <span className="text-body font-medium">{r.label}</span>
-              <span className="type-display text-heading">{f.money(r.amount)}</span>
-            </p>
-            <div
-              aria-hidden="true"
-              className="mt-2 h-4 overflow-hidden rounded-full"
-              style={{ backgroundColor: tint(r.color) }}
-            >
+        {rows.map((r) => {
+          const toCome = r.amount - r.done
+          return (
+            <li key={r.key}>
+              <p className="flex flex-wrap items-baseline justify-between gap-x-4">
+                <span className="text-body font-medium">{r.label}</span>
+                <span className="type-display text-heading">{f.money(r.amount)}</span>
+              </p>
               <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${(r.amount / scale) * 100}%`,
-                  minWidth: r.amount > 0 ? '0.5rem' : 0,
-                  backgroundColor: r.color,
-                }}
-              />
-            </div>
-            <p className="mt-1.5 text-caption text-muted tabular-nums">{r.hint}</p>
-          </li>
-        ))}
+                aria-hidden="true"
+                className="mt-2 flex h-4 overflow-hidden rounded-full"
+                style={{ backgroundColor: tint(r.color) }}
+              >
+                <div
+                  className={cx('h-full', toCome > 0 ? 'rounded-l-full' : 'rounded-full')}
+                  style={{
+                    width: `${(r.done / scale) * 100}%`,
+                    minWidth: r.done > 0 ? '0.5rem' : 0,
+                    backgroundColor: r.color,
+                  }}
+                />
+                {toCome > 0 && (
+                  <div
+                    className="h-full rounded-r-full"
+                    style={{
+                      width: `${(toCome / scale) * 100}%`,
+                      backgroundColor: tint(r.color, 45),
+                    }}
+                  />
+                )}
+              </div>
+              <p className="mt-1.5 text-caption text-muted tabular-nums">
+                {r.hint}
+                {toCome > 0 && ` · ${f.money(toCome)} still to come`}
+              </p>
+            </li>
+          )
+        })}
       </ul>
       <p className="mt-5 border-t border-line pt-4 text-body">
         {moneyIn === 0 && moneyOut === 0 ? (
-          <span className="text-muted">Nothing in or out yet.</span>
-        ) : diff >= 0 ? (
+          <span className="text-muted">
+            {past ? 'Nothing came in or went out.' : 'Nothing in or out yet.'}
+          </span>
+        ) : past ? (
           <>
-            <span className="font-semibold tabular-nums">{f.money(diff)}</span> more came in than
-            went out.
+            <span className="font-semibold tabular-nums">{f.money(Math.abs(diff))}</span>{' '}
+            {diff >= 0 ? 'more came in than went out.' : 'more went out than came in.'}
           </>
         ) : (
           <>
-            <span className="font-semibold tabular-nums">{f.money(-diff)}</span> more went out than
-            came in.
+            <span className="font-semibold tabular-nums">{f.money(Math.abs(diff))}</span>{' '}
+            {diff >= 0 ? 'more coming in than going out' : 'more going out than coming in'} by the
+            end of the {unit}.
           </>
         )}
         {safe.carriedIn !== 0 && (
@@ -119,19 +157,19 @@ export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters })
   const order = new Map(safe.envelopes.map((e, i) => [e.id, i]))
   const rank = (id: string) => order.get(id) ?? order.size
   const rows = [...safe.distribution].sort((a, b) => rank(a.id) - rank(b.id))
-  const total = rows.reduce((a, r) => a + r.amount, 0)
+  const total = sum(rows.map((r) => r.amount))
   if (total <= 0) return <p className="text-body text-muted">Nothing spent yet.</p>
   const pct = percents(rows.map((r) => r.amount))
   const R = 52
   const C = 2 * Math.PI * R
   const lens = rows.map((r) => (r.amount / total) * C)
-  const starts = lens.map((_, i) => lens.slice(0, i).reduce((a, b) => a + b, 0))
+  const starts = lens.map((_, i) => sum(lens.slice(0, i)))
   return (
     <div>
       <svg
         viewBox="0 0 140 140"
         aria-hidden="true"
-        className="h-44 w-44 shrink-0 -rotate-90 sm:h-52 sm:w-52"
+        className="h-44 w-44 shrink-0 -rotate-90 @xl:h-52 @xl:w-52"
       >
         {rows.map((r, i) => {
           const len = lens[i]!
@@ -160,7 +198,7 @@ export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters })
             />
             <span className="min-w-0 flex-1 truncate text-body">{r.name}</span>
             <span className="shrink-0 font-display text-body font-semibold">
-              {f.money(r.amount)} · {pct[i]}%
+              {f.money(r.amount)} · {percentLabel(r.amount, pct[i]!)}
             </span>
           </li>
         ))}
@@ -170,9 +208,14 @@ export function SpendingDonut({ safe, f }: { safe: SafeToSpend; f: Formatters })
 }
 
 /**
- * "Left to spend": the period's money as one bar. Envelopes (bills and spending), debt
- * paid, money saved, then what is still safe to spend; each part's width is its share of
- * their sum. The words and the "See the math" sheet carry the numbers.
+ * "Left to spend": the period's money in as one bar, cut into where it went. Envelopes
+ * (bills and spending), debt paid, money saved, then what is still free after those. The
+ * whole bar is the money in (starting balance or carry-over plus income); if the parts come
+ * to more than that, the bar is their sum instead.
+ *
+ * The big number is safe to spend, the same as Today's. Savings and debt never lower it
+ * (they are kept apart on purpose), so "Still free" can be less than it: the bar shows
+ * where the money actually is, the number what the plan lets you spend.
  */
 export function LeftToSpendBar({
   safe,
@@ -187,7 +230,8 @@ export function LeftToSpendBar({
   onSeeMath?: () => void
 }) {
   const short = safe.total < 0
-  const safeLabel = past ? 'Left over' : 'Safe to spend'
+  const debt = Math.max(0, safe.debtPaid)
+  const savings = Math.max(0, safe.savingsMoved)
   const parts = [
     {
       key: 'envelopes',
@@ -195,11 +239,17 @@ export function LeftToSpendBar({
       amount: Math.max(0, safe.bills + Math.max(0, safe.expenses)),
       color: ENVELOPES,
     },
-    { key: 'debt', label: 'Debt', amount: Math.max(0, safe.debtPaid), color: DEBT },
-    { key: 'savings', label: 'Savings', amount: Math.max(0, safe.savingsMoved), color: SAVINGS },
-    { key: 'safe', label: safeLabel, amount: Math.max(0, safe.total), color: SAFE_FILL },
+    { key: 'debt', label: 'Debt', amount: debt, color: DEBT },
+    { key: 'savings', label: 'Savings', amount: savings, color: SAVINGS },
+    {
+      key: 'free',
+      label: 'Still free',
+      amount: Math.max(0, safe.total - debt - savings),
+      color: SAFE_FILL,
+    },
   ]
-  const whole = parts.reduce((a, p) => a + p.amount, 0)
+  const moneyIn = Math.max(0, safe.income + safe.carriedIn)
+  const whole = Math.max(moneyIn, sum(parts.map((p) => p.amount)))
   const shown = parts.filter((p) => p.amount > 0)
   return (
     <div>
@@ -218,21 +268,27 @@ export function LeftToSpendBar({
         role="img"
         aria-label={
           whole > 0
-            ? parts.map((p) => `${p.label} ${f.money(p.amount)}`).join(', ')
+            ? `${f.money(moneyIn)} in: ${parts.map((p) => `${p.label} ${f.money(p.amount)}`).join(', ')}`
             : 'Nothing in or out yet'
         }
         className="mt-4 flex h-8 overflow-hidden rounded-full"
-        style={{ backgroundColor: SAFE_FILL }}
+        style={{ backgroundColor: TRACK }}
       >
         {whole > 0 &&
-          shown.map((p) => (
+          shown.map((p, i) => (
             <div
               key={p.key}
-              className={p.key === 'safe' ? 'border-l-2 border-dashed' : undefined}
+              data-part={p.key}
+              className={cx(
+                i === 0 && 'rounded-l-full',
+                i === shown.length - 1 && 'rounded-r-full',
+                // The light part's edge has to show against the card, so it is outlined.
+                p.key === 'free' && 'border-[1.5px] border-dashed',
+              )}
               style={{
                 width: `${(p.amount / whole) * 100}%`,
                 backgroundColor: p.color,
-                borderColor: p.key === 'safe' ? SAFE_LINE : undefined,
+                borderColor: p.key === 'free' ? SAFE_LINE : undefined,
               }}
             />
           ))}
@@ -243,12 +299,12 @@ export function LeftToSpendBar({
             <span
               aria-hidden="true"
               className={
-                p.key === 'safe'
+                p.key === 'free'
                   ? 'h-3 w-3 rounded-[3px] border-[1.5px] border-dashed'
                   : 'h-3 w-3 rounded-[3px]'
               }
               style={
-                p.key === 'safe'
+                p.key === 'free'
                   ? { borderColor: SAFE_LINE, backgroundColor: SAFE_FILL }
                   : { backgroundColor: p.color }
               }
@@ -257,6 +313,10 @@ export function LeftToSpendBar({
           </li>
         ))}
       </ul>
+      <p className="mt-2 text-caption text-muted">
+        Savings and debt show in the bar, but they never lower{' '}
+        {past ? 'what’s left over' : 'safe to spend'}.
+      </p>
       {onSeeMath && (
         <button
           type="button"

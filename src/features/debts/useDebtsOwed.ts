@@ -26,13 +26,13 @@ export function withOwed(
 ): OwedDebt[] {
   if (debts.length === 0) return []
   const from = debts.reduce((d, x) => (x.balanceAsOf < d ? x.balanceAsOf : d), today)
-  const minimums = billEntriesBetween(
+  const minimumEntries = billEntriesBetween(
     bills.filter((b) => b.debtId !== undefined),
     occurrences,
     from,
     addDays(today, PAID_AHEAD_DAYS),
   )
-  return debts.map((d) => ({ ...d, owed: debtOwed(d, transactions, minimums) }))
+  return debts.map((d) => ({ ...d, owed: debtOwed(d, transactions, minimumEntries) }))
 }
 
 /** Every live debt with what is still owed on it; undefined while loading. */
